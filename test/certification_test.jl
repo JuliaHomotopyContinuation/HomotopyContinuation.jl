@@ -448,12 +448,8 @@
         cert = HomotopyContinuation.certify_solution(f, sol, q, c, 1, false)
         @test is_certified(cert)
     end
-end
 
-include("../bsp.jl")
-
-@testset "BSP certification for ResultIterator" begin
-    @testset "parameterized iterator" begin
+    @testset "BSP certification: parameterized iterator" begin
         d = 2
         @var x y a[1:6]
         F = System(
@@ -476,7 +472,7 @@ include("../bsp.jl")
         @test summary.distinct_certified == 3
     end
 
-    @testset "parameter-free iterator" begin
+    @testset "BSP certification: parameter-free iterator" begin
         @var x y
         F = System([x^2 - 1, y - 1], [x, y])
         iter = solve(F; iterator_only = true, start_system = :total_degree)
@@ -489,7 +485,7 @@ include("../bsp.jl")
         @test summary.not_certified == 0
     end
 
-    @testset "bitmasked iterator" begin
+    @testset "BSP certification: bitmasked iterator" begin
         d = 2
         @var x y a[1:6]
         F = System(
@@ -510,7 +506,7 @@ include("../bsp.jl")
         @test summary.distinct_certified == 3
     end
 
-    @testset "iterator from iterator start solutions" begin
+    @testset "BSP certification: iterator from iterator start solutions" begin
         @var x y p
         f₁ = y - x^2 + p
         f₂ = y - x^3 - p
@@ -541,3 +537,4 @@ include("../bsp.jl")
         @test summary.certified ≤ nfinite_results
     end
 end
+

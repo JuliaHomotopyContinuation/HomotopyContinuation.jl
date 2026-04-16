@@ -1836,15 +1836,36 @@ end
 Binary spatial partition of the real line used to group certified solutions from a
 `ResultIterator` without materializing all solutions at once.
 
-The `tree` maps each leaf interval to the solution entries currently assigned to it.
-The `leaves` vector stores the same leaf intervals in sorted order, and
-`unsplittable` records leaves that cannot be refined further using only the chosen
-coordinate projection.
+The `tree` maps each leaf interval to the number of certified solutions assigned to
+that leaf after it has been processed. The `leaves` vector stores the same leaf
+intervals in sorted order, and `unsplittable` records leaves that cannot be refined
+further using only the chosen coordinate projection.
 """
 mutable struct BSPPartition
-    tree::IntervalTrees.IntervalMap{Float64,Vector{BSPBucketEntry}}
+    tree::IntervalTrees.IntervalMap{Float64,Int}
     leaves::Vector{IntervalTrees.Interval{Float64}}
     unsplittable::Set{Tuple{Float64,Float64}}
+end
+
+function Base.show(io::IO, bsp::BSPPartition; nshow::Int = 10)
+    println(io, "BSPPartition")
+    println(io, "============")
+    k = 1
+    l = 1
+    L = bsp.leaves
+    nleaves = length(L)
+    while k ≤ nleaves && l ≤ nshow
+        leaf = L[k]
+        c = _bucket_count(bsp, leaf)
+        if c > 0
+            println(io, "• ($(first(leaf)), $(last(leaf))) => $c")
+            l += 1
+        end
+        k += 1
+    end
+    if l == nshow + 1
+        println(io, " ... (skipped $(k - l - 1))")
+    end
 end
 
 """
@@ -1945,26 +1966,18 @@ Create the initial BSP partition of the real line from a set of finite boundarie
 """
 function _build_partition(boundaries)
     # Build the initial coarse partition of the real line.
-    tree = IntervalTrees.IntervalMap{Float64,Vector{BSPBucketEntry}}()
+    # Each leaf stores only a count; per-solution intervals are recollected locally.
+    tree = IntervalTrees.IntervalMap{Float64,Int}()
     leaves = IntervalTrees.Interval{Float64}[]
     normalized = _normalize_boundaries(boundaries)
     for i in 1:(length(normalized) - 1)
         interval = IntervalTrees.Interval(normalized[i], normalized[i + 1])
-        tree[interval] = BSPBucketEntry[]
+        tree[interval] = 0
         push!(leaves, interval)
     end
     BSPPartition(tree, leaves, Set{Tuple{Float64,Float64}}())
 end
-
-# Each reassignment pass starts from empty buckets and streams through the iterator again.
-function _clear_partition!(bsp::BSPPartition)
-    for leaf in bsp.leaves
-        empty!(_bucket_entries(bsp, leaf))
-    end
-    bsp
-end
-
-_bucket_entries(bsp::BSPPartition, leaf) = IntervalTrees.value(bsp.tree[leaf])
+_bucket_count(bsp::BSPPartition, leaf) = IntervalTrees.value(bsp.tree[leaf])
 
 function _find_bucket(bsp::BSPPartition, interval)
     for match in IntervalTrees.intersect(bsp.tree, interval)
@@ -1998,23 +2011,18 @@ function _merge_covering_leaves!(bsp::BSPPartition, interval)
     end
 
     # Merge the touched leaves into one larger leaf so `interval` fits into a single bucket.
+    # Only counts survive this merge; the leaf-local entries will be recollected on demand.
     merged_leaf = IntervalTrees.Interval(first(bsp.leaves[left]), last(bsp.leaves[right]))
-    merged_entries = BSPBucketEntry[]
-    total_entries = 0
-    for i in left:right
-        total_entries += length(_bucket_entries(bsp, bsp.leaves[i]))
-    end
-    sizehint!(merged_entries, total_entries)
-
+    merged_count = 0
     for i in left:right
         leaf = bsp.leaves[i]
-        append!(merged_entries, _bucket_entries(bsp, leaf))
+        merged_count += _bucket_count(bsp, leaf)
         delete!(bsp.tree, leaf)
         delete!(bsp.unsplittable, _bucket_id(leaf))
     end
 
     splice!(bsp.leaves, left:right, [merged_leaf])
-    bsp.tree[merged_leaf] = merged_entries
+    bsp.tree[merged_leaf] = merged_count
     return true
 end
 
@@ -2028,36 +2036,23 @@ function _ensure_bucket!(bsp::BSPPartition, interval)
     end
 end
 
-"""
-    _assign_solutions!(bsp, iter, F, cert_params, cert_cache; ...)
-
-Stream once through `iter`, certify each finite result, and assign the certified
-interval to the unique BSP leaf that fully contains its projected interval.
-"""
-function _assign_solutions!(
-    bsp::BSPPartition,
+function _iterator_certification_stats(
     iter,
     F,
     cert_params,
     cert_cache;
-    coordinate::Int = 1,
     max_precision::Int = 256,
     refine_solution::Bool = true,
     extended_certificate::Bool = false,
     certify_solution_kwargs...,
 )
-    # Reuse the existing bucket vectors and repopulate them in a fresh streaming pass.
-    _clear_partition!(bsp)
     stats = BSPAssignmentStats()
+    # This first pass only computes global counters and never stores projected intervals.
     for result in iter
-        # We index by the position inside the iterator so that we can later revisit
-        # exactly the same solutions without storing all of them in memory.
         stats.total_results += 1
         isfinite(result) || continue
 
         stats.finite_results += 1
-
-        # Certify one solution candidate at a time, matching the memory goal of the iterator.
         cert = certify_solution(
             F,
             solution(result),
@@ -2077,14 +2072,58 @@ function _assign_solutions!(
         stats.certified += 1
         stats.certified_real += Int(is_real(cert))
         stats.certified_complex += Int(is_complex(cert))
-
-        interval = _convert_to_interval(cert; coordinate = coordinate)
-        # If a certified interval straddles an existing BSP cut, merge the touched
-        # leaves so the interval is again fully contained in one bucket.
-        match = _ensure_bucket!(bsp, interval)
-        push!(IntervalTrees.value(match), BSPBucketEntry(stats.total_results, interval))
     end
     stats
+end
+
+function _collect_leaf_entries!(
+    bsp::BSPPartition,
+    leaf,
+    iter,
+    F,
+    cert_params,
+    cert_cache;
+    coordinate::Int = 1,
+    max_precision::Int = 256,
+    refine_solution::Bool = true,
+    extended_certificate::Bool = false,
+    certify_solution_kwargs...,
+)
+    # Revisit the iterator and keep projected intervals only for the current leaf.
+    entries = BSPBucketEntry[]
+    idx = 0
+    for result in iter
+        idx += 1
+        isfinite(result) || continue
+
+        cert = certify_solution(
+            F,
+            solution(result),
+            cert_params,
+            cert_cache,
+            idx;
+            max_precision = max_precision,
+            refine_solution = refine_solution,
+            extended_certificate = extended_certificate,
+            certify_solution_kwargs...,
+        )
+        is_certified(cert) || continue
+
+        interval = _convert_to_interval(cert; coordinate = coordinate)
+        if last(interval) < first(leaf) || last(leaf) < first(interval)
+            continue
+        elseif first(leaf) <= first(interval) && last(interval) <= last(leaf)
+            push!(entries, BSPBucketEntry(idx, interval))
+        else
+            # If a certified interval crosses the current cut, coarsen the BSP locally
+            # and restart the collection for the merged leaf.
+            match = _ensure_bucket!(bsp, interval)
+            merged_leaf = IntervalTrees.Interval(first(match), last(match))
+            return entries, merged_leaf, false
+        end
+    end
+
+    return entries, leaf, true
 end
 
 """
@@ -2116,60 +2155,21 @@ function _largest_gap(entries::Vector{BSPBucketEntry})
     split_point
 end
 
-"""
-    split_tree!(bsp, k)
+function _split_leaf!(bsp::BSPPartition, leaf, split_point)
+    # Split a single leaf in place and initialize the child counts to zero.
+    left_leaf = IntervalTrees.Interval(first(leaf), split_point)
+    right_leaf = IntervalTrees.Interval(split_point, last(leaf))
+    i = findfirst(==(leaf), bsp.leaves)
+    isnothing(i) && error("Internal BSP error: leaf $leaf not found during split.")
 
-Refine all BSP leaves that contain more than `k` entries by splitting them at a gap
-between projected certified intervals. Leaves with no such gap are marked unsplittable.
+    delete!(bsp.tree, leaf)
+    delete!(bsp.unsplittable, _bucket_id(leaf))
+    bsp.tree[left_leaf] = 0
+    bsp.tree[right_leaf] = 0
 
-Returns the number of leaves that were split.
-"""
-function split_tree!(bsp::BSPPartition, k::Integer)
-    nsplits = 0
-    i = 1
-    while i <= length(bsp.leaves)
-        leaf = bsp.leaves[i]
-        entries = _bucket_entries(bsp, leaf)
-        if length(entries) ≤ k || _bucket_id(leaf) in bsp.unsplittable
-            i += 1
-            continue
-        end
-
-        # We only split at a genuine gap. This guarantees that no certified interval
-        # is cut by the refinement step.
-        split_point = _largest_gap(entries)
-        if isnothing(split_point)
-            push!(bsp.unsplittable, _bucket_id(leaf))
-            i += 1
-            continue
-        end
-
-        # Split only the current leaf and reuse one of its bucket vectors.
-        left_leaf = IntervalTrees.Interval(first(leaf), split_point)
-        right_leaf = IntervalTrees.Interval(split_point, last(leaf))
-        left_entries = entries
-        empty!(left_entries)
-
-        delete!(bsp.tree, leaf)
-        delete!(bsp.unsplittable, _bucket_id(leaf))
-        bsp.tree[left_leaf] = left_entries
-        bsp.tree[right_leaf] = BSPBucketEntry[]
-
-        bsp.leaves[i] = left_leaf
-        insert!(bsp.leaves, i + 1, right_leaf)
-        nsplits += 1
-        i += 2
-    end
-
-    nsplits
-end
-
-function _count_oversized_buckets(bsp::BSPPartition, k::Integer)
-    n = 0
-    for leaf in bsp.leaves
-        n += Int(length(_bucket_entries(bsp, leaf)) > k)
-    end
-    n
+    bsp.leaves[i] = left_leaf
+    insert!(bsp.leaves, i + 1, right_leaf)
+    return left_leaf, right_leaf
 end
 
 function _count_distinct_certificates!(d)
@@ -2184,6 +2184,152 @@ function _count_distinct_certificates!(d)
         end
     end
     return ndistinct, nreal, ncomplex
+end
+
+function _set_leaf_count!(bsp::BSPPartition, leaf, count::Int)
+    # Once a leaf is terminal, we keep only its final count in the persistent BSP.
+    bsp.tree[leaf] = count
+    count
+end
+
+function _leaf_stats(bsp::BSPPartition, k::Integer)
+    max_bucket_size = 0
+    oversized_buckets = 0
+    for leaf in bsp.leaves
+        count = _bucket_count(bsp, leaf)
+        max_bucket_size = max(max_bucket_size, count)
+        oversized_buckets += Int(count > k)
+    end
+    return max_bucket_size, oversized_buckets
+end
+
+function _process_leaf!(
+    bsp::BSPPartition,
+    leaf,
+    iter::ResultIterator,
+    F::AbstractSystem,
+    cert_params,
+    cache::CertificationCache,
+    d::DistinctCertifiedSolutions;
+    k::Integer = 32,
+    coordinate::Int = 1,
+    max_refinement_rounds::Int = 50,
+    depth::Int = 0,
+    max_precision::Int = 256,
+    refine_solution::Bool = true,
+    extended_certificate::Bool = false,
+    certify_solution_kwargs...,
+)
+    # Process one leaf subtree depth-first so only the current branch lives in memory.
+    current_leaf = leaf
+    entries = BSPBucketEntry[]
+    while true
+        entries, updated_leaf, stable = _collect_leaf_entries!(
+            bsp,
+            current_leaf,
+            iter,
+            F,
+            cert_params,
+            cache;
+            coordinate = coordinate,
+            max_precision = max_precision,
+            refine_solution = refine_solution,
+            extended_certificate = extended_certificate,
+            certify_solution_kwargs...,
+        )
+        current_leaf = updated_leaf
+        stable && break
+    end
+
+    bucket_size = length(entries)
+    if bucket_size > k && depth < max_refinement_rounds
+        split_point = _largest_gap(entries)
+        if !isnothing(split_point)
+            # Recurse immediately on the two children and discard the parent entries.
+            left_leaf, right_leaf = _split_leaf!(bsp, current_leaf, split_point)
+            left_counts = _process_leaf!(
+                bsp,
+                left_leaf,
+                iter,
+                F,
+                cert_params,
+                cache,
+                d;
+                k = k,
+                coordinate = coordinate,
+                max_refinement_rounds = max_refinement_rounds,
+                depth = depth + 1,
+                max_precision = max_precision,
+                refine_solution = refine_solution,
+                extended_certificate = extended_certificate,
+                certify_solution_kwargs...,
+            )
+            right_counts = _process_leaf!(
+                bsp,
+                right_leaf,
+                iter,
+                F,
+                cert_params,
+                cache,
+                d;
+                k = k,
+                coordinate = coordinate,
+                max_refinement_rounds = max_refinement_rounds,
+                depth = depth + 1,
+                max_precision = max_precision,
+                refine_solution = refine_solution,
+                extended_certificate = extended_certificate,
+                certify_solution_kwargs...,
+            )
+            return (
+                distinct_certified = left_counts.distinct_certified + right_counts.distinct_certified,
+                distinct_real = left_counts.distinct_real + right_counts.distinct_real,
+                distinct_complex = left_counts.distinct_complex + right_counts.distinct_complex,
+                refinement_steps = left_counts.refinement_steps + right_counts.refinement_steps + 1,
+                rightmost_leaf = right_counts.rightmost_leaf,
+            )
+        end
+        # No safe gap exists in the chosen projection, so this leaf becomes terminal.
+        push!(bsp.unsplittable, _bucket_id(current_leaf))
+    end
+
+    _set_leaf_count!(bsp, current_leaf, bucket_size)
+    isempty(entries) &&
+        return (
+            distinct_certified = 0,
+            distinct_real = 0,
+            distinct_complex = 0,
+            refinement_steps = 0,
+            rightmost_leaf = current_leaf,
+        )
+
+    sols = _collect_bucket_solutions(iter, entries)
+    empty!(d)
+    length(entries) == length(sols) ||
+        error("Internal BSP error: bucket entries and recollected solutions disagree.")
+    for (entry, sol) in zip(entries, sols)
+        add_solution!(
+            d,
+            sol,
+            entry.index,
+            1;
+            max_precision = max_precision,
+            refine_solution = refine_solution,
+            extended_certificate = extended_certificate,
+            certify_solution_kwargs...,
+        )
+    end
+
+    # Distinct counts can be summed across terminal leaves because different leaves
+    # are disjoint in the chosen projected coordinate.
+    ndistinct, nreal, ncomplex = _count_distinct_certificates!(d)
+    return (
+        distinct_certified = ndistinct,
+        distinct_real = nreal,
+        distinct_complex = ncomplex,
+        refinement_steps = 0,
+        rightmost_leaf = current_leaf,
+    )
 end
 
 function _bucket_bitmask(iter::ResultIterator, entries::Vector{BSPBucketEntry})
@@ -2274,6 +2420,7 @@ The algorithm works in two phases:
 
 Returns `(bsp, summary)` where `summary` is a [`IteratorCertificationSummary`](@ref).
 """
+
 function _certify_iterator_bsp(
     iter::ResultIterator,
     F::AbstractSystem,
@@ -2282,58 +2429,30 @@ function _certify_iterator_bsp(
     k::Integer = 32,
     coordinate::Int = 1,
     boundaries = -10:10,
-    max_refinement_rounds::Int = typemax(Int),
+    max_refinement_rounds::Int = 50,
+    check_oversized_buckets::Bool = true,
     max_precision::Int = 256,
     refine_solution::Bool = true,
     extended_certificate::Bool = false,
     certify_solution_kwargs...,
 )
-    # Phase 1: build the BSP and repeatedly refine it until every splittable leaf is small enough.
+    # First collect the global certification counters without storing projected
+    # intervals for every certified solution.
     bsp = _build_partition(boundaries)
-
-    assignment_stats = _assign_solutions!(
-        bsp,
+    assignment_stats = _iterator_certification_stats(
         iter,
         F,
         cert_params,
         cache;
-        coordinate = coordinate,
         max_precision = max_precision,
         refine_solution = refine_solution,
         extended_certificate = extended_certificate,
         certify_solution_kwargs...,
     )
 
-    rounds = 0
-    while rounds < max_refinement_rounds
-        heavy_buckets = _count_oversized_buckets(bsp, k)
-        heavy_buckets == 0 && break
-
-        nsplits = split_tree!(bsp, k)
-        nsplits == 0 && break
-
-        # After every refinement step we recompute the bucket assignment from scratch.
-        # This keeps the implementation simple and still respects the streaming model.
-        assignment_stats = _assign_solutions!(
-            bsp,
-            iter,
-            F,
-            cert_params,
-            cache;
-            coordinate = coordinate,
-            max_precision = max_precision,
-            refine_solution = refine_solution,
-            extended_certificate = extended_certificate,
-            certify_solution_kwargs...,
-        )
-        rounds += 1
-    end
-
     distinct_certified = 0
     distinct_real = 0
     distinct_complex = 0
-    max_bucket_size = 0
-    oversized_buckets = 0
     params = isnothing(cert_params) ? nothing : complexF64_params(cert_params)
     d = DistinctCertifiedSolutions(
         F,
@@ -2341,40 +2460,41 @@ function _certify_iterator_bsp(
         extended_certificate = extended_certificate,
     )
 
-    # Phase 2: revisit the iterator bucket-by-bucket and certify only those solutions jointly.
-    for leaf in bsp.leaves
-        entries = _bucket_entries(bsp, leaf)
-        isempty(entries) && continue
+    refinement_steps = 0
+    i = 1
+    while i <= length(bsp.leaves)
+        # Walk the current leaf partition from left to right. Processing one leaf may
+        # split it into a whole local subtree, so we resume after the rightmost child.
+        leaf = bsp.leaves[i]
+        counts = _process_leaf!(
+            bsp,
+            leaf,
+            iter,
+            F,
+            cert_params,
+            cache,
+            d;
+            k = k,
+            coordinate = coordinate,
+            max_refinement_rounds = max_refinement_rounds,
+            max_precision = max_precision,
+            refine_solution = refine_solution,
+            extended_certificate = extended_certificate,
+            certify_solution_kwargs...,
+        )
+        distinct_certified += counts.distinct_certified
+        distinct_real += counts.distinct_real
+        distinct_complex += counts.distinct_complex
+        refinement_steps += counts.refinement_steps
+        rightmost_index = findfirst(==(counts.rightmost_leaf), bsp.leaves)
+        isnothing(rightmost_index) &&
+            error("Internal BSP error: processed leaf $(counts.rightmost_leaf) disappeared.")
+        i = rightmost_index + 1
+    end
 
-        bucket_size = length(entries)
-        max_bucket_size = max(max_bucket_size, bucket_size)
-        oversized_buckets += Int(bucket_size > k)
-
-        # Only the current bucket is materialized here; all other solutions remain in
-        # the iterator and are revisited on demand.
-        sols = _collect_bucket_solutions(iter, entries)
-        empty!(d)
-        length(entries) == length(sols) ||
-            error("Internal BSP error: bucket entries and recollected solutions disagree.")
-        for (entry, sol) in zip(entries, sols)
-            add_solution!(
-                d,
-                sol,
-                entry.index,
-                1;
-                max_precision = max_precision,
-                refine_solution = refine_solution,
-                extended_certificate = extended_certificate,
-                certify_solution_kwargs...,
-            )
-        end
-
-        # Distinct counts can be accumulated bucketwise since different BSP leaves are
-        # disjoint in the chosen projected coordinate.
-        ndistinct, nreal, ncomplex = _count_distinct_certificates!(d)
-        distinct_certified += ndistinct
-        distinct_real += nreal
-        distinct_complex += ncomplex
+    max_bucket_size, oversized_buckets = _leaf_stats(bsp, k)
+    if oversized_buckets > 0 && !check_oversized_buckets
+        oversized_buckets = 0
     end
 
     summary = IteratorCertificationSummary(;
@@ -2391,7 +2511,7 @@ function _certify_iterator_bsp(
         max_bucket_size = max_bucket_size,
         oversized_buckets = oversized_buckets,
         unsplittable_buckets = length(bsp.unsplittable),
-        refinement_rounds = rounds,
+        refinement_rounds = refinement_steps,
     )
 
     return bsp, summary
