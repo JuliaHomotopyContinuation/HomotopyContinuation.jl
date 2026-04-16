@@ -2028,7 +2028,7 @@ refinement_rounds(R::IteratorCertificationResult) = R.refinement_rounds
 
 function Base.show(io::IO, summary::IteratorCertificationResult)
     println(io, "IteratorCertificationResult")
-    println(io, "=======================")
+    println(io, "===========================")
     println(
         io,
         "• $(summary.certified) certified intervals " *
