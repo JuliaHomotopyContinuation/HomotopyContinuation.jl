@@ -2605,9 +2605,9 @@ function _process_leaf!(
         )
     end
 
-    if bucket_size > k
-        # Oversized buckets are recollected in full only when the caller explicitly
-        # allows us to certify them despite exceeding the target bucket size.
+    # Before final joint certification, recollect the full terminal bucket. The
+    # one-entry reservoir sample above is only for proposing memory-bounded splits.
+    if !isempty(entries)
         while true
             entries, bucket_size, updated_leaf, stable = _collect_leaf_entries!(
                 bsp,
