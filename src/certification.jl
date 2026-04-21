@@ -2303,15 +2303,7 @@ function _collect_leaf_entries!(
     return entries, bucket_size, leaf, true
 end
 
-"""
-    _sample_split_points(entries, leaf; ε = 1e-4)
-
-Return up to two candidate split points from one sampled projected certified interval
-inside `leaf`: first `ε` to the left, then `ε` to the right, and finally one random
-admissible split point. If the sampled interval leaves no room for a safe split,
-return an empty tuple.
-"""
-function _sample_split_points(entries::Vector{BSPBucketEntry}, leaf; ε::Float64 = 1e-4)
+function _left_right_split_points(entries::Vector{BSPBucketEntry}, leaf; ε::Float64 = 1e-4)
     isempty(entries) && return ()
 
     # We deliberately use only one sampled certified interval here to keep the split
@@ -2321,7 +2313,23 @@ function _sample_split_points(entries::Vector{BSPBucketEntry}, leaf; ε::Float64
     right_gap = last(leaf) - last(interval)
     left_split = left_gap > ε ? (first(interval) - ε) : nothing
     right_split = right_gap > ε ? (last(interval) + ε) : nothing
-    random_split = nothing
+
+    candidates = Float64[]
+    !isnothing(left_split) && push!(candidates, left_split)
+    !isnothing(right_split) && push!(candidates, right_split)
+    return Tuple(candidates)
+end
+
+"""
+    _random_split_point(entries, leaf; ε = 1e-4)
+
+Return one random admissible split point outside the sampled certified interval.
+If the sampled interval leaves no room for a safe split, return `nothing`.
+"""
+function _random_split_point(entries::Vector{BSPBucketEntry}, leaf; ε::Float64 = 1e-4)
+    isempty(entries) && return nothing
+
+    interval = entries[1].interval
 
     left_lo = first(leaf)
     left_hi = first(interval) - ε
@@ -2332,25 +2340,13 @@ function _sample_split_points(entries::Vector{BSPBucketEntry}, leaf; ε::Float64
     total_width = left_width + right_width
     if total_width > 0
         t = rand() * total_width
-        random_split = if t < left_width
+        return if t < left_width
             left_lo + t
         else
             right_lo + (t - left_width)
         end
     end
-
-    if isnothing(left_split) && isnothing(right_split) && isnothing(random_split)
-        return ()
-    end
-
-    candidates = Float64[]
-    !isnothing(left_split) && push!(candidates, left_split)
-    !isnothing(right_split) && push!(candidates, right_split)
-    if !isnothing(random_split) &&
-       all(!isapprox(random_split, c; atol = 0.0, rtol = 0.0) for c in candidates)
-        push!(candidates, random_split)
-    end
-    return Tuple(candidates)
+    nothing
 end
 
 function _verify_split!(
@@ -2592,13 +2588,13 @@ function _process_leaf!(
         split_attempts = 0
         while split_attempts < 8
             split_attempts += 1
-            candidate_points = _sample_split_points(entries, current_leaf; ε = ε)
-            isempty(candidate_points) && break
 
             # Restrict all split checks to the current bucket instead of rescanning the
             # parent iterator. Entry indices remain relative to `bucket_iter`.
             bucket_iter = _bucket_iterator(iter, entries)
-            for split_point in candidate_points
+            deterministic_points = _left_right_split_points(entries, current_leaf; ε = ε)
+            restart_from_merged_leaf = false
+            for split_point in deterministic_points
                 verification = _verify_split!(
                     bsp,
                     current_leaf,
@@ -2628,10 +2624,10 @@ function _process_leaf!(
                         max_entries = nothing,
                         max_precision = max_precision,
                         refine_solution = refine_solution,
-                        extended_certificate = extended_certificate,
-                        certify_solution_kwargs...,
-                    )
-                    bucket_size ≤ k && break
+                            extended_certificate = extended_certificate,
+                            certify_solution_kwargs...,
+                        )
+                    restart_from_merged_leaf = true
                     break
                 elseif verification.valid
                     # Step 3: reuse the partition computed during verification. Each child
@@ -2697,7 +2693,203 @@ function _process_leaf!(
                 end
             end
 
+            restart_from_merged_leaf && continue
+            if isempty(deterministic_points)
+                random_split = _random_split_point(entries, current_leaf; ε = ε)
+                isnothing(random_split) && break
+                verification = _verify_split!(
+                    bsp,
+                    current_leaf,
+                    random_split,
+                    bucket_iter,
+                    F,
+                    cert_params,
+                    cache;
+                    coordinate = coordinate,
+                    max_precision = max_precision,
+                    refine_solution = refine_solution,
+                    extended_certificate = extended_certificate,
+                    certify_solution_kwargs...,
+                )
+
+                if !verification.stable
+                    # A certified interval crossed the current BSP cut, so the leaf had
+                    # to be merged. Restart from the merged leaf using the broader iterator.
+                    entries, bucket_size, current_leaf = _stable_leaf_entries!(
+                        bsp,
+                        verification.leaf,
+                        iter,
+                        F,
+                        cert_params,
+                        cache;
+                        coordinate = coordinate,
+                        max_entries = nothing,
+                        max_precision = max_precision,
+                        refine_solution = refine_solution,
+                            extended_certificate = extended_certificate,
+                            certify_solution_kwargs...,
+                        )
+                    continue
+                elseif verification.valid
+                    # Step 3: reuse the partition computed during verification. Each child
+                    # gets its own bucket iterator, so recursion never has to rediscover
+                    # which entries belong to the left/right subtree.
+                    left_leaf, right_leaf = _split_leaf!(bsp, current_leaf, random_split)
+                    left_iter = _bucket_iterator(bucket_iter, verification.left_entries)
+                    right_iter = _bucket_iterator(bucket_iter, verification.right_entries)
+                    left_entries = _reindex_bucket_entries(verification.left_entries)
+                    right_entries = _reindex_bucket_entries(verification.right_entries)
+                    left_counts = _process_leaf!(
+                        bsp,
+                        left_leaf,
+                        left_iter,
+                        F,
+                        cert_params,
+                        cache,
+                        d;
+                        k = k,
+                        certify_oversized_buckets = certify_oversized_buckets,
+                        ε = ε,
+                        coordinate = coordinate,
+                        max_refinement_rounds = max_refinement_rounds,
+                        depth = depth + 1,
+                        initial_entries = left_entries,
+                        max_precision = max_precision,
+                        refine_solution = refine_solution,
+                        extended_certificate = extended_certificate,
+                        certify_solution_kwargs...,
+                    )
+                    right_counts = _process_leaf!(
+                        bsp,
+                        right_leaf,
+                        right_iter,
+                        F,
+                        cert_params,
+                        cache,
+                        d;
+                        k = k,
+                        certify_oversized_buckets = certify_oversized_buckets,
+                        ε = ε,
+                        coordinate = coordinate,
+                        max_refinement_rounds = max_refinement_rounds,
+                        depth = depth + 1,
+                        initial_entries = right_entries,
+                        max_precision = max_precision,
+                        refine_solution = refine_solution,
+                        extended_certificate = extended_certificate,
+                        certify_solution_kwargs...,
+                    )
+                    return (
+                        distinct_certified = left_counts.distinct_certified +
+                                             right_counts.distinct_certified,
+                        distinct_real = left_counts.distinct_real +
+                                        right_counts.distinct_real,
+                        distinct_complex = left_counts.distinct_complex +
+                                           right_counts.distinct_complex,
+                        refinement_steps = left_counts.refinement_steps +
+                                           right_counts.refinement_steps +
+                                           1,
+                        rightmost_leaf = right_counts.rightmost_leaf,
+                    )
+                end
+            end
+
             bucket_size ≤ k && break
+            if !isempty(deterministic_points)
+                random_split = _random_split_point(entries, current_leaf; ε = ε)
+                if !isnothing(random_split)
+                    verification = _verify_split!(
+                        bsp,
+                        current_leaf,
+                        random_split,
+                        bucket_iter,
+                        F,
+                        cert_params,
+                        cache;
+                        coordinate = coordinate,
+                        max_precision = max_precision,
+                        refine_solution = refine_solution,
+                        extended_certificate = extended_certificate,
+                        certify_solution_kwargs...,
+                    )
+
+                    if !verification.stable
+                        entries, bucket_size, current_leaf = _stable_leaf_entries!(
+                            bsp,
+                            verification.leaf,
+                            iter,
+                            F,
+                            cert_params,
+                            cache;
+                            coordinate = coordinate,
+                            max_entries = nothing,
+                            max_precision = max_precision,
+                            refine_solution = refine_solution,
+                            extended_certificate = extended_certificate,
+                            certify_solution_kwargs...,
+                        )
+                        continue
+                    elseif verification.valid
+                        left_leaf, right_leaf = _split_leaf!(bsp, current_leaf, random_split)
+                        left_iter = _bucket_iterator(bucket_iter, verification.left_entries)
+                        right_iter = _bucket_iterator(bucket_iter, verification.right_entries)
+                        left_entries = _reindex_bucket_entries(verification.left_entries)
+                        right_entries = _reindex_bucket_entries(verification.right_entries)
+                        left_counts = _process_leaf!(
+                            bsp,
+                            left_leaf,
+                            left_iter,
+                            F,
+                            cert_params,
+                            cache,
+                            d;
+                            k = k,
+                            certify_oversized_buckets = certify_oversized_buckets,
+                            ε = ε,
+                            coordinate = coordinate,
+                            max_refinement_rounds = max_refinement_rounds,
+                            depth = depth + 1,
+                            initial_entries = left_entries,
+                            max_precision = max_precision,
+                            refine_solution = refine_solution,
+                            extended_certificate = extended_certificate,
+                            certify_solution_kwargs...,
+                        )
+                        right_counts = _process_leaf!(
+                            bsp,
+                            right_leaf,
+                            right_iter,
+                            F,
+                            cert_params,
+                            cache,
+                            d;
+                            k = k,
+                            certify_oversized_buckets = certify_oversized_buckets,
+                            ε = ε,
+                            coordinate = coordinate,
+                            max_refinement_rounds = max_refinement_rounds,
+                            depth = depth + 1,
+                            initial_entries = right_entries,
+                            max_precision = max_precision,
+                            refine_solution = refine_solution,
+                            extended_certificate = extended_certificate,
+                            certify_solution_kwargs...,
+                        )
+                        return (
+                            distinct_certified = left_counts.distinct_certified +
+                                                 right_counts.distinct_certified,
+                            distinct_real = left_counts.distinct_real +
+                                            right_counts.distinct_real,
+                            distinct_complex = left_counts.distinct_complex +
+                                               right_counts.distinct_complex,
+                            refinement_steps = left_counts.refinement_steps +
+                                               right_counts.refinement_steps +
+                                               1,
+                            rightmost_leaf = right_counts.rightmost_leaf,
+                        )
+                    end
+                end
+            end
             break
         end
         # No safe gap exists in the chosen projection, so this leaf becomes terminal.
