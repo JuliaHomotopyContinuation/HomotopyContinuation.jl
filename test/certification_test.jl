@@ -495,7 +495,10 @@
             parameters = a,
         )
         params = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
-        iter = bitmask_filter(isfinite, solve(F; iterator_only = true, target_parameters = params))
+        iter = bitmask_filter(
+            isfinite,
+            solve(F; iterator_only = true, target_parameters = params),
+        )
 
         res = certify(F, iter, params; coordinate = 2, certify_oversized_buckets = true)
 
