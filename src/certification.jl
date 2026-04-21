@@ -1829,17 +1829,7 @@ end
 #### Certification of iterators 
 ################################
 
-"""
-    BSPBucketEntry
 
-Stores the information we keep per certified solution during the BSP phase:
-the position of the path result in the `ResultIterator` and the certified interval
-for the chosen real coordinate.
-"""
-struct BSPBucketEntry
-    index::Int
-    interval::IntervalTrees.Interval{Float64}
-end
 
 """
     BSPPartition
@@ -1847,10 +1837,10 @@ end
 Binary spatial partition of the real line used to group certified solutions from a
 `ResultIterator` without materializing all solutions at once.
 
-The `tree` maps each leaf interval to the number of certified solutions assigned to
-that leaf after it has been processed. The `leaves` vector stores the same leaf
-intervals in sorted order, and `unsplittable` records leaves that cannot be refined
-further using only the chosen coordinate projection.
+A `BSPPartition` contains three objects: `tree`, `leaves` and `unsplittable`:
+* The partition is based on a `tree` whose leaves correspond to intervals, and a map defined on the leaves (implemented by an `IntervalTrees.IntervalMap`). This map assigns to each interval leaf the number of certified solutions assigned to that leaf. 
+* The `leaves` vector stores the leaf intervals in sorted order.
+* `unsplittable` records leaves that cannot be refined further.
 """
 mutable struct BSPPartition
     tree::IntervalTrees.IntervalMap{Float64,Int}
@@ -1882,8 +1872,7 @@ end
 """
     BSPAssignmentStats
 
-Summary statistics for one streaming pass through the iterator while assigning
-certified solutions to BSP buckets.
+Summary statistics for the BSP.
 """
 Base.@kwdef mutable struct BSPAssignmentStats
     nresults::Int = 0
@@ -1897,10 +1886,7 @@ end
 """
     IteratorCertificationResult
 
-Final summary returned by the BSP-based [`certify`](@ref) method for
-`ResultIterator`s. This combines the statistics
-from the iterator passes with the distinct certification counts obtained by certifying
-bucket-by-bucket after refinement.
+Final summary returned by the BSP-based [`certify`](@ref) method for`ResultIterator`. 
 """
 Base.@kwdef struct IteratorCertificationResult
     bsp::BSPPartition
@@ -2040,14 +2026,8 @@ function Base.show(io::IO, summary::IteratorCertificationResult)
         "• $(summary.distinct_certified) distinct certified intervals " *
         "($(summary.distinct_real) real, $(summary.distinct_complex) complex)",
     )
-    println(
-        io,
-        "• max bucket size: $(summary.max_bucket_size)",
-    )
-    println(
-        io,
-        "• BSP leaves: $(summary.nparts) ",
-    )
+    println(io, "• max bucket size: $(summary.max_bucket_size)")
+    println(io, "• BSP leaves: $(summary.nparts) ")
     if summary.oversized_buckets > 0
         println(
             io,
@@ -2057,13 +2037,11 @@ function Base.show(io::IO, summary::IteratorCertificationResult)
     end
 end
 
-_bucket_id(interval) = (first(interval), last(interval))
 
 """
     _convert_to_interval(cert; coordinate = 1)
 
-Project a certified solution interval to the real part of one coordinate and convert it
-to an `IntervalTrees.Interval`.
+Project a certified solution interval to the real part of one coordinate and convert it to an `IntervalTrees.Interval`.
 """
 function _convert_to_interval(cert; coordinate::Int = 1)
     cert_interval = certified_solution_interval(cert)[coordinate]
@@ -2072,7 +2050,6 @@ function _convert_to_interval(cert; coordinate::Int = 1)
 end
 
 # We always work with a sorted list of finite cut points and extend it by `±Inf`
-# so every real number belongs to exactly one initial leaf.
 function _normalize_boundaries(boundaries)
     b = unique!(sort!(collect(float.(boundaries))))
     [-Inf, b..., Inf]
@@ -2089,51 +2066,50 @@ function _build_partition(boundaries)
     tree = IntervalTrees.IntervalMap{Float64,Int}()
     leaves = IntervalTrees.Interval{Float64}[]
     normalized = _normalize_boundaries(boundaries)
-    for i in 1:(length(normalized) - 1)
-        interval = IntervalTrees.Interval(normalized[i], normalized[i + 1])
+    for i = 1:(length(normalized)-1)
+        interval = IntervalTrees.Interval(normalized[i], normalized[i+1])
         tree[interval] = 0
         push!(leaves, interval)
     end
     BSPPartition(tree, leaves, Set{Tuple{Float64,Float64}}())
 end
-_bucket_count(bsp::BSPPartition, leaf) = IntervalTrees.value(bsp.tree[leaf])
 
-function _find_bucket(bsp::BSPPartition, interval)
-    for match in IntervalTrees.intersect(bsp.tree, interval)
-        if first(match) <= first(interval) && last(interval) <= last(match)
-            return match
-        end
-    end
-    nothing
-end
+_bucket_count(bsp::BSPPartition, leaf) = IntervalTrees.value(bsp.tree[leaf])
+_bucket_id(interval) = (first(interval), last(interval))
 
 function _merge_covering_leaves!(bsp::BSPPartition, interval)
-    # Find the contiguous block of leaves touched by `interval`.
+    # Find the block of leaves touched by `interval`.
+    # this implementation exploits that the intervals at the leaves of bsp are ordered 
     left = 0
     right = 0
     for i in eachindex(bsp.leaves)
         leaf = bsp.leaves[i]
+        # suppose leaf = (a,b) and interval = (x,y)
+        # if b < x continue
         if last(leaf) < first(interval)
             continue
         end
         left == 0 && (left = i)
+        # if y < a stop
         if last(interval) < first(leaf)
             break
         end
-        right = i
+        right = i # only assigned when x ≤ b and a ≤ y; i.e., when (x,y) intersects (a,b) but is not contained in it
     end
     left == 0 && return false
     right == 0 && (right = left)
 
-    if left == right && first(bsp.leaves[left]) <= first(interval) && last(interval) <= last(bsp.leaves[left])
+    if left == right &&
+       first(bsp.leaves[left]) <= first(interval) &&
+       last(interval) <= last(bsp.leaves[left])
         return true
     end
 
-    # Merge the touched leaves into one larger leaf so `interval` fits into a single bucket.
+    # we only arrive here, when interval is not contained in a single leaf interval. In this case, it touches two subsequent intervals and we merge them into one larger leaf so `interval` fits into a single bucket.
     # Only counts survive this merge; the leaf-local entries will be recollected on demand.
     merged_leaf = IntervalTrees.Interval(first(bsp.leaves[left]), last(bsp.leaves[right]))
     merged_count = 0
-    for i in left:right
+    for i = left:right
         leaf = bsp.leaves[i]
         merged_count += _bucket_count(bsp, leaf)
         delete!(bsp.tree, leaf)
@@ -2145,13 +2121,24 @@ function _merge_covering_leaves!(bsp::BSPPartition, interval)
     return true
 end
 
+# this function finds the interval in bsp containing the given interval
+function _find_bucket(bsp::BSPPartition, interval)
+    for match in IntervalTrees.intersect(bsp.tree, interval)
+        if first(match) <= first(interval) && last(interval) <= last(match)
+            return match
+        end
+    end
+    nothing
+end
+
 function _ensure_bucket!(bsp::BSPPartition, interval)
     while true
         match = _find_bucket(bsp, interval)
         !isnothing(match) && return match
         # If `interval` crosses a current cut, coarsen the BSP locally and try again.
-        _merge_covering_leaves!(bsp, interval) ||
-            error("Could not place certified interval $interval into the current BSP leaves.")
+        _merge_covering_leaves!(bsp, interval) || error(
+            "Could not place certified interval $interval into the current BSP leaves.",
+        )
     end
 end
 
@@ -2193,6 +2180,16 @@ function _iterator_certification_stats(
         stats.certified_complex += Int(is_complex(cert))
     end
     stats
+end
+
+"""
+    BSPBucketEntry
+
+Stores the information we keep per certified solution during the BSP phase: the position of the path result in the `ResultIterator` and the certified interval for the chosen real coordinate.
+"""
+struct BSPBucketEntry
+    index::Int
+    interval::IntervalTrees.Interval{Float64}
 end
 
 function _collect_leaf_entries!(
@@ -2352,13 +2349,25 @@ function _verify_split!(
         elseif !(first(leaf) <= first(interval) && last(interval) <= last(leaf))
             match = _ensure_bucket!(bsp, interval)
             merged_leaf = IntervalTrees.Interval(first(match), last(match))
-            return (valid = false, left_count = 0, right_count = 0, leaf = merged_leaf, stable = false)
+            return (
+                valid = false,
+                left_count = 0,
+                right_count = 0,
+                leaf = merged_leaf,
+                stable = false,
+            )
         elseif last(interval) <= split_point
             left_count += 1
         elseif split_point <= first(interval)
             right_count += 1
         else
-            return (valid = false, left_count = 0, right_count = 0, leaf = leaf, stable = true)
+            return (
+                valid = false,
+                left_count = 0,
+                right_count = 0,
+                leaf = leaf,
+                stable = true,
+            )
         end
     end
     return (
@@ -2549,10 +2558,15 @@ function _process_leaf!(
                         certify_solution_kwargs...,
                     )
                     return (
-                        distinct_certified = left_counts.distinct_certified + right_counts.distinct_certified,
-                        distinct_real = left_counts.distinct_real + right_counts.distinct_real,
-                        distinct_complex = left_counts.distinct_complex + right_counts.distinct_complex,
-                        refinement_steps = left_counts.refinement_steps + right_counts.refinement_steps + 1,
+                        distinct_certified = left_counts.distinct_certified +
+                                             right_counts.distinct_certified,
+                        distinct_real = left_counts.distinct_real +
+                                        right_counts.distinct_real,
+                        distinct_complex = left_counts.distinct_complex +
+                                           right_counts.distinct_complex,
+                        refinement_steps = left_counts.refinement_steps +
+                                           right_counts.refinement_steps +
+                                           1,
                         rightmost_leaf = right_counts.rightmost_leaf,
                     )
                 end
@@ -2584,14 +2598,13 @@ function _process_leaf!(
     end
 
     _set_leaf_count!(bsp, current_leaf, bucket_size)
-    isempty(entries) &&
-        return (
-            distinct_certified = 0,
-            distinct_real = 0,
-            distinct_complex = 0,
-            refinement_steps = 0,
-            rightmost_leaf = current_leaf,
-        )
+    isempty(entries) && return (
+        distinct_certified = 0,
+        distinct_real = 0,
+        distinct_complex = 0,
+        refinement_steps = 0,
+        rightmost_leaf = current_leaf,
+    )
 
     # Optionally leave oversized terminal buckets uncertified while still recording
     # their size in the final BSP summary.
@@ -2696,11 +2709,7 @@ function _bucket_iterator(iter::ResultIterator, entries::Vector{BSPBucketEntry})
     # Build a sparse subiterator so recollecting one BSP bucket only retracks the
     # selected paths instead of rescanning the full iterator.
     bucket_mask = _bucket_bitmask(iter, entries)
-    ResultIterator(
-        start_solutions(iter),
-        solver(iter);
-        bitmask = bucket_mask,
-    )
+    ResultIterator(start_solutions(iter), solver(iter); bitmask = bucket_mask)
 end
 
 """
@@ -2722,11 +2731,10 @@ function _collect_bucket_solutions(iter::ResultIterator, entries::Vector{BSPBuck
             nnonfinite += 1
         end
     end
-    length(sols) == length(entries) ||
-        error(
-            "Re-tracking a BSP bucket produced $(length(sols)) finite solutions for " *
-            "$(length(entries)) expected entries ($nnonfinite non-finite results).",
-        )
+    length(sols) == length(entries) || error(
+        "Re-tracking a BSP bucket produced $(length(sols)) finite solutions for " *
+        "$(length(entries)) expected entries ($nnonfinite non-finite results).",
+    )
     sols
 end
 
@@ -2788,11 +2796,7 @@ function _certify_iterator_bsp(
     distinct_real = 0
     distinct_complex = 0
     params = isnothing(cert_params) ? nothing : complexF64_params(cert_params)
-    d = DistinctCertifiedSolutions(
-        F,
-        params;
-        extended_certificate = extended_certificate,
-    )
+    d = DistinctCertifiedSolutions(F, params; extended_certificate = extended_certificate)
 
     refinement_steps = 0
     i = 1
@@ -2823,8 +2827,9 @@ function _certify_iterator_bsp(
         distinct_complex += counts.distinct_complex
         refinement_steps += counts.refinement_steps
         rightmost_index = findfirst(==(counts.rightmost_leaf), bsp.leaves)
-        isnothing(rightmost_index) &&
-            error("Internal BSP error: processed leaf $(counts.rightmost_leaf) disappeared.")
+        isnothing(rightmost_index) && error(
+            "Internal BSP error: processed leaf $(counts.rightmost_leaf) disappeared.",
+        )
         i = rightmost_index + 1
     end
 
@@ -2861,12 +2866,7 @@ function certify(
     compile::Union{Bool,Symbol} = false,
     kwargs...,
 )
-    certify(
-        fixed(F; compile = compile),
-        iter,
-        args...;
-        kwargs...,
-    )
+    certify(fixed(F; compile = compile), iter, args...; kwargs...)
 end
 
 function certify(
@@ -2879,10 +2879,7 @@ function certify(
     kwargs...,
 )
     cert_params =
-        certification_parameters(
-            isnothing(p) ? target_parameters : p;
-            prec = max_precision,
-        )
+        certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
     _certify_iterator_bsp(
         iter,
         F,
