@@ -2142,19 +2142,65 @@ function _ensure_bucket!(bsp::BSPPartition, interval)
     end
 end
 
-function _iterator_certification_stats(
+"""
+    BSPBucketEntry
+
+Stores the information we keep per certified solution during the BSP phase: the position of the path result in the `ResultIterator` and the certified interval for the chosen real coordinate.
+"""
+struct BSPBucketEntry
+    index::Int
+    interval::IntervalTrees.Interval{Float64}
+end
+
+_bucket_entries_dict() = Dict{Tuple{Float64,Float64},Vector{BSPBucketEntry}}()
+
+function _ensure_bucket_entries!(
+    bucket_entries::Dict{Tuple{Float64,Float64},Vector{BSPBucketEntry}},
+    leaf,
+)
+    key = _bucket_id(leaf)
+    if haskey(bucket_entries, key)
+        return bucket_entries[key]
+    end
+
+    merged_entries = BSPBucketEntry[]
+    for (old_key, old_entries) in collect(bucket_entries)
+        if first(leaf) <= old_key[1] && old_key[2] <= last(leaf)
+            append!(merged_entries, old_entries)
+            delete!(bucket_entries, old_key)
+        end
+    end
+    bucket_entries[key] = merged_entries
+    merged_entries
+end
+
+function _reindex_bucket_entries(entries::Vector{BSPBucketEntry})
+    sorted_entries = sort!(copy(entries); by = entry -> entry.index)
+    reindexed = BSPBucketEntry[]
+    sizehint!(reindexed, length(sorted_entries))
+    for (i, entry) in enumerate(sorted_entries)
+        push!(reindexed, BSPBucketEntry(i, entry.interval))
+    end
+    reindexed
+end
+
+function _assign_initial_buckets!(
+    bsp::BSPPartition,
     iter,
     F,
     cert_params,
     cert_cache;
+    coordinate::Int = 1,
     max_precision::Int = 256,
     refine_solution::Bool = true,
     extended_certificate::Bool = false,
     certify_solution_kwargs...,
 )
     stats = BSPAssignmentStats()
-    # This first pass only computes global counters and never stores projected intervals.
+    bucket_entries = _bucket_entries_dict()
+    idx = 0
     for result in iter
+        idx += 1
         stats.nresults += 1
         isfinite(result) || continue
 
@@ -2164,7 +2210,7 @@ function _iterator_certification_stats(
             solution(result),
             cert_params,
             cert_cache,
-            stats.nresults;
+            idx;
             max_precision = max_precision,
             refine_solution = refine_solution,
             extended_certificate = extended_certificate,
@@ -2178,18 +2224,16 @@ function _iterator_certification_stats(
         stats.certified += 1
         stats.certified_real += Int(is_real(cert))
         stats.certified_complex += Int(is_complex(cert))
+
+        interval = _convert_to_interval(cert; coordinate = coordinate)
+        match = _ensure_bucket!(bsp, interval)
+        leaf = IntervalTrees.Interval(first(match), last(match))
+        entries = _ensure_bucket_entries!(bucket_entries, leaf)
+        push!(entries, BSPBucketEntry(idx, interval))
+        bsp.tree[leaf] = _bucket_count(bsp, leaf) + 1
     end
-    stats
-end
 
-"""
-    BSPBucketEntry
-
-Stores the information we keep per certified solution during the BSP phase: the position of the path result in the `ResultIterator` and the certified interval for the chosen real coordinate.
-"""
-struct BSPBucketEntry
-    index::Int
-    interval::IntervalTrees.Interval{Float64}
+    return stats, bucket_entries
 end
 
 function _collect_leaf_entries!(
@@ -2496,6 +2540,7 @@ function _process_leaf!(
     coordinate::Int = 1,
     max_refinement_rounds::Int = 50,
     depth::Int = 0,
+    initial_entries::Union{Nothing,Vector{BSPBucketEntry}} = nothing,
     max_precision::Int = 256,
     refine_solution::Bool = true,
     extended_certificate::Bool = false,
@@ -2504,38 +2549,46 @@ function _process_leaf!(
     # Process one leaf subtree depth-first so only the current branch lives in memory.
     # Step 1: stabilize the current leaf with a tiny sample so we can cheaply decide
     # whether this subtree needs further refinement at all.
-    entries, bucket_size, current_leaf = _stable_leaf_entries!(
-        bsp,
-        leaf,
-        iter,
-        F,
-        cert_params,
-        cache;
-        coordinate = coordinate,
-        max_entries = 1,
-        max_precision = max_precision,
-        refine_solution = refine_solution,
-        extended_certificate = extended_certificate,
-        certify_solution_kwargs...,
-    )
-
-    if bucket_size > k && depth < max_refinement_rounds
-        # Step 2: this leaf is oversized, so recollect the full local bucket and work
-        # only with the corresponding bucket iterator from here on.
+    if isnothing(initial_entries)
         entries, bucket_size, current_leaf = _stable_leaf_entries!(
             bsp,
-            current_leaf,
+            leaf,
             iter,
             F,
             cert_params,
             cache;
             coordinate = coordinate,
-            max_entries = nothing,
+            max_entries = 1,
             max_precision = max_precision,
             refine_solution = refine_solution,
             extended_certificate = extended_certificate,
             certify_solution_kwargs...,
         )
+    else
+        entries = initial_entries
+        bucket_size = length(entries)
+        current_leaf = leaf
+    end
+
+    if bucket_size > k && depth < max_refinement_rounds
+        # Step 2: this leaf is oversized, so recollect the full local bucket and work
+        # only with the corresponding bucket iterator from here on.
+        if isnothing(initial_entries)
+            entries, bucket_size, current_leaf = _stable_leaf_entries!(
+                bsp,
+                current_leaf,
+                iter,
+                F,
+                cert_params,
+                cache;
+                coordinate = coordinate,
+                max_entries = nothing,
+                max_precision = max_precision,
+                refine_solution = refine_solution,
+                extended_certificate = extended_certificate,
+                certify_solution_kwargs...,
+            )
+        end
         split_attempts = 0
         while split_attempts < 8
             split_attempts += 1
@@ -2587,6 +2640,8 @@ function _process_leaf!(
                     left_leaf, right_leaf = _split_leaf!(bsp, current_leaf, split_point)
                     left_iter = _bucket_iterator(bucket_iter, verification.left_entries)
                     right_iter = _bucket_iterator(bucket_iter, verification.right_entries)
+                    left_entries = _reindex_bucket_entries(verification.left_entries)
+                    right_entries = _reindex_bucket_entries(verification.right_entries)
                     left_counts = _process_leaf!(
                         bsp,
                         left_leaf,
@@ -2601,6 +2656,7 @@ function _process_leaf!(
                         coordinate = coordinate,
                         max_refinement_rounds = max_refinement_rounds,
                         depth = depth + 1,
+                        initial_entries = left_entries,
                         max_precision = max_precision,
                         refine_solution = refine_solution,
                         extended_certificate = extended_certificate,
@@ -2620,6 +2676,7 @@ function _process_leaf!(
                         coordinate = coordinate,
                         max_refinement_rounds = max_refinement_rounds,
                         depth = depth + 1,
+                        initial_entries = right_entries,
                         max_precision = max_precision,
                         refine_solution = refine_solution,
                         extended_certificate = extended_certificate,
@@ -2670,7 +2727,7 @@ function _process_leaf!(
 
     # Before final joint certification, recollect the full terminal bucket. The
     # one-entry reservoir sample above is only for proposing memory-bounded splits.
-    if !isempty(entries)
+    if !isempty(entries) && isnothing(initial_entries)
         entries, bucket_size, current_leaf = _stable_leaf_entries!(
             bsp,
             current_leaf,
@@ -2826,14 +2883,14 @@ function _certify_iterator_bsp(
     extended_certificate::Bool = false,
     certify_solution_kwargs...,
 )
-    # First collect the global certification counters without storing projected
-    # intervals for every certified solution.
     bsp = _build_partition(boundaries)
-    assignment_stats = _iterator_certification_stats(
+    assignment_stats, bucket_entries = _assign_initial_buckets!(
+        bsp,
         iter,
         F,
         cert_params,
         cache;
+        coordinate = coordinate,
         max_precision = max_precision,
         refine_solution = refine_solution,
         extended_certificate = extended_certificate,
@@ -2852,10 +2909,17 @@ function _certify_iterator_bsp(
         # Walk the current leaf partition from left to right. Processing one leaf may
         # split it into a whole local subtree, so we resume after the rightmost child.
         leaf = bsp.leaves[i]
+        leaf_entries = get(bucket_entries, _bucket_id(leaf), BSPBucketEntry[])
+        if isempty(leaf_entries)
+            i += 1
+            continue
+        end
+        leaf_iter = _bucket_iterator(iter, leaf_entries)
+        local_entries = _reindex_bucket_entries(leaf_entries)
         counts = _process_leaf!(
             bsp,
             leaf,
-            iter,
+            leaf_iter,
             F,
             cert_params,
             cache,
@@ -2865,6 +2929,7 @@ function _certify_iterator_bsp(
             ε = ε,
             coordinate = coordinate,
             max_refinement_rounds = max_refinement_rounds,
+            initial_entries = local_entries,
             max_precision = max_precision,
             refine_solution = refine_solution,
             extended_certificate = extended_certificate,
