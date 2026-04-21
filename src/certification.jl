@@ -2294,7 +2294,7 @@ function _collect_leaf_entries!(
         # Ignore certified intervals completely outside the leaf.
         if last(interval) < first(leaf) || last(leaf) < first(interval)
             continue
-        # Keep certified intervals fully contained in the leaf.
+            # Keep certified intervals fully contained in the leaf.
         elseif first(leaf) <= first(interval) && last(interval) <= last(leaf)
             bucket_size += 1
             if isnothing(max_entries)
@@ -2663,9 +2663,9 @@ function _process_leaf!(
                         max_entries = nothing,
                         max_precision = max_precision,
                         refine_solution = refine_solution,
-                            extended_certificate = extended_certificate,
-                            certify_solution_kwargs...,
-                        )
+                        extended_certificate = extended_certificate,
+                        certify_solution_kwargs...,
+                    )
                     restart_from_merged_leaf = true
                     break
                 elseif verification.valid
@@ -2769,9 +2769,9 @@ function _process_leaf!(
                         max_entries = nothing,
                         max_precision = max_precision,
                         refine_solution = refine_solution,
-                            extended_certificate = extended_certificate,
-                            certify_solution_kwargs...,
-                        )
+                        extended_certificate = extended_certificate,
+                        certify_solution_kwargs...,
+                    )
                     continue
                 elseif verification.valid
                     # Step 3: reuse the partition computed during verification. Each child
@@ -2875,9 +2875,11 @@ function _process_leaf!(
                         )
                         continue
                     elseif verification.valid
-                        left_leaf, right_leaf = _split_leaf!(bsp, current_leaf, random_split)
+                        left_leaf, right_leaf =
+                            _split_leaf!(bsp, current_leaf, random_split)
                         left_iter = _bucket_iterator(bucket_iter, verification.left_entries)
-                        right_iter = _bucket_iterator(bucket_iter, verification.right_entries)
+                        right_iter =
+                            _bucket_iterator(bucket_iter, verification.right_entries)
                         left_entries = _reindex_bucket_entries(verification.left_entries)
                         right_entries = _reindex_bucket_entries(verification.right_entries)
                         left_counts = _process_leaf!(
