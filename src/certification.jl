@@ -2158,6 +2158,9 @@ function _ensure_bucket_entries!(
     bucket_entries::Dict{Tuple{Float64,Float64},Vector{BSPBucketEntry}},
     leaf,
 )
+    # Keep the entry table synchronized with the current BSP leaves.
+    # If `leaf` is new because several leaves were merged, collect all entry vectors
+    # whose keys are now covered by `leaf` and store them under the merged key.
     key = _bucket_id(leaf)
     if haskey(bucket_entries, key)
         return bucket_entries[key]
@@ -2175,6 +2178,8 @@ function _ensure_bucket_entries!(
 end
 
 function _reindex_bucket_entries(entries::Vector{BSPBucketEntry})
+    # Convert entry indices from the current iterator's output numbering into the
+    # local numbering of a freshly built bucket iterator.
     sorted_entries = sort!(copy(entries); by = entry -> entry.index)
     reindexed = BSPBucketEntry[]
     sizehint!(reindexed, length(sorted_entries))
@@ -2196,12 +2201,19 @@ function _assign_initial_buckets!(
     extended_certificate::Bool = false,
     certify_solution_kwargs...,
 )
+    # Phase 1:
+    # 1. stream once through the full iterator;
+    # 2. certify each finite result individually;
+    # 3. project certified results to one real interval;
+    # 4. place those intervals into the current coarse BSP leaves, merging leaves when
+    #    a certified interval crosses an existing coarse cut.
     stats = BSPAssignmentStats()
     bucket_entries = _bucket_entries_dict()
     idx = 0
     for result in iter
         idx += 1
         stats.nresults += 1
+        # Non-finite results contribute to the global counts but never enter the BSP.
         isfinite(result) || continue
 
         stats.nfinite += 1
@@ -2225,10 +2237,14 @@ function _assign_initial_buckets!(
         stats.certified_real += Int(is_real(cert))
         stats.certified_complex += Int(is_complex(cert))
 
+        # `_ensure_bucket!` may merge neighboring leaves before returning a container
+        # leaf for the current certified interval.
         interval = _convert_to_interval(cert; coordinate = coordinate)
         match = _ensure_bucket!(bsp, interval)
         leaf = IntervalTrees.Interval(first(match), last(match))
         entries = _ensure_bucket_entries!(bucket_entries, leaf)
+        # At the root these indices are global iterator positions. Later, child buckets
+        # are reindexed relative to their local bucket iterators.
         push!(entries, BSPBucketEntry(idx, interval))
         bsp.tree[leaf] = _bucket_count(bsp, leaf) + 1
     end
@@ -2275,13 +2291,17 @@ function _collect_leaf_entries!(
         is_certified(cert) || continue
 
         interval = _convert_to_interval(cert; coordinate = coordinate)
+        # Ignore certified intervals completely outside the leaf.
         if last(interval) < first(leaf) || last(leaf) < first(interval)
             continue
+        # Keep certified intervals fully contained in the leaf.
         elseif first(leaf) <= first(interval) && last(interval) <= last(leaf)
             bucket_size += 1
             if isnothing(max_entries)
+                # Full recollection mode: keep every entry.
                 push!(entries, BSPBucketEntry(idx, interval))
             elseif length(entries) < max_entries
+                # Sampling mode: fill the reservoir first.
                 push!(entries, BSPBucketEntry(idx, interval))
             else
                 # Reservoir sampling keeps a uniform random sample of the leaf entries
@@ -2308,6 +2328,9 @@ function _left_right_split_points(entries::Vector{BSPBucketEntry}, leaf; ε::Flo
 
     # We deliberately use only one sampled certified interval here to keep the split
     # proposal step at O(1) sampled entries, even if the geometry becomes unbalanced.
+    # The deterministic split policy is:
+    # 1. try a cut just left of the sampled interval;
+    # 2. if possible, then try a cut just right of that interval.
     interval = entries[1].interval
     left_gap = first(interval) - first(leaf)
     right_gap = last(leaf) - last(interval)
@@ -2331,6 +2354,8 @@ function _random_split_point(entries::Vector{BSPBucketEntry}, leaf; ε::Float64 
 
     interval = entries[1].interval
 
+    # Sample only from the admissible part of the leaf that lies at least `ε` away
+    # from the sampled interval.
     left_lo = first(leaf)
     left_hi = first(interval) - ε
     right_lo = last(interval) + ε
@@ -2365,6 +2390,8 @@ function _verify_split!(
 )
     # Check one proposed split against every certified interval in the current bucket.
     # If the split is valid, also return the left/right partition so recursion can reuse it.
+    # So one successful verification both proves correctness of the cut and computes
+    # the child membership that later recursive calls will reuse.
     left_entries = BSPBucketEntry[]
     right_entries = BSPBucketEntry[]
     left_count = 0
@@ -2388,6 +2415,8 @@ function _verify_split!(
         is_certified(cert) || continue
 
         interval = _convert_to_interval(cert; coordinate = coordinate)
+        # Ignore intervals outside the leaf. This is usually redundant for a bucket
+        # iterator, but keeping it here makes the routine safe for broader iterators too.
         if last(interval) < first(leaf) || last(leaf) < first(interval)
             continue
         elseif !(first(leaf) <= first(interval) && last(interval) <= last(leaf))
@@ -2425,6 +2454,7 @@ function _verify_split!(
             )
         end
     end
+    # A split with an empty child is safe but not useful, so it is reported as invalid.
     return (
         valid = left_count > 0 && right_count > 0,
         left_entries = left_entries,
@@ -2453,6 +2483,8 @@ function _stable_leaf_entries!(
     # Recollect one leaf until every certified interval seen in `iter` is either fully
     # inside that leaf or outside it. If an interval crosses a current BSP cut, the leaf
     # is merged and we immediately retry on the merged interval.
+    # This is the normalization step that turns "candidate leaf + iterator" into a
+    # locally stable bucket before we split or certify it.
     current_leaf = leaf
     while true
         entries, bucket_size, updated_leaf, stable = _collect_leaf_entries!(
@@ -2492,6 +2524,8 @@ function _split_leaf!(bsp::BSPPartition, leaf, split_point)
 end
 
 function _count_distinct_certificates!(d)
+    # `d` is reused bucket-by-bucket, so this helper just summarizes the certificates
+    # currently stored for the one terminal bucket processed most recently.
     ndistinct = 0
     nreal = 0
     ncomplex = 0
@@ -2512,6 +2546,8 @@ function _set_leaf_count!(bsp::BSPPartition, leaf, count::Int)
 end
 
 function _leaf_stats(bsp::BSPPartition, k::Integer)
+    # Summarize the final BSP leaves for reporting after the full iterator pass and all
+    # local refinements have finished.
     max_bucket_size = 0
     oversized_buckets = 0
     for leaf in bsp.leaves
@@ -2591,10 +2627,13 @@ function _process_leaf!(
 
             # Restrict all split checks to the current bucket instead of rescanning the
             # parent iterator. Entry indices remain relative to `bucket_iter`.
+            # This is the key optimization: once we know the current bucket membership,
+            # all later work happens on a sparse subiterator for that bucket only.
             bucket_iter = _bucket_iterator(iter, entries)
             deterministic_points = _left_right_split_points(entries, current_leaf; ε = ε)
             restart_from_merged_leaf = false
             for split_point in deterministic_points
+                # Try the deterministic split candidates first.
                 verification = _verify_split!(
                     bsp,
                     current_leaf,
@@ -2633,6 +2672,8 @@ function _process_leaf!(
                     # Step 3: reuse the partition computed during verification. Each child
                     # gets its own bucket iterator, so recursion never has to rediscover
                     # which entries belong to the left/right subtree.
+                    # The verification output is still indexed relative to `bucket_iter`,
+                    # so we reindex it before passing it to the child recursion.
                     left_leaf, right_leaf = _split_leaf!(bsp, current_leaf, split_point)
                     left_iter = _bucket_iterator(bucket_iter, verification.left_entries)
                     right_iter = _bucket_iterator(bucket_iter, verification.right_entries)
@@ -2695,6 +2736,8 @@ function _process_leaf!(
 
             restart_from_merged_leaf && continue
             if isempty(deterministic_points)
+                # If the sampled interval leaves no deterministic gap, try one random cut
+                # in the remaining admissible region before giving up on splitting.
                 random_split = _random_split_point(entries, current_leaf; ε = ε)
                 isnothing(random_split) && break
                 verification = _verify_split!(
@@ -2796,6 +2839,8 @@ function _process_leaf!(
 
             bucket_size ≤ k && break
             if !isempty(deterministic_points)
+                # Only after both deterministic tries fail do we spend one extra pass on
+                # a random admissible cut.
                 random_split = _random_split_point(entries, current_leaf; ε = ε)
                 if !isnothing(random_split)
                     verification = _verify_split!(
@@ -2893,9 +2938,13 @@ function _process_leaf!(
             break
         end
         # No safe gap exists in the chosen projection, so this leaf becomes terminal.
+        # We remember that explicitly so the final result can distinguish "oversized
+        # because unsplittable in this projection" from "oversized because unchecked".
         bucket_size > k && push!(bsp.unsplittable, _bucket_id(current_leaf))
     end
 
+    # From here on we treat the leaf as terminal, either because it is small enough or
+    # because refinement stopped without finding a useful split.
     _set_leaf_count!(bsp, current_leaf, bucket_size)
     isempty(entries) && return (
         distinct_certified = 0,
@@ -2918,7 +2967,7 @@ function _process_leaf!(
     end
 
     # Before final joint certification, recollect the full terminal bucket. The
-    # one-entry reservoir sample above is only for proposing memory-bounded splits.
+    # one-entry sample above is only for proposing memory-bounded splits.
     if !isempty(entries) && isnothing(initial_entries)
         entries, bucket_size, current_leaf = _stable_leaf_entries!(
             bsp,
@@ -2938,11 +2987,14 @@ function _process_leaf!(
 
     # Step 4: the leaf is terminal. Recollect the full bucket once and certify only the
     # solutions in this terminal iterator.
+    # This still avoids materializing the whole iterator: only the current bucket is
+    # retracked and certified jointly.
     sols = _collect_bucket_solutions(iter, entries)
     empty!(d)
     length(entries) == length(sols) ||
         error("Internal BSP error: bucket entries and recollected solutions disagree.")
     for (entry, sol) in zip(entries, sols)
+        # `entry.index` is local to the terminal bucket iterator at this point.
         add_solution!(
             d,
             sol,
@@ -2969,7 +3021,8 @@ end
 
 function _bucket_bitmask(iter::ResultIterator, entries::Vector{BSPBucketEntry})
     # We sort the live bucket vector in place here and rely on the same order later in
-    # Phase 2 when pairing the recollected solutions back with their bucket entries.
+    # the terminal certification step when pairing recollected solutions back with their
+    # bucket entries.
     sort!(entries; by = entry -> entry.index)
     current_bitmask = bitmask(iter)
     # The bucket indices live in the output index space of `iter`.
@@ -3005,6 +3058,8 @@ end
 function _bucket_iterator(iter::ResultIterator, entries::Vector{BSPBucketEntry})
     # Build a sparse subiterator so recollecting one BSP bucket only retracks the
     # selected paths instead of rescanning the full iterator.
+    # This is what makes the refinement phase scale with the current bucket size rather
+    # than the size of the original iterator.
     bucket_mask = _bucket_bitmask(iter, entries)
     ResultIterator(start_solutions(iter), solver(iter); bitmask = bucket_mask)
 end
@@ -3022,6 +3077,8 @@ function _collect_bucket_solutions(iter::ResultIterator, entries::Vector{BSPBuck
     sizehint!(sols, length(entries))
     nnonfinite = 0
     for result in bucket_iter
+        # All selected paths should still be finite here. We keep `nnonfinite` only to
+        # produce a useful error if that invariant fails during retracking.
         if isfinite(result)
             push!(sols, solution(result))
         else
@@ -3046,7 +3103,7 @@ The algorithm works in two phases:
 2. iteratively refine heavy leaves until every splittable bucket contains at most `k`
    entries, then revisit the iterator bucket-by-bucket and certify only the solutions
    belonging to that bucket jointly.
-
+For more details of the implementation see [^BBK26].
 ## Options
 
 * `max_precision = 256`: The maximal accuracy (in bits) that is used in the certification process.
@@ -3056,6 +3113,8 @@ The algorithm works in two phases:
 * `ε = 1e-4`: when proposing a split from one sampled certified interval, place the split at distance `ε` from that interval.
 * `coordinate = 1`: the coordinate of the solutions we project to to compute the binary spatial partition tree. * `boundaries = -10:10`: the initial boundaries of the spatial partition.
 * `max_refinement_rounds = 50`: the maximal number of times we split buckets to get all buckets containing at most `k` solutions 
+
+[^BBK26]: Breiding, P., Brysiewicz, T. and Johnson, D. K. "Low-Memory Numerical Certification." arXiv:2604.16623.
 """
 
 function _certify_iterator_bsp(
@@ -3076,6 +3135,7 @@ function _certify_iterator_bsp(
     certify_solution_kwargs...,
 )
     bsp = _build_partition(boundaries)
+    # First pass over the full iterator: assign certified intervals to the coarse BSP.
     assignment_stats, bucket_entries = _assign_initial_buckets!(
         bsp,
         iter,
@@ -3101,6 +3161,9 @@ function _certify_iterator_bsp(
         # Walk the current leaf partition from left to right. Processing one leaf may
         # split it into a whole local subtree, so we resume after the rightmost child.
         leaf = bsp.leaves[i]
+        # `bucket_entries` stores the root-level membership found during the first pass.
+        # We immediately turn that into a bucket-local iterator and recurse only inside
+        # that sparse iterator from here on.
         leaf_entries = get(bucket_entries, _bucket_id(leaf), BSPBucketEntry[])
         if isempty(leaf_entries)
             i += 1
