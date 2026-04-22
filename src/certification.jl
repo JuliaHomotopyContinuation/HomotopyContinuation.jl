@@ -2433,16 +2433,19 @@ function _verify_split!(
                 leaf = merged_leaf,
                 stable = false,
             )
-        elseif last(interval) <= split_point
+        elseif last(interval) < split_point
             # This certified interval lies entirely in the left child.
             left_count += 1
             push!(left_entries, BSPBucketEntry(idx, interval))
-        elseif split_point <= first(interval)
+        elseif split_point < first(interval)
             # This certified interval lies entirely in the right child.
             right_count += 1
             push!(right_entries, BSPBucketEntry(idx, interval))
         else
-            # The proposed split cuts through a certified interval, so it is unsafe.
+            # The proposed split cuts through a certified interval or touches one of
+            # its projected endpoints, so it is unsafe. Rejecting endpoint-touching
+            # splits keeps neighboring closed BSP leaves from sharing certified
+            # point intervals at the split boundary.
             return (
                 valid = false,
                 left_entries = BSPBucketEntry[],
