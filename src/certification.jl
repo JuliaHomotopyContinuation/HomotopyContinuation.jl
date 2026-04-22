@@ -2337,10 +2337,13 @@ function _left_right_split_points(entries::Vector{BSPBucketEntry}, leaf; ε::Flo
     left_split = left_gap > ε ? (first(interval) - ε) : nothing
     right_split = right_gap > ε ? (last(interval) + ε) : nothing
 
-    candidates = Float64[]
-    !isnothing(left_split) && push!(candidates, left_split)
-    !isnothing(right_split) && push!(candidates, right_split)
-    return Tuple(candidates)
+    if isnothing(left_split)
+        return isnothing(right_split) ? () : (right_split,)
+    elseif isnothing(right_split)
+        return (left_split,)
+    else
+        return (left_split, right_split)
+    end
 end
 
 """
@@ -2990,27 +2993,29 @@ function _process_leaf!(
         )
     end
 
-    # Step 4: the leaf is terminal. Recollect the full bucket once and certify only the
-    # solutions in this terminal iterator.
-    # This still avoids materializing the whole iterator: only the current bucket is
-    # retracked and certified jointly.
-    sols = _collect_bucket_solutions(iter, entries)
+    # Step 4: the leaf is terminal. Revisit only the current bucket and stream its solutions directly into `d`.
     empty!(d)
-    length(entries) == length(sols) ||
-        error("Internal BSP error: bucket entries and recollected solutions disagree.")
-    for (entry, sol) in zip(entries, sols)
-        # `entry.index` is local to the terminal bucket iterator at this point.
-        add_solution!(
-            d,
-            sol,
-            entry.index,
-            1;
-            max_precision = max_precision,
-            refine_solution = refine_solution,
-            extended_certificate = extended_certificate,
-            certify_solution_kwargs...,
-        )
+    bucket_iter = _bucket_iterator(iter, entries)
+    nfinite = 0
+    for result in bucket_iter
+        if isfinite(result)
+            nfinite += 1
+            add_solution!(
+                d,
+                solution(result),
+                nfinite,
+                1;
+                max_precision = max_precision,
+                refine_solution = refine_solution,
+                extended_certificate = extended_certificate,
+                certify_solution_kwargs...,
+            )
+        end
     end
+    nfinite == length(entries) || error(
+        "Re-tracking a BSP bucket produced $nfinite finite solutions for " *
+        "$(length(entries)) expected entries.",
+    )
 
     # Distinct counts can be summed across terminal leaves because different leaves
     # are disjoint in the chosen projected coordinate.
@@ -3067,34 +3072,6 @@ function _bucket_iterator(iter::ResultIterator, entries::Vector{BSPBucketEntry})
     # than the size of the original iterator.
     bucket_mask = _bucket_bitmask(iter, entries)
     ResultIterator(start_solutions(iter), solver(iter); bitmask = bucket_mask)
-end
-
-"""
-    _collect_bucket_solutions(iter, entries)
-
-Revisit the iterator and collect only the solution candidates referenced by `entries`.
-This is used after the BSP refinement so each bucket can be certified independently.
-"""
-function _collect_bucket_solutions(iter::ResultIterator, entries::Vector{BSPBucketEntry})
-    # Build a sparse subiterator so we only retrack the paths needed for this bucket.
-    bucket_iter = _bucket_iterator(iter, entries)
-    sols = Vector{Vector{ComplexF64}}()
-    sizehint!(sols, length(entries))
-    nnonfinite = 0
-    for result in bucket_iter
-        # All selected paths should still be finite here. We keep `nnonfinite` only to
-        # produce a useful error if that invariant fails during retracking.
-        if isfinite(result)
-            push!(sols, solution(result))
-        else
-            nnonfinite += 1
-        end
-    end
-    length(sols) == length(entries) || error(
-        "Re-tracking a BSP bucket produced $(length(sols)) finite solutions for " *
-        "$(length(entries)) expected entries ($nnonfinite non-finite results).",
-    )
-    sols
 end
 
 """
