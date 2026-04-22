@@ -1514,7 +1514,7 @@ function certify(
     cert_params = certification_parameters(params; prec = max_precision)
     _certify(
         F,
-        solutions(X; only_nonsingular = true),
+        solutions(X; only_nonsingular = false),
         cert_params,
         cache;
         max_precision = max_precision,
