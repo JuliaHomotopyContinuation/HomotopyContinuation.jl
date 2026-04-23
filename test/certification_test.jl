@@ -448,4 +448,94 @@
         cert = HomotopyContinuation.certify_solution(f, sol, q, c, 1, false)
         @test is_certified(cert)
     end
+
+    @testset "BSP certification: parameterized iterator" begin
+        d = 2
+        @var x y a[1:6]
+        F = System(
+            [
+                (a[1] * x^d + a[2] * y) * (a[3] * x + a[4] * y) + 1,
+                (a[1] * x^d + a[2] * y) * (a[5] * x + a[6] * y) + 1,
+            ];
+            parameters = a,
+        )
+        params = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
+        iter = solve(F; iterator_only = true, target_parameters = params)
+
+        res = certify(F, iter, params)
+
+        @test bsp(res) isa BSPPartition
+        @test res isa IteratorCertificationResult
+        @test nresults(res) == 7
+        @test nfinite(res) == 3
+        @test ncertified(res) == 3
+        @test ndistinct_certified(res) == 3
+    end
+
+    @testset "BSP certification: parameter-free iterator" begin
+        @var x y
+        F = System([x^2 - 1, y - 1], [x, y])
+        iter = solve(F; iterator_only = true, start_system = :total_degree)
+
+        res = certify(F, iter, nothing; k = 2, boundaries = -3:3, show_progress = false)
+
+        @test ncertified(res) == 2
+        @test ndistinct_certified(res) == 2
+        @test nnotcertified(res) == 0
+    end
+
+    @testset "BSP certification: bitmasked iterator" begin
+        d = 2
+        @var x y a[1:6]
+        F = System(
+            [
+                (a[1] * x^d + a[2] * y) * (a[3] * x + a[4] * y) + 1,
+                (a[1] * x^d + a[2] * y) * (a[5] * x + a[6] * y) + 1,
+            ];
+            parameters = a,
+        )
+        params = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
+        iter = bitmask_filter(
+            isfinite,
+            solve(F; iterator_only = true, target_parameters = params),
+        )
+
+        res = certify(F, iter, params; coordinate = 2, certify_oversized_buckets = true)
+
+        @test nresults(res) == 3
+        @test nfinite(res) == 3
+        @test ncertified(res) == 3
+        @test ndistinct_certified(res) == 3
+    end
+
+    @testset "BSP certification: iterator from iterator start solutions" begin
+        @var x y p
+        f₁ = y - x^2 + p
+        f₂ = y - x^3 - p
+        F = System([f₁, f₂]; variables = [x; y], parameters = [p])
+
+        first_iter = solve(
+            F,
+            [[1, 1], [-1, 1]];
+            iterator_only = true,
+            start_parameters = [0],
+            target_parameters = [-1],
+        )
+        second_iter = solve(
+            F,
+            first_iter;
+            iterator_only = true,
+            start_parameters = [-1],
+            target_parameters = [-2],
+        )
+
+        res = certify(F, second_iter, [-2]; max_refinement_rounds = 0)
+        results = collect(second_iter)
+        nfinite_results = count(isfinite, results)
+
+        @test nresults(res) == length(results)
+        @test nfinite(res) == nfinite_results
+        @test ndistinct_certified(res) == ncertified(res)
+        @test ncertified(res) ≤ nfinite_results
+    end
 end
