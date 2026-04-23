@@ -1883,6 +1883,168 @@ Base.@kwdef mutable struct BSPAssignmentStats
     not_certified::Int = 0
 end
 
+Base.@kwdef mutable struct IteratorCertificationProgress
+    progress_meter::PM.ProgressUnknown
+    phase::Symbol = :assignment
+    known_work::Int = 0
+    streamed_work::Int = 0
+    iterator_length::Int = 0
+    current_pass::String = "Waiting for iterator pass"
+    current_pass_total::Int = 0
+    current_pass_done::Int = 0
+    nresults::Int = 0
+    nfinite::Int = 0
+    certified::Int = 0
+    certified_real::Int = 0
+    certified_complex::Int = 0
+    not_certified::Int = 0
+    processed_leaves::Int = 0
+    total_leaves::Int = 0
+    distinct_certified::Int = 0
+    distinct_real::Int = 0
+    distinct_complex::Int = 0
+    refinement_rounds::Int = 0
+end
+
+function make_iterator_certification_progress(; dt::Float64 = 0.4)
+    progress_meter = PM.ProgressUnknown(;
+        dt = dt,
+        desc = "Certifying iterator:",
+        color = :green,
+        output = stdout,
+    )
+    progress_meter.tlast += 0.3
+    IteratorCertificationProgress(progress_meter = progress_meter)
+end
+
+function _phase_label(progress::IteratorCertificationProgress)
+    if progress.phase == :assignment
+        "Assign initial BSP buckets"
+    elseif progress.phase == :refinement
+        "Refine BSP buckets"
+    else
+        "Finished"
+    end
+end
+
+function _format_local_pass_bar(progress::IteratorCertificationProgress; barlen::Int = 20)
+    total = progress.current_pass_total
+    done = min(progress.current_pass_done, total)
+    filled = total == 0 ? 0 : clamp(fld(done * barlen, total), 0, barlen)
+    pct = total == 0 ? 100.0 : 100 * done / total
+    string(
+        lpad(string(round(pct; digits = 1), "%"), 6),
+        "|",
+        repeat("█", filled),
+        repeat(" ", barlen - filled),
+        "| ",
+        done,
+        "/",
+        total,
+    )
+end
+
+@noinline function _iterator_certification_showvalues(
+    progress::IteratorCertificationProgress,
+)
+    (
+        ("Phase", _phase_label(progress)),
+        ("Current pass", progress.current_pass),
+        ("Pass progress", _format_local_pass_bar(progress)),
+        ("Iterator length", progress.iterator_length),
+        ("Finite solutions", progress.nfinite),
+        (
+            "Certified solutions (real/complex)",
+            "$(progress.certified) ($(progress.certified_real)/$(progress.certified_complex))",
+        ),
+        ("Not certified", progress.not_certified),
+        ("Leaves", "$(progress.processed_leaves) / $(progress.total_leaves)"),
+        (
+            "Distinct (real/complex)",
+            "$(progress.distinct_certified) ($(progress.distinct_real)/$(progress.distinct_complex))",
+        ),
+        ("Refinement rounds", progress.refinement_rounds),
+    )
+end
+
+update_iterator_progress!(::Nothing; kwargs...) = nothing
+register_iterator_pass!(::Nothing, pass, total; kwargs...) = nothing
+advance_iterator_progress!(::Nothing; kwargs...) = nothing
+
+function update_iterator_progress!(
+    progress::IteratorCertificationProgress;
+    phase::Union{Nothing,Symbol} = nothing,
+    iterator_length::Union{Nothing,Int} = nothing,
+    nresults::Union{Nothing,Int} = nothing,
+    nfinite::Union{Nothing,Int} = nothing,
+    certified::Union{Nothing,Int} = nothing,
+    certified_real::Union{Nothing,Int} = nothing,
+    certified_complex::Union{Nothing,Int} = nothing,
+    not_certified::Union{Nothing,Int} = nothing,
+    processed_leaves::Union{Nothing,Int} = nothing,
+    total_leaves::Union{Nothing,Int} = nothing,
+    distinct_certified::Union{Nothing,Int} = nothing,
+    distinct_real::Union{Nothing,Int} = nothing,
+    distinct_complex::Union{Nothing,Int} = nothing,
+    refinement_rounds::Union{Nothing,Int} = nothing,
+    force::Bool = false,
+    finish::Bool = false,
+)
+    isnothing(phase) || (progress.phase = phase)
+    isnothing(iterator_length) || (progress.iterator_length = iterator_length)
+    isnothing(nresults) || (progress.nresults = nresults)
+    isnothing(nfinite) || (progress.nfinite = nfinite)
+    isnothing(certified) || (progress.certified = certified)
+    isnothing(certified_real) || (progress.certified_real = certified_real)
+    isnothing(certified_complex) || (progress.certified_complex = certified_complex)
+    isnothing(not_certified) || (progress.not_certified = not_certified)
+    isnothing(processed_leaves) || (progress.processed_leaves = processed_leaves)
+    isnothing(total_leaves) || (progress.total_leaves = total_leaves)
+    isnothing(distinct_certified) || (progress.distinct_certified = distinct_certified)
+    isnothing(distinct_real) || (progress.distinct_real = distinct_real)
+    isnothing(distinct_complex) || (progress.distinct_complex = distinct_complex)
+    isnothing(refinement_rounds) || (progress.refinement_rounds = refinement_rounds)
+
+    progress_meter = progress.progress_meter
+    if finish
+        PM.update!(progress_meter, progress.streamed_work)
+        PM.finish!(
+            progress_meter;
+            showvalues = _iterator_certification_showvalues(progress),
+        )
+    elseif force || time() > progress_meter.tlast + progress_meter.dt
+        PM.update!(
+            progress_meter,
+            progress.streamed_work;
+            showvalues = _iterator_certification_showvalues(progress),
+        )
+    end
+    nothing
+end
+
+function register_iterator_pass!(
+    progress::IteratorCertificationProgress,
+    pass::AbstractString,
+    total::Integer;
+    force::Bool = false,
+)
+    progress.current_pass = String(pass)
+    progress.current_pass_total = Int(total)
+    progress.current_pass_done = 0
+    progress.known_work += Int(total)
+    update_iterator_progress!(progress; force = force)
+end
+
+function advance_iterator_progress!(
+    progress::IteratorCertificationProgress;
+    step::Integer = 1,
+    kwargs...,
+)
+    progress.streamed_work += Int(step)
+    progress.current_pass_done += Int(step)
+    update_iterator_progress!(progress; kwargs...)
+end
+
 """
     IteratorCertificationResult
 
@@ -2195,6 +2357,7 @@ function _assign_initial_buckets!(
     F,
     cert_params,
     cert_cache;
+    progress::Union{Nothing,IteratorCertificationProgress} = nothing,
     coordinate::Int = 1,
     max_precision::Int = 256,
     refine_solution::Bool = true,
@@ -2210,9 +2373,20 @@ function _assign_initial_buckets!(
     stats = BSPAssignmentStats()
     bucket_entries = _bucket_entries_dict()
     idx = 0
+    register_iterator_pass!(progress, "Assign initial BSP buckets", length(iter))
     for result in iter
         idx += 1
         stats.nresults += 1
+        advance_iterator_progress!(
+            progress;
+            phase = :assignment,
+            nresults = stats.nresults,
+            nfinite = stats.nfinite,
+            certified = stats.certified,
+            certified_real = stats.certified_real,
+            certified_complex = stats.certified_complex,
+            not_certified = stats.not_certified,
+        )
         # Non-finite results contribute to the global counts but never enter the BSP.
         isfinite(result) || continue
 
@@ -2230,6 +2404,16 @@ function _assign_initial_buckets!(
         )
         if !is_certified(cert)
             stats.not_certified += 1
+            update_iterator_progress!(
+                progress;
+                phase = :assignment,
+                nresults = stats.nresults,
+                nfinite = stats.nfinite,
+                certified = stats.certified,
+                certified_real = stats.certified_real,
+                certified_complex = stats.certified_complex,
+                not_certified = stats.not_certified,
+            )
             continue
         end
 
@@ -2247,6 +2431,16 @@ function _assign_initial_buckets!(
         # are reindexed relative to their local bucket iterators.
         push!(entries, BSPBucketEntry(idx, interval))
         bsp.tree[leaf] = _bucket_count(bsp, leaf) + 1
+        update_iterator_progress!(
+            progress;
+            phase = :assignment,
+            nresults = stats.nresults,
+            nfinite = stats.nfinite,
+            certified = stats.certified,
+            certified_real = stats.certified_real,
+            certified_complex = stats.certified_complex,
+            not_certified = stats.not_certified,
+        )
     end
 
     return stats, bucket_entries
@@ -2259,6 +2453,7 @@ function _collect_leaf_entries!(
     F,
     cert_params,
     cert_cache;
+    progress::Union{Nothing,IteratorCertificationProgress} = nothing,
     coordinate::Int = 1,
     max_entries::Union{Nothing,Int} = nothing,
     max_precision::Int = 256,
@@ -2273,8 +2468,14 @@ function _collect_leaf_entries!(
     !isnothing(max_entries) && sizehint!(entries, max_entries)
     idx = 0
     bucket_size = 0
+    register_iterator_pass!(
+        progress,
+        isnothing(max_entries) ? "Recollect BSP bucket" : "Sample BSP bucket",
+        length(iter),
+    )
     for result in iter
         idx += 1
+        advance_iterator_progress!(progress)
         isfinite(result) || continue
 
         cert = certify_solution(
@@ -2385,6 +2586,7 @@ function _verify_split!(
     F,
     cert_params,
     cert_cache;
+    progress::Union{Nothing,IteratorCertificationProgress} = nothing,
     coordinate::Int = 1,
     max_precision::Int = 256,
     refine_solution::Bool = true,
@@ -2400,8 +2602,10 @@ function _verify_split!(
     left_count = 0
     right_count = 0
     idx = 0
+    register_iterator_pass!(progress, "Verify BSP split", length(iter))
     for result in iter
         idx += 1
+        advance_iterator_progress!(progress)
         isfinite(result) || continue
 
         cert = certify_solution(
@@ -2479,6 +2683,7 @@ function _stable_leaf_entries!(
     F,
     cert_params,
     cache;
+    progress::Union{Nothing,IteratorCertificationProgress} = nothing,
     coordinate::Int = 1,
     max_entries::Union{Nothing,Int} = nothing,
     max_precision::Int = 256,
@@ -2500,6 +2705,7 @@ function _stable_leaf_entries!(
             F,
             cert_params,
             cache;
+            progress = progress,
             coordinate = coordinate,
             max_entries = max_entries,
             max_precision = max_precision,
@@ -2572,6 +2778,7 @@ function _process_leaf!(
     cert_params,
     cache::CertificationCache,
     d::DistinctCertifiedSolutions;
+    progress::Union{Nothing,IteratorCertificationProgress} = nothing,
     k::Integer = 32,
     certify_oversized_buckets::Bool = false,
     ε::Float64 = 1e-4,
@@ -2595,6 +2802,7 @@ function _process_leaf!(
             F,
             cert_params,
             cache;
+            progress = progress,
             coordinate = coordinate,
             max_entries = 1,
             max_precision = max_precision,
@@ -2619,6 +2827,7 @@ function _process_leaf!(
                 F,
                 cert_params,
                 cache;
+                progress = progress,
                 coordinate = coordinate,
                 max_entries = nothing,
                 max_precision = max_precision,
@@ -2648,6 +2857,7 @@ function _process_leaf!(
                     F,
                     cert_params,
                     cache;
+                    progress = progress,
                     coordinate = coordinate,
                     max_precision = max_precision,
                     refine_solution = refine_solution,
@@ -2665,6 +2875,7 @@ function _process_leaf!(
                         F,
                         cert_params,
                         cache;
+                        progress = progress,
                         coordinate = coordinate,
                         max_entries = nothing,
                         max_precision = max_precision,
@@ -2693,6 +2904,7 @@ function _process_leaf!(
                         cert_params,
                         cache,
                         d;
+                        progress = progress,
                         k = k,
                         certify_oversized_buckets = certify_oversized_buckets,
                         ε = ε,
@@ -2713,6 +2925,7 @@ function _process_leaf!(
                         cert_params,
                         cache,
                         d;
+                        progress = progress,
                         k = k,
                         certify_oversized_buckets = certify_oversized_buckets,
                         ε = ε,
@@ -2754,6 +2967,7 @@ function _process_leaf!(
                     F,
                     cert_params,
                     cache;
+                    progress = progress,
                     coordinate = coordinate,
                     max_precision = max_precision,
                     refine_solution = refine_solution,
@@ -2771,6 +2985,7 @@ function _process_leaf!(
                         F,
                         cert_params,
                         cache;
+                        progress = progress,
                         coordinate = coordinate,
                         max_entries = nothing,
                         max_precision = max_precision,
@@ -2796,6 +3011,7 @@ function _process_leaf!(
                         cert_params,
                         cache,
                         d;
+                        progress = progress,
                         k = k,
                         certify_oversized_buckets = certify_oversized_buckets,
                         ε = ε,
@@ -2816,6 +3032,7 @@ function _process_leaf!(
                         cert_params,
                         cache,
                         d;
+                        progress = progress,
                         k = k,
                         certify_oversized_buckets = certify_oversized_buckets,
                         ε = ε,
@@ -2857,6 +3074,7 @@ function _process_leaf!(
                         F,
                         cert_params,
                         cache;
+                        progress = progress,
                         coordinate = coordinate,
                         max_precision = max_precision,
                         refine_solution = refine_solution,
@@ -2872,6 +3090,7 @@ function _process_leaf!(
                             F,
                             cert_params,
                             cache;
+                            progress = progress,
                             coordinate = coordinate,
                             max_entries = nothing,
                             max_precision = max_precision,
@@ -2896,6 +3115,7 @@ function _process_leaf!(
                             cert_params,
                             cache,
                             d;
+                            progress = progress,
                             k = k,
                             certify_oversized_buckets = certify_oversized_buckets,
                             ε = ε,
@@ -2916,6 +3136,7 @@ function _process_leaf!(
                             cert_params,
                             cache,
                             d;
+                            progress = progress,
                             k = k,
                             certify_oversized_buckets = certify_oversized_buckets,
                             ε = ε,
@@ -2984,6 +3205,7 @@ function _process_leaf!(
             F,
             cert_params,
             cache;
+            progress = progress,
             coordinate = coordinate,
             max_entries = nothing,
             max_precision = max_precision,
@@ -2996,8 +3218,10 @@ function _process_leaf!(
     # Step 4: the leaf is terminal. Revisit only the current bucket and stream its solutions directly into `d`.
     empty!(d)
     bucket_iter = _bucket_iterator(iter, entries)
+    register_iterator_pass!(progress, "Certify terminal BSP bucket", length(bucket_iter))
     nfinite = 0
     for result in bucket_iter
+        advance_iterator_progress!(progress)
         if isfinite(result)
             nfinite += 1
             add_solution!(
@@ -3088,6 +3312,7 @@ The algorithm works in two phases:
 For more details of the implementation see [^BBK26].
 ## Options
 
+* `show_progress = true`: If `true` shows a progress meter for the BSP certification.
 * `max_precision = 256`: The maximal accuracy (in bits) that is used in the certification process.
 * `compile = false`: See the [`solve`](@ref) documentation.
 * `k = 1000`: the algorithm tries to split the real lines into buckets each containing at most `k` solutions.
@@ -3104,6 +3329,7 @@ function _certify_iterator_bsp(
     F::AbstractSystem,
     cert_params,
     cache::CertificationCache;
+    show_progress::Bool = true,
     k::Integer = 1000,
     certify_oversized_buckets::Bool = false,
     ε::Float64 = 1e-4,
@@ -3117,6 +3343,9 @@ function _certify_iterator_bsp(
     certify_solution_kwargs...,
 )
     bsp = _build_partition(boundaries)
+    iter_length = length(iter)
+    progress = show_progress ? make_iterator_certification_progress() : nothing
+    update_iterator_progress!(progress; iterator_length = iter_length, force = true)
     # First pass over the full iterator: assign certified intervals to the coarse BSP.
     assignment_stats, bucket_entries = _assign_initial_buckets!(
         bsp,
@@ -3124,6 +3353,7 @@ function _certify_iterator_bsp(
         F,
         cert_params,
         cache;
+        progress = progress,
         coordinate = coordinate,
         max_precision = max_precision,
         refine_solution = refine_solution,
@@ -3140,6 +3370,22 @@ function _certify_iterator_bsp(
     refinement_steps = 0
     i = 1
     while i <= length(bsp.leaves)
+        update_iterator_progress!(
+            progress;
+            phase = :refinement,
+            nresults = assignment_stats.nresults,
+            nfinite = assignment_stats.nfinite,
+            certified = assignment_stats.certified,
+            certified_real = assignment_stats.certified_real,
+            certified_complex = assignment_stats.certified_complex,
+            not_certified = assignment_stats.not_certified,
+            processed_leaves = i - 1,
+            total_leaves = length(bsp.leaves),
+            distinct_certified = distinct_certified,
+            distinct_real = distinct_real,
+            distinct_complex = distinct_complex,
+            refinement_rounds = refinement_steps,
+        )
         # Walk the current leaf partition from left to right. Processing one leaf may
         # split it into a whole local subtree, so we resume after the rightmost child.
         leaf = bsp.leaves[i]
@@ -3161,6 +3407,7 @@ function _certify_iterator_bsp(
             cert_params,
             cache,
             d;
+            progress = progress,
             k = k,
             certify_oversized_buckets = certify_oversized_buckets,
             ε = ε,
@@ -3204,6 +3451,24 @@ function _certify_iterator_bsp(
         oversized_buckets = oversized_buckets,
         unsplittable_buckets = length(bsp.unsplittable),
         refinement_rounds = refinement_steps,
+    )
+
+    update_iterator_progress!(
+        progress;
+        phase = :finished,
+        nresults = assignment_stats.nresults,
+        nfinite = assignment_stats.nfinite,
+        certified = assignment_stats.certified,
+        certified_real = assignment_stats.certified_real,
+        certified_complex = assignment_stats.certified_complex,
+        not_certified = assignment_stats.not_certified,
+        processed_leaves = length(bsp.leaves),
+        total_leaves = length(bsp.leaves),
+        distinct_certified = distinct_certified,
+        distinct_real = distinct_real,
+        distinct_complex = distinct_complex,
+        refinement_rounds = refinement_steps,
+        finish = true,
     )
 
     return res
