@@ -1610,11 +1610,13 @@ Returns the witness sets in `N`.
 function witness_sets(
     N::NumericalIrreducibleDecomposition{T};
     dims::Union{Vector{Int},Nothing} = nothing,
+    dim::Union{Int,Nothing} = nothing,
     only_irreducible::Bool = true,
 ) where {T}
     W = N.witness_sets
     out = Dict{Int,Vector{T}}()
-    selected_dims = isnothing(dims) ? keys(W) : dims
+    selected_dims = isnothing(dim) ? dims : [dim]
+    selected_dims = isnothing(selected_dims) ? keys(W) : selected_dims
 
     for k in selected_dims
         if haskey(W, k)
@@ -1627,8 +1629,11 @@ function witness_sets(
 
     out
 end
-witness_sets(N::NumericalIrreducibleDecomposition{T}, dim::Int) where {T} =
-    witness_sets(N; dims = [dim])
+witness_sets(
+    N::NumericalIrreducibleDecomposition{T},
+    dim::Int;
+    only_irreducible::Bool = true,
+) where {T} = witness_sets(N; dim = dim, only_irreducible = only_irreducible)
 seed(N::NumericalIrreducibleDecomposition{T}) where {T} = N.seed
 
 """
@@ -1642,8 +1647,10 @@ Returns the total number of components in `N`.
 function ncomponents(
     N::NumericalIrreducibleDecomposition{T};
     dims::Union{Vector{Int},Nothing} = nothing,
+    dim::Union{Int,Nothing} = nothing,
     only_irreducible::Bool = true,
 ) where {T}
+    dims = isnothing(dim) ? dims : [dim]
     D = witness_sets(N; dims = dims, only_irreducible = only_irreducible)
     if isempty(D)
         return 0
@@ -1651,12 +1658,15 @@ function ncomponents(
         return sum(length(last(Ws)) for Ws in D)
     end
 end
-ncomponents(N::NumericalIrreducibleDecomposition{T}, dim::Int) where {T} =
-    ncomponents(N; dims = [dim])
-n_components(N; dims = nothing, only_irreducible::Bool = true) =
-    ncomponents(N; dims = dims, only_irreducible = only_irreducible)
+ncomponents(
+    N::NumericalIrreducibleDecomposition{T},
+    dim::Int;
+    only_irreducible::Bool = true,
+) where {T} = ncomponents(N; dim = dim, only_irreducible = only_irreducible)
+n_components(N; dims = nothing, dim = nothing, only_irreducible::Bool = true) =
+    ncomponents(N; dims = dims, dim = dim, only_irreducible = only_irreducible)
 n_components(N, dim; only_irreducible::Bool = true) =
-    ncomponents(N; dims = [dim], only_irreducible = only_irreducible)
+    ncomponents(N; dim = dim, only_irreducible = only_irreducible)
 
 """
 
@@ -1671,8 +1681,10 @@ Returns the degrees of the components in `N`.
 function ModelKit.degrees(
     N::NumericalIrreducibleDecomposition{T};
     dims::Union{Vector{Int},Nothing} = nothing,
+    dim::Union{Int,Nothing} = nothing,
     only_irreducible::Bool = true,
 ) where {T}
+    dims = isnothing(dim) ? dims : [dim]
     D = witness_sets(N; dims = dims, only_irreducible = only_irreducible)
     out = Dict{Int,Vector{Int}}()
     for key in keys(D)
@@ -1681,8 +1693,11 @@ function ModelKit.degrees(
 
     out
 end
-ModelKit.degrees(N::NumericalIrreducibleDecomposition{T}, dim::Int) where {T} =
-    degrees(N; dims = [dim])
+ModelKit.degrees(
+    N::NumericalIrreducibleDecomposition{T},
+    dim::Int;
+    only_irreducible::Bool = true,
+) where {T} = degrees(N; dim = dim, only_irreducible = only_irreducible)
 
 function max_dim(
     N::NumericalIrreducibleDecomposition{T};
