@@ -1407,7 +1407,7 @@ function decompose_with_monodromy_options(M::MonodromyOptions)
         permutations = true,
         trace_test = true,
         single_loop_per_start_solution = true,
-        check_startsolutions = M.check_startsolutions,
+        check_startsolutions = false,
         group_actions = M.group_actions,
         loop_finished_callback = M.loop_finished_callback,
         parameter_sampler = M.parameter_sampler,

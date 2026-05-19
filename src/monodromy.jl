@@ -940,7 +940,9 @@ function monodromy_solve(
     end
     reset_trace!(MS)
     reset_loops!(MS)
-    results = check_start_solutions(MS, X, p)
+    results =
+        MS.options.check_startsolutions ? check_start_solutions(MS, X, p) :
+        initialize_start_solutions(MS, X)
     if isempty(results)
         if warning
             @warn "None of the provided solutions is a valid start solution (Newton's method did not converge)."
@@ -1004,6 +1006,36 @@ function check_start_solutions(MS::MonodromySolver, X, p)
         end
     end
 
+    results
+end
+
+function initialize_start_solutions(MS::MonodromySolver, X)
+    results = PathResult[]
+    for (i, x) in enumerate(X)
+        p = convert(Vector{ComplexF64}, x)
+        res = PathResult(
+            return_code = :success,
+            solution = p,
+            t = 1.0,
+            accuracy = eps(),
+            residual = NaN,
+            singular = false,
+            condition_jacobian = NaN,
+            winding_number = nothing,
+            extended_precision = false,
+            path_number = nothing,
+            start_solution = x,
+            last_path_point = (p, 1.0),
+            valuation = nothing,
+            ω = 1.0,
+            μ = eps(),
+            accepted_steps = 0,
+            rejected_steps = 0,
+            extended_precision_used = false,
+        )
+        add!(MS, res, i)
+        push!(results, res)
+    end
     results
 end
 
