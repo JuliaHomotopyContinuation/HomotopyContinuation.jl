@@ -705,7 +705,7 @@ function intersect_with_hypersurface!(
             options = cache.endgame_options,
         )
     end
-    
+
 
     # the start solutions are the Cartesian product between P_next and the d-th roots of unity.
     roots = [exp(2 * pi * im * k / d) for k = 0:(d-1)]
@@ -837,7 +837,7 @@ function set_up_u_homotopy(W, f, X, h, vars, u)
     Hom1 = linear_subspace_homotopy(F, L, L1)
     Hom2 = StraightLineHomotopy(slice(F, L1), slice(G, L1); gamma = cis(2 * pi * rand()))
     Hom3 = linear_subspace_homotopy(G, L1, L2)
-    
+
     return (Hom1, Hom2, Hom3), d
 end
 
