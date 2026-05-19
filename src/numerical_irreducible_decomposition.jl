@@ -1112,14 +1112,14 @@ function decompose_with_monodromy!(
             progress = show_monodromy_progress ? nothing : progress,
         )
         update_progress!(progress; is_monodromy = false)
-        update_progress_npts!(progress, nsolutions(res))
+        update_progress_npts!(progress, length(indexed_solutions(res)))
 
         if warning && (trace(res) > options.trace_test_tol)
             @warn "Trying to decompose non-complete set of witness points for codimension $(dim(L)) (trace test failed). Will try to compute the missing points. The output will contain all components, for which the trace test was successfull."
         end
 
         iter = 0
-        non_complete_points = solutions(res)
+        non_complete_points = indexed_solutions(res)
         d = length(non_complete_points) # the total degree (i.e., number of points on all irreducible components)
         non_complete_orbits = Vector{Set{Int}}()
 
@@ -1144,8 +1144,9 @@ function decompose_with_monodromy!(
                 update_progress!(progress; is_monodromy = false)
             end
 
-            d += nresults(res) - length(non_complete_points) # update total degree in case we found new points.
-            non_complete_points = solutions(res)
+            updated_points = indexed_solutions(res)
+            d += length(updated_points) - length(non_complete_points) # update total degree in case we found new points.
+            non_complete_points = updated_points
             ℓ = length(non_complete_points) # once for a later check
             k = length(non_complete_points) # and once for counting progress
             update_progress_npts!(progress, k)

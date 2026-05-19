@@ -350,6 +350,13 @@ solutions(r::MonodromyResult) =
     isnothing(r.certified_solutions) ? solutions(r.results) : r.certified_solutions
 
 """
+    indexed_solutions(result::MonodromyResult)
+
+Return the solutions in the index order used by [`permutations`](@ref).
+"""
+indexed_solutions(r::MonodromyResult) = solution.(results(r))
+
+"""
     nsolutions(result::MonodromyResult)
 
 Returns the number solutions of the `result`. When `duplicate_check = :certified`, this
@@ -434,15 +441,21 @@ and `permutations(S, reduced = false)` returns
 """
 function permutations(r::MonodromyResult; reduced::Bool = true)
     π = r.statistics.permutations
-    N = nresults(r)
 
-    π = filter(πⱼ -> length(πⱼ) == N, π)
     if reduced
         π = unique(π)
     end
 
+    N = nresults(r)
+    for πⱼ in π
+        N = max(N, length(πⱼ))
+        if !isempty(πⱼ)
+            N = max(N, maximum(πⱼ))
+        end
+    end
+
     A = zeros(Int, N, length(π))
-    for (j, πⱼ) in enumerate(π), i = 1:N
+    for (j, πⱼ) in enumerate(π), i = 1:length(πⱼ)
         A[i, j] = πⱼ[i]
     end
 
@@ -1089,7 +1102,7 @@ function serial_monodromy_solve!(
                 MS.trace_lock;
                 collect_trace = MS.options.trace_test && nloops(MS) == job.loop_id,
             )
-            if !isnothing(res)
+            if !isnothing(res) && !res.singular
                 loop_tracked!(stats)
 
                 # 1) check whether solutions already exists
@@ -1229,7 +1242,7 @@ function threaded_monodromy_solve!(
                                                 nloops(MS) == job.loop_id,
                             )
 
-                            if !isnothing(res)
+                            if !isnothing(res) && !res.singular
                                 loop_tracked!(stats)
 
                                 # 1) check whether solutions already exists
