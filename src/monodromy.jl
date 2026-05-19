@@ -976,7 +976,7 @@ function monodromy_solve(
     MonodromyResult(
         retcode,
         results,
-        eachindex(results),
+        1:length(results),
         p,
         MS.loops,
         MS.statistics,
