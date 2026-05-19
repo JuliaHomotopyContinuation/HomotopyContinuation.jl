@@ -248,7 +248,7 @@ The implementation is based on the algorithm [u-regeneration](https://arxiv.org/
 
 ### Options
 
-* `sorted = true`: if `true`, the polynomials in F will be sorted by degree in decreasing order. 
+* `sorted = true`: if `true`, the polynomials in F will be sorted by degree in increasing order. 
 * `max_codim`: the maximal codimension until which witness supersets should be computed.
 * `show_progress = true`: indicate whether a progress bar should be displayed.
 * `show_monodromy_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) should be displayed.
@@ -346,7 +346,7 @@ function _regeneration(
 
     # sort expressions by degree
     if sorted
-        σ = sortperm(H, by = ModelKit.degree, rev = true)
+        σ = sortperm(H, by = ModelKit.degree)
         f = expressions(F)[σ]
         H = H[σ]
     else
@@ -1606,7 +1606,7 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 ### Options
 
 * `show_progress = true`: indicate whether a progress bar should be displayed.
-* `sorted = true`: the polynomials in F will be sorted by degree in decreasing order. 
+* `sorted = true`: the polynomials in F will be sorted by degree in increasing order. 
 * `max_codim`: the maximal codimension until which witness supersets should be computed.
 * `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
 * `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
