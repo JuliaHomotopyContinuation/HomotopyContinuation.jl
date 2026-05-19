@@ -229,7 +229,7 @@ also stored separately and returned by [`solutions`](@ref) and [`nsolutions`](@r
 struct MonodromyResult{P,LP}
     returncode::Symbol
     results::Vector{PathResult}
-    indexed_solution_indices::Vector{Int}
+    indexed_solution_indices::UnitRange{Int}
     parameters::P
     loops::Vector{MonodromyLoop{LP}}
     statistics::MonodromyStatistics
@@ -976,7 +976,7 @@ function monodromy_solve(
     MonodromyResult(
         retcode,
         results,
-        collect(eachindex(results)),
+        eachindex(results),
         p,
         MS.loops,
         MS.statistics,
