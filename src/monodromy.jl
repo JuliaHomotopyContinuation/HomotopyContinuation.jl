@@ -229,6 +229,7 @@ also stored separately and returned by [`solutions`](@ref) and [`nsolutions`](@r
 struct MonodromyResult{P,LP}
     returncode::Symbol
     results::Vector{PathResult}
+    indexed_solution_indices::Vector{Int}
     parameters::P
     loops::Vector{MonodromyLoop{LP}}
     statistics::MonodromyStatistics
@@ -294,7 +295,8 @@ function TreeViews.nodelabel(
 end
 function TreeViews.treenode(r::MonodromyResult, i::Integer)
     if i == 1
-        return isnothing(r.certified_solutions) ? r.results : r.certified_solutions
+        return isnothing(r.certified_solutions) ? indexed_solutions(r) :
+               r.certified_solutions
     elseif i == 2
         return r.returncode
     elseif i == 3
@@ -354,7 +356,9 @@ solutions(r::MonodromyResult) =
 
 Return the solutions in the index order used by [`permutations`](@ref).
 """
-indexed_solutions(r::MonodromyResult) = solution.(results(r))
+indexed_solutions(r::MonodromyResult) =
+    map(i -> solution(r.results[i]), r.indexed_solution_indices)
+nindexed_solutions(r::MonodromyResult) = length(r.indexed_solution_indices)
 
 """
     nsolutions(result::MonodromyResult)
@@ -972,6 +976,7 @@ function monodromy_solve(
     MonodromyResult(
         retcode,
         results,
+        collect(eachindex(results)),
         p,
         MS.loops,
         MS.statistics,

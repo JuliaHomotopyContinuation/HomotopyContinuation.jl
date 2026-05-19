@@ -1112,7 +1112,7 @@ function decompose_with_monodromy!(
             progress = show_monodromy_progress ? nothing : progress,
         )
         update_progress!(progress; is_monodromy = false)
-        update_progress_npts!(progress, length(indexed_solutions(res)))
+        update_progress_npts!(progress, nindexed_solutions(res))
 
         if warning && (trace(res) > options.trace_test_tol)
             @warn "Trying to decompose non-complete set of witness points for codimension $(dim(L)) (trace test failed). Will try to compute the missing points. The output will contain all components, for which the trace test was successfull."
