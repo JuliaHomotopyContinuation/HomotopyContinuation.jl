@@ -645,13 +645,16 @@ function intersect_with_hypersurface!(
     # Step 2:
     # the points in P_next are used as starting points for a homotopy.
     # where u^d-1 (u is the extra variable in u-regeneration) is deformed into g 
-    Hom, d = set_up_u_homotopy(W, f, X, H, h, vars, u)
+    Hom, d = set_up_u_homotopy(W, f, X, h, vars, u)
 
-    tracker = EndgameTracker(
-        Hom;
-        tracker_options = cache.tracker_options,
-        options = cache.endgame_options,
-    )
+    trackers = map(Hom) do H
+        EndgameTracker(
+            H;
+            tracker_options = cache.tracker_options,
+            options = cache.endgame_options,
+        )
+    end
+    
 
     # the start solutions are the Cartesian product between P_next and the d-th roots of unity.
     roots = [exp(2 * pi * im * k / d) for k = 0:(d-1)]
@@ -664,9 +667,9 @@ function intersect_with_hypersurface!(
         is_monodromy = false,
     )
     if threading
-        threaded_intersection!(X, P_next, roots, tracker, progress)
+        threaded_intersection!(X, P_next, roots, trackers, progress)
     else
-        serial_intersection!(X, P_next, roots, tracker, progress)
+        serial_intersection!(X, P_next, roots, trackers, progress)
     end
     nothing
 end
@@ -677,7 +680,27 @@ function manage_initial_points!(P, m)
     return P_next
 end
 
-function serial_intersection!(X, P, roots, egtracker, progress)
+function track_intersection_path(egtrackers, p)
+    # Stage 1: L -> random linear space L1
+    res1 = track(egtrackers[1], p, 1)
+    is_success(res1) && is_finite(res1) && is_nonsingular(res1) || return nothing
+
+    # Stage 2: replace u^d - 1 by hypersurface equation
+    p1 = solution(egtrackers[1])
+    res2 = track(egtrackers[2], p1, 1)
+    is_success(res2) && is_finite(res2) && is_nonsingular(res2) || return nothing
+
+    # Stage 3: L1 -> {u = c}
+    p2 = solution(egtrackers[2])
+    res3 = track(egtrackers[3], p2, 1)
+    is_success(res3) && is_finite(res3) && is_nonsingular(res3) || return nothing
+
+    q = copy(solution(egtrackers[3]))
+
+    q
+end
+
+function serial_intersection!(X, P, roots, egtrackers, progress)
     start = Iterators.product(P, roots)
     l_start = length(P) * length(roots)
 
@@ -687,24 +710,16 @@ function serial_intersection!(X, P, roots, egtracker, progress)
         p = s[1]
         p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
 
-        res = track(egtracker, p, 1)
-        if is_success(res) && is_finite(res) && is_nonsingular(res)
-            q = copy(egtracker.state.solution)
-            # we only want nonsingular solutions q
-            # an additional check is whether q can be tracked the reverse homotopy from 0 to 1
-            # it's enough to go from t = 0 to t = 0.1, since singularities can only be expected at t = 0.
-            tracker = egtracker.tracker
-            track!(tracker, q, 0.0, 0.1)
-            if is_success(status(tracker))
-                push!(X, q)
-            end
+        q = track_intersection_path(egtrackers, p)
+        if !isnothing(q)
+            push!(X, q)
         end
     end
 
     nothing
 end
 
-function threaded_intersection!(X, P, roots, tracker, progress)
+function threaded_intersection!(X, P, roots, trackers, progress)
 
     l_P = length(P)
     l_roots = length(roots)
@@ -712,7 +727,7 @@ function threaded_intersection!(X, P, roots, tracker, progress)
 
     # Pre-allocate one tracker per thread
     nthr = Threads.nthreads()
-    trackers = [deepcopy(tracker) for _ = 1:nthr]
+    trackers_per_thread = [deepcopy(trackers) for _ = 1:nthr]
 
     # Use a lock for thread-safe operations on X and progress
     progress_lock = ReentrantLock()
@@ -720,7 +735,7 @@ function threaded_intersection!(X, P, roots, tracker, progress)
     next_idx = Threads.Atomic{Int}(1)
     Threads.@sync begin
         for tid = 1:nthr
-            let local_egtracker = trackers[tid]
+            let local_egtrackers = trackers_per_thread[tid]
                 Threads.@spawn begin
                     while true
 
@@ -738,19 +753,10 @@ function threaded_intersection!(X, P, roots, tracker, progress)
                         p = copy(P[p_idx])
                         p[end] = roots[r_idx] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
 
-                        res = track(local_egtracker, p, 1)
-
-                        if is_success(res) && is_finite(res) && is_nonsingular(res)
-                            q = copy(local_egtracker.state.solution)
-                            # we only want nonsingular solutions q
-                            # an additional check is whether q can be tracked the reverse homotopy from 0 to 1
-                            # it's enough to go from t = 0 to t = 0.1, since singularities can only be expected at t = 0.
-                            local_tracker = local_egtracker.tracker
-                            track!(local_tracker, q, 0.0, 0.1)
-                            if is_success(status(local_tracker))
-                                lock(progress_lock) do
-                                    push!(X, q)
-                                end
+                        q = track_intersection_path(local_egtrackers, p)
+                        if !isnothing(q)
+                            lock(progress_lock) do
+                                push!(X, q)
                             end
                         end
                     end
@@ -762,22 +768,26 @@ function threaded_intersection!(X, P, roots, tracker, progress)
     nothing
 end
 
-function set_up_u_homotopy(W, f, X, H, h, vars, u)
+function set_up_u_homotopy(W, f, X, h, vars, u)
 
     P, Q = get_num_den(h)
     d = degree(P)
     h0 = (u^d - 1) / Q
 
     # we start with the linear space L which does not use pose conditions on u, so that u^d=1
-    # we end with the linear space K with u=c.
+    # we end with the linear space L2 with u=c.
     L = linear_subspace_u(W)
-    K = linear_subspace(X)
+    L1 = rand_subspace(ambient_dim(L); dim = dim(L))
+    L2 = linear_subspace(X)
 
-    F₀ = slice(System([f; h0], variables = vars), L; compile = false)
-    G₀ = slice(System([f; h], variables = vars), K; compile = false)
-    Hom = StraightLineHomotopy(F₀, G₀; gamma = cis(2 * pi * rand()))
+    F = fixed(System([f; h0], variables = vars); compile = false)
+    G = fixed(System([f; h], variables = vars); compile = false)
 
-    return Hom, d
+    Hom1 = linear_subspace_homotopy(F, L, L1)
+    Hom2 = StraightLineHomotopy(slice(F, L1), slice(G, L1); gamma = cis(2 * pi * rand()))
+    Hom3 = linear_subspace_homotopy(G, L1, L2)
+    
+    return (Hom1, Hom2, Hom3), d
 end
 
 
