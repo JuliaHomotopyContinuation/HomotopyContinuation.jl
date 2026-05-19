@@ -1122,6 +1122,7 @@ function decompose_with_monodromy!(
         non_complete_points = indexed_solutions(res)
         d = length(non_complete_points) # the total degree (i.e., number of points on all irreducible components)
         non_complete_orbits = Vector{Set{Int}}()
+        trace_certified_all = false
 
         while !isempty(non_complete_points)
             iter += 1
@@ -1193,6 +1194,7 @@ function decompose_with_monodromy!(
 
             # Check if we are done
             if sum(degree, decomposition; init = 0) == d
+                trace_certified_all = true
                 update_progress_step!(progress)
                 break
             end
@@ -1254,6 +1256,34 @@ function decompose_with_monodromy!(
                     ),
                 )
         end
+
+        if !trace_certified_all && !isempty(non_complete_points)
+            covered_indices = Set{Int}()
+            for orbit in non_complete_orbits
+                union!(covered_indices, orbit)
+            end
+
+            orbits_to_return = copy(non_complete_orbits)
+            for i in eachindex(non_complete_points)
+                if !(i in covered_indices)
+                    push!(orbits_to_return, Set([i]))
+                end
+            end
+
+            for orbit in orbits_to_return
+                isempty(orbit) && continue
+                P_orbit = non_complete_points[sort!(collect(orbit))]
+                W_new = WitnessSet(G, L, P_orbit; is_irreducible = nothing)
+
+                push!(decomposition, W_new)
+                update_progress!(progress, W_new)
+            end
+
+            if warning
+                @warn "Some witness sets could not be certified by the trace test and are returned with is_irreducible = nothing. They will not be displayed in a numerical irreducible decomposition."
+            end
+        end
+
         update_progress_step!(progress)
         update_progress_npts!(progress, 0)
     else
@@ -1523,7 +1553,7 @@ decompose(W::WitnessSet; kwargs...) = decompose([W]; kwargs...)
 Store the witness sets in a common data structure.
 """
 struct NumericalIrreducibleDecomposition{T<:WitnessSet}
-    Witness_Sets::Dict{Int,Vector{T}}
+    witness_sets::Dict{Int,Vector{T}}
     seed::Union{Nothing,UInt32}
 end
 NumericalIrreducibleDecomposition(Ws::Vector{T}) where {T<:WitnessSet} =
@@ -1532,14 +1562,15 @@ function NumericalIrreducibleDecomposition(Ws::Vector{T}, seed) where {T<:Witnes
     D = Dict{Int,Vector{T}}()
     for W in Ws
         k = dim(W)
-        push!(get!(D, k, WitnessSet[]), W)
+        push!(get!(D, k, T[]), W)
     end
     NumericalIrreducibleDecomposition(D, seed)
 end
 
 """
     witness_sets(N::NumericalIrreducibleDecomposition;
-        dims::Union{Vector{Int},Nothing} = nothing)
+                dims::Union{Vector{Int},Nothing} = nothing,
+                only_irreducible::Bool = true)
 
 Returns the witness sets in `N`. 
 `dims` specifies the dimensions that should be considered.
@@ -1547,15 +1578,17 @@ Returns the witness sets in `N`.
 function witness_sets(
     N::NumericalIrreducibleDecomposition{T};
     dims::Union{Vector{Int},Nothing} = nothing,
+    only_irreducible::Bool = true,
 ) where {T}
-    D = N.Witness_Sets
-    if isnothing(dims)
-        out = D
-    else
-        out = Dict{Int,Vector{T}}()
-        for k in dims
-            if haskey(D, k)
-                out[k] = D[k]
+    W = N.witness_sets
+    out = Dict{Int,Vector{T}}()
+    selected_dims = isnothing(dims) ? keys(W) : dims
+
+    for k in selected_dims
+        if haskey(W, k)
+            Ws = only_irreducible ? filter(_is_irreducible, W[k]) : W[k]
+            if !isempty(Ws)
+                out[k] = Ws
             end
         end
     end
@@ -1568,7 +1601,8 @@ seed(N::NumericalIrreducibleDecomposition{T}) where {T} = N.seed
 
 """
     ncomponents(N::NumericalIrreducibleDecomposition;
-        dims::Union{Vector{Int},Nothing} = nothing)
+                dims::Union{Vector{Int},Nothing} = nothing,
+                only_irreducible::Bool = true)
 
 Returns the total number of components in `N`. 
 `dims` specifies the dimensions that should be considered.
@@ -1576,32 +1610,27 @@ Returns the total number of components in `N`.
 function ncomponents(
     N::NumericalIrreducibleDecomposition{T};
     dims::Union{Vector{Int},Nothing} = nothing,
+    only_irreducible::Bool = true,
 ) where {T}
-    D = witness_sets(N)
+    D = witness_sets(N; dims = dims, only_irreducible = only_irreducible)
     if isempty(D)
         return 0
-    elseif isnothing(dims)
-        out = sum(length(last(Ws)) for Ws in D)
     else
-        out = 0
-        for d in dims
-            if haskey(D, d)
-                out += length(D[d])
-            end
-        end
+        return sum(length(last(Ws)) for Ws in D)
     end
-
-    out
 end
 ncomponents(N::NumericalIrreducibleDecomposition{T}, dim::Int) where {T} =
     ncomponents(N; dims = [dim])
-n_components(N; dims = nothing) = ncomponents(N; dims = dims)
-n_components(N, dim) = ncomponents(N; dims = [dim])
+n_components(N; dims = nothing, only_irreducible::Bool = true) =
+    ncomponents(N; dims = dims, only_irreducible = only_irreducible)
+n_components(N, dim; only_irreducible::Bool = true) =
+    ncomponents(N; dims = [dim], only_irreducible = only_irreducible)
 
 """
 
     degrees(N::NumericalIrreducibleDecomposition;
-        dims::Union{Vector{Int},Nothing} = nothing)
+            dims::Union{Vector{Int},Nothing} = nothing,
+            only_irreducible::Bool = true)
 
 Returns the degrees of the components in `N`.
 `dims` specifies the dimensions that should be considered.
@@ -1610,22 +1639,12 @@ Returns the degrees of the components in `N`.
 function ModelKit.degrees(
     N::NumericalIrreducibleDecomposition{T};
     dims::Union{Vector{Int},Nothing} = nothing,
+    only_irreducible::Bool = true,
 ) where {T}
-    D = N.Witness_Sets
+    D = witness_sets(N; dims = dims, only_irreducible = only_irreducible)
     out = Dict{Int,Vector{Int}}()
-    if isnothing(dims)
-        for key in keys(D)
-            out[key] = degree.(D[key])
-        end
-    else
-        out = Dict{Int,Vector{Int}}()
-        if !isempty(dims)
-            for k in dims
-                if haskey(D, k)
-                    out[k] = degree.(D[k])
-                end
-            end
-        end
+    for key in keys(D)
+        out[key] = degree.(D[key])
     end
 
     out
@@ -1633,8 +1652,11 @@ end
 ModelKit.degrees(N::NumericalIrreducibleDecomposition{T}, dim::Int) where {T} =
     degrees(N; dims = [dim])
 
-function max_dim(N::NumericalIrreducibleDecomposition{T}) where {T}
-    D = witness_sets(N)
+function max_dim(
+    N::NumericalIrreducibleDecomposition{T};
+    only_irreducible::Bool = true,
+) where {T}
+    D = witness_sets(N; only_irreducible = only_irreducible)
     k = keys(D)
     if !isempty(k)
         maximum(k)
@@ -1645,20 +1667,16 @@ end
 
 function Base.show(io::IO, N::NumericalIrreducibleDecomposition{T}) where {T}
     D = witness_sets(N)
-    if !isempty(D)
-        total = sum(length(last(Ws)) for Ws in D)
-    else
-        total = 0
-    end
+    total = ncomponents(N)
     s = total == 1 ? "component" : "components"
     header = "Numerical irreducible decomposition with $total $s"
     println(io, header)
     println(io, "="^(length(header)))
     mdim = max_dim(N)
     if mdim >= 0
-        for d = max_dim(N):-1:0
+        for d = mdim:-1:0
             if haskey(D, d)
-                ℓ = length(D[d])
+                ℓ = count(_is_irreducible, D[d])
                 if ℓ > 0
                     println(io, "• $ℓ component(s) of dimension $d.")
                 end
@@ -1670,7 +1688,7 @@ function Base.show(io::IO, N::NumericalIrreducibleDecomposition{T}) where {T}
     end
 end
 function degree_table(io, N::NumericalIrreducibleDecomposition{T}) where {T}
-    D = witness_sets(N)
+    D = degrees(N)
     k = collect(keys(D))
     sort!(k, rev = true)
     n = length(k)
@@ -1680,7 +1698,7 @@ function degree_table(io, N::NumericalIrreducibleDecomposition{T}) where {T}
 
     for (i, key) in enumerate(k)
         data[i, 1] = key
-        components = [ModelKit.degree(W) for W in D[key]]
+        components = D[key]
         sort!(components, rev = true)
         if length(components) == 1
             data[i, 2] = first(components)
