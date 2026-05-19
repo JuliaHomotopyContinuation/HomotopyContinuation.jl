@@ -1026,7 +1026,7 @@ function showstatus(progress::DecomposeProgress)
                 text,
                 (
                     "Status",
-                    "running monodromy ($(progress.monodromy_tracked_loops) loops tracked ($(progress.monodromy_generated_loops) generated, $(progress.monodromy_no_change) no change)",
+                    "running monodromy ($(progress.monodromy_tracked_loops) loops tracked, $(progress.monodromy_generated_loops) generated, $(progress.monodromy_no_change) no change)",
                 ),
             )
         else
