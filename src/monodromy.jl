@@ -1048,8 +1048,10 @@ function find_existing_point(MS::MonodromySolver, res::PathResult)
     search_in_radius(MS.unique_points, solution(res), rad)
 end
 
-function validate_new_result(MS::MonodromySolver, res::PathResult, tid::Int = 1)
-    validated_res = track(MS.trackers[tid], solution(res))
+function validate_new_result(MS::MonodromySolver, res::PathResult, p, tid::Int = 1)
+    tracker = MS.trackers[tid]
+    parameters!(tracker, p, p)
+    validated_res = track(tracker, solution(res))
     if is_success(validated_res) && !validated_res.singular
         validated_res
     else
@@ -1057,7 +1059,7 @@ function validate_new_result(MS::MonodromySolver, res::PathResult, tid::Int = 1)
     end
 end
 
-function add_tracked_result!(MS::MonodromySolver, res::PathResult, id, tid::Int = 1)
+function add_tracked_result!(MS::MonodromySolver, res::PathResult, id, p, tid::Int = 1)
     if duplicate_check_is_certified(MS)
         added_id, got_added = add!(MS, res, id, tid)
         return added_id, got_added, res
@@ -1068,7 +1070,7 @@ function add_tracked_result!(MS::MonodromySolver, res::PathResult, id, tid::Int 
         return (existing_id, false, res)
     end
 
-    validated_res = validate_new_result(MS, res, tid)
+    validated_res = validate_new_result(MS, res, p, tid)
     if isnothing(validated_res)
         return (0, false, res)
     end
@@ -1182,7 +1184,7 @@ function serial_monodromy_solve!(
 
                 # 1) check whether solution already exists. In heuristic mode, validate
                 # genuinely new endpoints before later monodromy calls can use them as starts.
-                id, got_added, res = add_tracked_result!(MS, res, length(results) + 1)
+                id, got_added, res = add_tracked_result!(MS, res, length(results) + 1, p)
 
                 if MS.options.permutations
                     add_permutation!(stats, job.loop_id, job.id, id)
@@ -1330,6 +1332,7 @@ function threaded_monodromy_solve!(
                                         MS,
                                         res,
                                         length(results) + 1,
+                                        p,
                                         tid,
                                     )
 
