@@ -334,7 +334,6 @@ function _regeneration(
         sing_cond = 1e12,
     ),
     monodromy_options::MonodromyOptions = MonodromyOptions(;
-        trace_test = true,
         parameter_sampler = weighted_normal,
     ),
     show_monodromy_progress::Bool = false,
@@ -1443,7 +1442,6 @@ function decompose(
     show_progress::Bool = true,
     show_monodromy_progress::Bool = false,
     monodromy_options::MonodromyOptions = MonodromyOptions(;
-        trace_test_tol = 1e-10,
         parameter_sampler = weighted_normal,
     ),
     max_iters::Int = 50,
@@ -1783,11 +1781,10 @@ function numerical_irreducible_decomposition(
         sing_accuracy = 1e-10,
     ),
     monodromy_options_for_regeneration = MonodromyOptions(;
-        trace_test = true,
         parameter_sampler = weighted_normal,
     ),
     monodromy_options_for_decompose::MonodromyOptions = MonodromyOptions(;
-        trace_test_tol = 1e-10,
+        parameter_sampler = weighted_normal,
     ),
     show_monodromy_progress::Bool = false,
     show_monodromy_for_regeneration_progress::Bool = false,
@@ -2075,7 +2072,6 @@ function _intersect(
         sing_cond = 1e12,
     ),
     monodromy_options::MonodromyOptions = MonodromyOptions(;
-        trace_test = true,
         parameter_sampler = weighted_normal,
     ),
     show_monodromy_progress::Bool = false,

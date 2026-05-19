@@ -2,6 +2,7 @@ export monodromy_solve,
     find_start_pair,
     MonodromyOptions,
     MonodromyResult,
+    independent_normal,
     is_success,
     is_heuristic_stop,
     ncertified_distinct,
@@ -9,7 +10,8 @@ export monodromy_solve,
     parameters,
     permutations,
     trace,
-    verify_solution_completeness
+    verify_solution_completeness,
+    weighted_normal
 
 #####################
 # Monodromy Options #
@@ -678,7 +680,7 @@ See also [`linear_subspace_homotopy`](@ref) for the `intrinsic` option.
 * `trace_test = true`: If `true` a trace test is performed to check whether all solutions
   are found. This is only applicable if monodromy is performed with a linear subspace.
   See also [`trace_test`](@ref).
-* `trace_test_tol = 1e-10`: The tolerance for the trace test to be successfull.
+* `trace_test_tol = 1e-6`: The tolerance for the trace test to be successfull.
   The trace is divided by the number of solutions before compared to the trace_test_tol.
 * `unique_points_rtol`: the relative tolerance for [`unique_points`](@ref).
 * `unique_points_atol`: the absolute tolerance for [`unique_points`](@ref).
