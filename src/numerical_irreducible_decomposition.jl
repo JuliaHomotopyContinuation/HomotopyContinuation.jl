@@ -1105,7 +1105,7 @@ function decompose_with_monodromy!(
         initial_points = check_start_solutions(MS, P, L)
         res = monodromy_solve(
             MS,
-            initial_points,
+            solution.(initial_points),
             L,
             seed;
             threading = threading,
