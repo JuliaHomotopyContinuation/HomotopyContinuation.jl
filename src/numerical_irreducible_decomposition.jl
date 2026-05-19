@@ -1173,7 +1173,7 @@ function decompose_with_monodromy!(
                 if trace(res_orbit) < options.trace_test_tol
 
                     # We do not want to add orbits of length 1 in the beginning. Even if they are on an irreducible component of degree > 1, they tend to have small trace.
-                    if length(orbit) > 1 || iter ≥ 5
+                    if length(orbit) > 1 || iter ≥ 5 || iter ≥ max_iters - 1
                         W_new = WitnessSet(G, L, P_orbit; is_irreducible = true)
 
                         push!(decomposition, W_new)
