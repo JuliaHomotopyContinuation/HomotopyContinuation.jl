@@ -919,6 +919,7 @@ Base.@kwdef mutable struct DecomposeProgress
     step::Int = 0
     is_monodromy::Bool = true
     is_finished::Bool = false
+    monodromy_solutions::Int = 0
     monodromy_tracked_loops::Int = 0
     monodromy_generated_loops::Int = 0
     monodromy_no_change::Int = 0
@@ -927,6 +928,7 @@ end
 function update_progress!(progress::DecomposeProgress; is_monodromy = nothing)
     isnothing(is_monodromy) ? nothing : progress.is_monodromy = is_monodromy
     if is_monodromy === true
+        progress.monodromy_solutions = 0
         progress.monodromy_tracked_loops = 0
         progress.monodromy_generated_loops = 0
         progress.monodromy_no_change = 0
@@ -948,7 +950,7 @@ function update_progress!(
     solutions::Int,
     finish::Bool = false,
 )
-    progress.npts = solutions
+    progress.monodromy_solutions = solutions
     progress.monodromy_tracked_loops = stats.tracked_loops[]
     progress.monodromy_generated_loops = stats.generated_loops[]
     progress.monodromy_no_change = loops_no_change(stats, solutions)
@@ -1026,7 +1028,7 @@ function showstatus(progress::DecomposeProgress)
                 text,
                 (
                     "Status",
-                    "running monodromy ($(progress.monodromy_tracked_loops) loops tracked, $(progress.monodromy_generated_loops) generated, $(progress.monodromy_no_change) no change)",
+                    "running monodromy ($(progress.monodromy_solutions) solutions, $(progress.monodromy_generated_loops) loops generated, $(progress.monodromy_no_change) no change)",
                 ),
             )
         else
