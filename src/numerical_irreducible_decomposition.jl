@@ -1102,9 +1102,10 @@ function decompose_with_monodromy!(
         update_progress!(progress; is_monodromy = true)
 
         MS = MonodromySolver(G, L; compile = false, options = options)
+        initial_points = check_start_solutions(MS, P, L)
         res = monodromy_solve(
             MS,
-            P,
+            initial_points,
             L,
             seed;
             threading = threading,
@@ -1180,11 +1181,24 @@ function decompose_with_monodromy!(
 
                     # We do not want to add orbits of length 1 in the beginning. Even if they are on an irreducible component of degree > 1, they tend to have small trace.
                     if length(orbit) > 1 || iter ≥ 5 || iter ≥ max_iters - 1
-                        W_new = WitnessSet(G, L, P_orbit; is_irreducible = true)
+                        P_certified = indexed_solutions(res_orbit)
+                        W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
+                        complete_orbit =
+                            length(P_certified) == length(orbit) ? orbit :
+                            Set(
+                                matching_indices(
+                                    non_complete_points,
+                                    P_certified;
+                                    norm = options.distance,
+                                    atol = something(options.unique_points_atol, 1e-14),
+                                    rtol = something(options.unique_points_rtol, 1e-8),
+                                ),
+                            )
 
                         push!(decomposition, W_new)
-                        push!(complete_orbits, orbit)
-                        k = k - length(orbit)
+                        push!(complete_orbits, complete_orbit)
+                        d += length(P_certified) - length(complete_orbit)
+                        k = k - length(complete_orbit)
 
                         update_progress!(progress, W_new)
                         update_progress_npts!(progress, k)
@@ -1357,6 +1371,24 @@ function merge_sets(sets)
         end
     end
     return collect(values(result))
+end
+
+# find indices of newly detected points
+function matching_indices(points, certified_points; norm, atol, rtol)
+    indices = Int[]
+    matched = falses(length(certified_points))
+    for (i, p) in pairs(points)
+        tol = max(atol, rtol * distance(p, zero(p), norm))
+        for (j, q) in pairs(certified_points)
+            matched[j] && continue
+            if distance(p, q, norm) ≤ tol
+                push!(indices, i)
+                matched[j] = true
+                break
+            end
+        end
+    end
+    indices
 end
 
 
