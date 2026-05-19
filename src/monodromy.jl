@@ -1039,6 +1039,44 @@ function initialize_start_solutions(MS::MonodromySolver, X)
     results
 end
 
+function find_existing_point(MS::MonodromySolver, res::PathResult)
+    atol, rtol = monodromy_add_tolerances(MS, res)
+    rad = max(
+        atol,
+        rtol * MS.unique_points.tree.distance(solution(res), MS.unique_points.zero_vec),
+    )
+    search_in_radius(MS.unique_points, solution(res), rad)
+end
+
+function validate_new_result(MS::MonodromySolver, res::PathResult, tid::Int = 1)
+    validated_res = track(MS.trackers[tid], solution(res))
+    if is_success(validated_res) && !validated_res.singular
+        validated_res
+    else
+        nothing
+    end
+end
+
+function add_tracked_result!(MS::MonodromySolver, res::PathResult, id, tid::Int = 1)
+    if duplicate_check_is_certified(MS)
+        added_id, got_added = add!(MS, res, id, tid)
+        return added_id, got_added, res
+    end
+
+    existing_id = find_existing_point(MS, res)
+    if !isnothing(existing_id)
+        return (existing_id, false, res)
+    end
+
+    validated_res = validate_new_result(MS, res, tid)
+    if isnothing(validated_res)
+        return (0, false, res)
+    end
+
+    added_id, got_added = add!(MS, validated_res, id, tid)
+    added_id, got_added, validated_res
+end
+
 function add!(MS::MonodromySolver, res::PathResult, id, tid::Int = 1)
     atol, rtol = monodromy_add_tolerances(MS, res)
     if !duplicate_check_is_certified(MS)
@@ -1142,8 +1180,9 @@ function serial_monodromy_solve!(
             if !isnothing(res) && !res.singular
                 loop_tracked!(stats)
 
-                # 1) check whether solutions already exists
-                id, got_added = add!(MS, res, length(results) + 1)
+                # 1) check whether solution already exists. In heuristic mode, validate
+                # genuinely new endpoints before later monodromy calls can use them as starts.
+                id, got_added, res = add_tracked_result!(MS, res, length(results) + 1)
 
                 if MS.options.permutations
                     add_permutation!(stats, job.loop_id, job.id, id)
@@ -1282,11 +1321,17 @@ function threaded_monodromy_solve!(
                             if !isnothing(res) && !res.singular
                                 loop_tracked!(stats)
 
-                                # 1) check whether solutions already exists
+                                # 1) check whether solution already exists. In heuristic mode,
+                                # validate genuinely new endpoints before insertion.
                                 lock(data_lock)
                                 if length(results) <
                                    something(MS.options.target_solutions_count, Inf)
-                                    id, got_added = add!(MS, res, length(results) + 1, tid)
+                                    id, got_added, res = add_tracked_result!(
+                                        MS,
+                                        res,
+                                        length(results) + 1,
+                                        tid,
+                                    )
 
                                     if MS.options.permutations
                                         add_permutation!(stats, job.loop_id, job.id, id)
