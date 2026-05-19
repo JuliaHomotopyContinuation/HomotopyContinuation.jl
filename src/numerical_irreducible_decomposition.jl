@@ -1885,6 +1885,10 @@ Base.@kwdef mutable struct IntersectProgress
     ntasks::Int = 0
     current_path::Int = 0
     npaths::Int = 0
+    monodromy_solutions::Int = 0
+    monodromy_tracked_loops::Int = 0
+    monodromy_generated_loops::Int = 0
+    monodromy_no_change::Int = 0
 end
 IntersectProgress(progress_meter::PM.ProgressUnknown) =
     IntersectProgress(progress_meter = progress_meter)
@@ -1898,9 +1902,42 @@ function update_progress!(
     isnothing(is_membership_test) ? nothing :
     progress.is_membership_test = is_membership_test
     isnothing(is_monodromy) ? nothing : progress.is_monodromy = is_monodromy
+    if is_monodromy === true
+        progress.monodromy_solutions = 0
+        progress.monodromy_tracked_loops = 0
+        progress.monodromy_generated_loops = 0
+        progress.monodromy_no_change = 0
+    end
     PM.update!(progress.progress_meter, showvalues = showvalues(progress))
 end
+function update_progress!(
+    progress::IntersectProgress,
+    stats::MonodromyStatistics;
+    queued::Int,
+    solutions::Int,
+    finish::Bool = false,
+)
+    progress.monodromy_solutions = solutions
+    progress.monodromy_tracked_loops = stats.tracked_loops[]
+    progress.monodromy_generated_loops = stats.generated_loops[]
+    progress.monodromy_no_change = loops_no_change(stats, solutions)
+
+    if finish
+        PM.update!(progress.progress_meter, showvalues = showvalues(progress))
+    elseif time() > progress.progress_meter.tlast + progress.progress_meter.dt
+        PM.update!(progress.progress_meter, showvalues = showvalues(progress))
+    end
+
+    nothing
+end
 update_progress!(progress::IntersectProgress, W) = nothing
+function update_progress_monodromy_witness!(progress::IntersectProgress, W)
+    progress.monodromy_solutions = degree(W)
+    progress.monodromy_tracked_loops = 0
+    progress.monodromy_generated_loops = 0
+    progress.monodromy_no_change = 0
+    PM.update!(progress.progress_meter, showvalues = showvalues(progress))
+end
 function update_progress_tasks!(progress::IntersectProgress, i::Int, m::Int)
     progress.current_task = i
     progress.ntasks = m
@@ -1928,8 +1965,8 @@ function showvalues(progress::IntersectProgress)
             push!(
                 text,
                 (
-                    "Track paths",
-                    "$(progress.ntasks) / $(progress.ntasks) (fill up points...)",
+                    "Fill up points",
+                    "$(progress.monodromy_solutions) solutions, $(progress.monodromy_tracked_loops) loops tracked ($(progress.monodromy_generated_loops) generated, $(progress.monodromy_no_change) no change)",
                 ),
             )
         elseif progress.is_membership_test
