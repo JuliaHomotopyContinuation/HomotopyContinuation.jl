@@ -58,6 +58,7 @@ Base.@kwdef mutable struct WitnessSetsProgress
     monodromy_codim::Int = 0
     monodromy_solutions::Int = 0
     monodromy_tracked_loops::Int = 0
+    monodromy_generated_loops::Int = 0
     monodromy_no_change::Int = 0
 end
 WitnessSetsProgress(n::Int, nhypersurfaces::Int, progress_meter::PM.ProgressUnknown) =
@@ -101,6 +102,7 @@ function update_progress!(
 )
     progress.monodromy_solutions = solutions
     progress.monodromy_tracked_loops = stats.tracked_loops[]
+    progress.monodromy_generated_loops = stats.generated_loops[]
     progress.monodromy_no_change = loops_no_change(stats, solutions)
 
     if finish
@@ -124,6 +126,7 @@ function update_progress_monodromy_witness!(progress::WitnessSetsProgress, W)
     progress.monodromy_codim = codim(W)
     progress.monodromy_solutions = degree(W)
     progress.monodromy_tracked_loops = 0
+    progress.monodromy_generated_loops = 0
     progress.monodromy_no_change = 0
     PM.update!(
         progress.progress_meter,
@@ -203,7 +206,7 @@ function showvalues(progress::WitnessSetsProgress)
                     text,
                     (
                         "Fill up points",
-                        "$(progress.monodromy_tracked_loops) loops tracked, $(progress.monodromy_no_change) no change",
+                        "$(progress.monodromy_tracked_loops) loops tracked ($(progress.monodromy_generated_loops) generated, $(progress.monodromy_no_change) no change)",
                     ),
                 )
             elseif progress.is_membership_test
@@ -916,10 +919,18 @@ Base.@kwdef mutable struct DecomposeProgress
     step::Int = 0
     is_monodromy::Bool = true
     is_finished::Bool = false
+    monodromy_tracked_loops::Int = 0
+    monodromy_generated_loops::Int = 0
+    monodromy_no_change::Int = 0
 end
 
 function update_progress!(progress::DecomposeProgress; is_monodromy = nothing)
     isnothing(is_monodromy) ? nothing : progress.is_monodromy = is_monodromy
+    if is_monodromy === true
+        progress.monodromy_tracked_loops = 0
+        progress.monodromy_generated_loops = 0
+        progress.monodromy_no_change = 0
+    end
 
     if !isnothing(is_monodromy)
         PM.update!(
@@ -929,6 +940,34 @@ function update_progress!(progress::DecomposeProgress; is_monodromy = nothing)
             force = true,
         )
     end
+end
+function update_progress!(
+    progress::DecomposeProgress,
+    stats::MonodromyStatistics;
+    queued::Int,
+    solutions::Int,
+    finish::Bool = false,
+)
+    progress.npts = solutions
+    progress.monodromy_tracked_loops = stats.tracked_loops[]
+    progress.monodromy_generated_loops = stats.generated_loops[]
+    progress.monodromy_no_change = loops_no_change(stats, solutions)
+
+    if finish
+        PM.update!(
+            progress.progress_meter,
+            progress.step,
+            showvalues = showstatus(progress),
+        )
+    elseif time() > progress.progress_meter.tlast + progress.progress_meter.dt
+        PM.update!(
+            progress.progress_meter,
+            progress.step,
+            showvalues = showstatus(progress),
+        )
+    end
+
+    nothing
 end
 update_progress!(progress::Nothing, D::Vector{WitnessSet}) = nothing
 function update_progress!(progress::DecomposeProgress, W::WitnessSet)
@@ -983,7 +1022,13 @@ function showstatus(progress::DecomposeProgress)
     end
     if !progress.is_finished
         if progress.is_monodromy
-            push!(text, ("Status", "running monodromy"))
+            push!(
+                text,
+                (
+                    "Status",
+                    "running monodromy ($(progress.monodromy_tracked_loops) loops tracked ($(progress.monodromy_generated_loops) generated, $(progress.monodromy_no_change) no change)",
+                ),
+            )
         else
             push!(text, ("Status", "partitioning points"))
         end
@@ -1059,6 +1104,7 @@ function decompose_with_monodromy!(
             seed;
             threading = threading,
             show_progress = show_monodromy_progress,
+            progress = show_monodromy_progress ? nothing : progress,
         )
         update_progress!(progress; is_monodromy = false)
         update_progress_npts!(progress, nsolutions(res))
@@ -1088,6 +1134,7 @@ function decompose_with_monodromy!(
                     seed;
                     threading = threading,
                     show_progress = show_monodromy_progress,
+                    progress = show_monodromy_progress ? nothing : progress,
                 )
                 update_progress!(progress; is_monodromy = false)
             end
@@ -1118,6 +1165,7 @@ function decompose_with_monodromy!(
                     seed;
                     threading = threading,
                     show_progress = show_monodromy_progress,
+                    progress = show_monodromy_progress ? nothing : progress,
                 )
                 update_progress!(progress; is_monodromy = false)
 
