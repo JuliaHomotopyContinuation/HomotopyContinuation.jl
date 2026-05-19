@@ -1023,13 +1023,17 @@ function showstatus(progress::DecomposeProgress)
     end
     if !progress.is_finished
         if progress.is_monodromy
-            push!(
-                text,
-                (
-                    "Status",
-                    "running monodromy ($(progress.monodromy_solutions) solutions, $(progress.monodromy_generated_loops) loops generated, $(progress.monodromy_no_change) no change)",
-                ),
-            )
+            if progress.monodromy_solutions > 0
+                push!(
+                    text,
+                    (
+                        "Status",
+                        "running monodromy ($(progress.monodromy_solutions) solutions, $(progress.monodromy_generated_loops) loops generated, $(progress.monodromy_no_change) no change)",
+                    ),
+                )
+            else
+                push!(text, ("Status", "running monodromy"))
+            end
         else
             push!(text, ("Status", "partitioning points"))
         end
