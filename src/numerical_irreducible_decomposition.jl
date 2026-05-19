@@ -55,6 +55,10 @@ Base.@kwdef mutable struct WitnessSetsProgress
     ntasks::Int = 0
     current_hypersurface::Int = 1
     nhypersurfaces::Int
+    monodromy_codim::Int = 0
+    monodromy_solutions::Int = 0
+    monodromy_tracked_loops::Int = 0
+    monodromy_no_change::Int = 0
 end
 WitnessSetsProgress(n::Int, nhypersurfaces::Int, progress_meter::PM.ProgressUnknown) =
     WitnessSetsProgress(
@@ -86,6 +90,45 @@ function update_progress!(
         progress.progress_meter,
         progress.current_hypersurface,
         showvalues = showvalues(progress);
+    )
+end
+function update_progress!(
+    progress::WitnessSetsProgress,
+    stats::MonodromyStatistics;
+    queued::Int,
+    solutions::Int,
+    finish::Bool = false,
+)
+    progress.monodromy_solutions = solutions
+    progress.monodromy_tracked_loops = stats.tracked_loops[]
+    progress.monodromy_no_change = loops_no_change(stats, solutions)
+
+    if finish
+        PM.update!(
+            progress.progress_meter,
+            progress.current_hypersurface,
+            showvalues = showvalues(progress),
+        )
+    elseif time() > progress.progress_meter.tlast + progress.progress_meter.dt
+        PM.update!(
+            progress.progress_meter,
+            progress.current_hypersurface,
+            showvalues = showvalues(progress),
+        )
+    end
+
+    nothing
+end
+update_progress_monodromy_witness!(progress::Nothing, W) = nothing
+function update_progress_monodromy_witness!(progress::WitnessSetsProgress, W)
+    progress.monodromy_codim = codim(W)
+    progress.monodromy_solutions = degree(W)
+    progress.monodromy_tracked_loops = 0
+    progress.monodromy_no_change = 0
+    PM.update!(
+        progress.progress_meter,
+        progress.current_hypersurface,
+        showvalues = showvalues(progress),
     )
 end
 update_progress_hypersurface!(progress::Nothing, i::Int) = nothing
@@ -159,8 +202,8 @@ function showvalues(progress::WitnessSetsProgress)
                 push!(
                     text,
                     (
-                        "Track paths",
-                        "$(progress.current_path) / $(progress.npaths) (fill up points...)",
+                        "Fill up points",
+                        "$(progress.monodromy_tracked_loops) loops tracked, $(progress.monodromy_no_change) no change",
                     ),
                 )
             elseif progress.is_membership_test
@@ -178,6 +221,9 @@ function showvalues(progress::WitnessSetsProgress)
     for c = 1:progress.current_hypersurface
         d = progress.ambient_dim - c
         deg = get(progress.degrees, c, nothing)
+        if progress.is_monodromy && c == progress.monodromy_codim
+            deg = progress.monodromy_solutions
+        end
         if !isnothing(deg) && deg > 0
             push!(text, ("Dimension $d", "$(deg)"))
         end
@@ -561,12 +607,14 @@ function fill_up!(out, monodromy_options, cache, show_monodromy_progress, thread
     )
     for W in out
         if !isnothing(W) && dim(W) > 0 && degree(W) > 0
+            update_progress_monodromy_witness!(progress, W)
             res = monodromy_solve(
                 Fᵢ,
                 W.R,
                 linear_subspace(W);
                 options = regeneration_monodromy_options(monodromy_options, W),
                 show_progress = show_monodromy_progress,
+                progress = show_monodromy_progress ? nothing : progress,
                 threading = threading,
                 warning = false,
             )

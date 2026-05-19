@@ -703,6 +703,7 @@ function monodromy_solve(
     seed = rand(UInt32),
     tracker_options = TrackerOptions(),
     show_progress::Bool = true,
+    progress = nothing,
     threading::Bool = Threads.nthreads() > 1,
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
     catch_interrupt::Bool = true,
@@ -778,6 +779,7 @@ function monodromy_solve(
         p,
         seed;
         show_progress = show_progress,
+        progress = progress,
         threading = threading,
         catch_interrupt = catch_interrupt,
         warning = warning,
@@ -898,13 +900,12 @@ function monodromy_solve(
     p,
     seed;
     show_progress::Bool = true,
+    progress = nothing,
     threading::Bool = Threads.nthreads() > 1,
     catch_interrupt::Bool = true,
     warning::Bool = true,
 )
-    if !show_progress
-        progress = nothing
-    else
+    if isnothing(progress) && show_progress
         if MS.options.equivalence_classes
             desc = "Solutions (modulo group action) found:"
         else
