@@ -54,8 +54,10 @@ Base.IteratorEltype(::Type{<:PolyhedralStartSolutionsIterator}) = Base.HasEltype
 Base.eltype(iter::PolyhedralStartSolutionsIterator) = Tuple{MixedCell,Vector{ComplexF64}}
 
 function compute_mixed_cells!(iter::PolyhedralStartSolutionsIterator)
-    # Mixed cells are computed at construction time. Keep this method as a cheap
-    # compatibility hook for callers that used to force lazy initialization.
+    Base.depwarn(
+        "`compute_mixed_cells!` is deprecated. Mixed cells are computed when the `PolyhedralStartSolutionsIterator` is constructed.",
+        :compute_mixed_cells!,
+    )
     iter
 end
 
