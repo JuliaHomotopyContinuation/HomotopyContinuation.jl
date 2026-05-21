@@ -477,7 +477,14 @@
         F = System([x^2 - 1, y - 1], [x, y])
         iter = solve(F; iterator_only = true, start_system = :total_degree)
 
-        res = certify(F, iter, nothing; k = 2, boundaries = -3:3, show_progress = false)
+        res = certify(
+            F,
+            iter,
+            nothing;
+            bucket_size_bound = 2,
+            boundaries = -3:3,
+            show_progress = false,
+        )
 
         @test ncertified(res) == 2
         @test ndistinct_certified(res) == 2
