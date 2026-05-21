@@ -2244,6 +2244,7 @@ function check_iterator_certify_options(
     ε::Float64,
     coordinate::Int,
     bucket_size_bound::Integer,
+    boundaries,
     max_refinement_rounds::Int,
 )
     ε > 0 && isfinite(ε) || throw(ArgumentError("`ε` must be positive and finite."))
@@ -2255,11 +2256,13 @@ function check_iterator_certify_options(
             "`coordinate` must be between 1 and the number of variables ($(size(F, 2))).",
         ),
     )
+    all(isfinite, float.(boundaries)) ||
+        throw(ArgumentError("`boundaries` must contain only finite values."))
 
     return nothing
 end
 
-function _threaded_iterator_data(
+function threaded_iterator_data(
     iter::ResultIterator,
     F::AbstractSystem,
     cert_params,
@@ -2319,7 +2322,7 @@ function _threaded_iterator_data(
     )
 end
 
-function _merge_covering_leaves!(bsp::BSPPartition, interval)
+function merge_covering_leaves!(bsp::BSPPartition, interval)
     # Find the block of leaves touched by `interval`.
     # this implementation exploits that the intervals at the leaves of bsp are ordered 
     left = 0
@@ -2378,7 +2381,7 @@ function _ensure_bucket!(bsp::BSPPartition, interval)
         match = _find_bucket(bsp, interval)
         !isnothing(match) && return match
         # If `interval` crosses a current cut, coarsen the BSP locally and try again.
-        _merge_covering_leaves!(bsp, interval) || error(
+        merge_covering_leaves!(bsp, interval) || error(
             "Could not place certified interval $interval into the current BSP leaves.",
         )
     end
@@ -2396,7 +2399,7 @@ end
 
 _bucket_entries_dict() = Dict{Tuple{Float64,Float64},Vector{BSPBucketEntry}}()
 
-function _ensure_bucket_entries!(
+function ensure_bucket_entries!(
     bucket_entries::Dict{Tuple{Float64,Float64},Vector{BSPBucketEntry}},
     leaf,
 )
@@ -2419,7 +2422,7 @@ function _ensure_bucket_entries!(
     merged_entries
 end
 
-function _reindex_bucket_entries(entries::Vector{BSPBucketEntry})
+function reindex_bucket_entries(entries::Vector{BSPBucketEntry})
     # Convert entry indices from the current iterator's output numbering into the
     # local numbering of a freshly built bucket iterator.
     sorted_entries = sort!(copy(entries); by = entry -> entry.index)
@@ -2431,7 +2434,7 @@ function _reindex_bucket_entries(entries::Vector{BSPBucketEntry})
     reindexed
 end
 
-function _assign_initial_buckets!(
+function assign_initial_buckets!(
     bsp::BSPPartition,
     iter::ResultIterator,
     F,
@@ -2456,7 +2459,7 @@ function _assign_initial_buckets!(
     register_iterator_pass!(progress, "Assign initial BSP buckets", length(iter))
 
     if threading && Threads.nthreads() > 1 && length(iter) > 1
-        contexts = _threaded_iterator_data(iter, F, cert_params, cert_cache, true)
+        contexts = threaded_iterator_data(iter, F, cert_params, cert_cache, true)
         progress_lock = ReentrantLock()
         # Only counters and progress are shared while certifying. BSP mutation is
         # deferred until all workers have produced their local bucket entries.
@@ -2534,7 +2537,7 @@ function _assign_initial_buckets!(
             # Apply bucket updates serially.
             match = _ensure_bucket!(bsp, entry.interval)
             leaf = IntervalTrees.Interval(first(match), last(match))
-            entries = _ensure_bucket_entries!(bucket_entries, leaf)
+            entries = ensure_bucket_entries!(bucket_entries, leaf)
             push!(entries, entry)
             bsp.tree[leaf] = _bucket_count(bsp, leaf) + 1
         end
@@ -2595,7 +2598,7 @@ function _assign_initial_buckets!(
         interval = _convert_to_interval(cert; coordinate = coordinate)
         match = _ensure_bucket!(bsp, interval)
         leaf = IntervalTrees.Interval(first(match), last(match))
-        entries = _ensure_bucket_entries!(bucket_entries, leaf)
+        entries = ensure_bucket_entries!(bucket_entries, leaf)
         # At the root these indices are global iterator positions. Later, child buckets
         # are reindexed relative to their local bucket iterators.
         push!(entries, BSPBucketEntry(idx, interval))
@@ -2615,7 +2618,7 @@ function _assign_initial_buckets!(
     return stats, bucket_entries
 end
 
-function _collect_leaf_entries!(
+function collect_leaf_entries!(
     bsp::BSPPartition,
     leaf,
     iter::ResultIterator,
@@ -2645,7 +2648,7 @@ function _collect_leaf_entries!(
     )
 
     if threading && Threads.nthreads() > 1 && isnothing(max_entries) && length(iter) > 1
-        contexts = _threaded_iterator_data(iter, F, cert_params, cert_cache, true)
+        contexts = threaded_iterator_data(iter, F, cert_params, cert_cache, true)
         progress_lock = ReentrantLock()
         # The threaded path is only used for full recollection.
         local_entries = [BSPBucketEntry[] for _ in eachindex(contexts.iters)]
@@ -2808,7 +2811,7 @@ function _random_split_point(entries::Vector{BSPBucketEntry}, leaf; ε::Float64 
     nothing
 end
 
-function _verify_split!(
+function verify_split!(
     bsp::BSPPartition,
     leaf,
     split_point,
@@ -2836,7 +2839,7 @@ function _verify_split!(
     register_iterator_pass!(progress, "Verify BSP split", length(iter))
 
     if threading && Threads.nthreads() > 1 && length(iter) > 1
-        contexts = _threaded_iterator_data(iter, F, cert_params, cert_cache, true)
+        contexts = threaded_iterator_data(iter, F, cert_params, cert_cache, true)
         progress_lock = ReentrantLock()
         # Workers certify and classify intervals independently. They only report three
         # outcomes: left child, right child, or "this split/leaf cannot be used".
@@ -3010,7 +3013,7 @@ function _verify_split!(
     )
 end
 
-function _stable_leaf_entries!(
+function stable_leaf_entries!(
     bsp::BSPPartition,
     leaf,
     iter,
@@ -3033,7 +3036,7 @@ function _stable_leaf_entries!(
     # locally stable bucket before we split or certify it.
     current_leaf = leaf
     while true
-        entries, bucket_size, updated_leaf, stable = _collect_leaf_entries!(
+        entries, bucket_size, updated_leaf, stable = collect_leaf_entries!(
             bsp,
             current_leaf,
             iter,
@@ -3054,7 +3057,7 @@ function _stable_leaf_entries!(
     end
 end
 
-function _split_leaf!(bsp::BSPPartition, leaf, split_point)
+function split_leaf!(bsp::BSPPartition, leaf, split_point)
     # Split a single leaf in place and initialize the child counts to zero.
     left_leaf = IntervalTrees.Interval(first(leaf), split_point)
     right_leaf = IntervalTrees.Interval(split_point, last(leaf))
@@ -3106,7 +3109,7 @@ function _leaf_stats(bsp::BSPPartition, bucket_size_bound::Integer)
     return max_bucket_size, oversized_buckets
 end
 
-function _certify_terminal_bucket!(
+function certify_terminal_bucket!(
     d::DistinctCertifiedSolutions,
     bucket_iter::ResultIterator,
     F::AbstractSystem,
@@ -3123,7 +3126,7 @@ function _certify_terminal_bucket!(
     register_iterator_pass!(progress, "Certify terminal BSP bucket", length(bucket_iter))
 
     if threading && Threads.nthreads() > 1 && length(bucket_iter) > 1
-        contexts = _threaded_iterator_data(bucket_iter, F, cert_params, cache, true)
+        contexts = threaded_iterator_data(bucket_iter, F, cert_params, cache, true)
         progress_lock = ReentrantLock()
         # Certification of individual candidates is independent and can be threaded.
         # Insertion into the distinct-certificate set is done serially, because it compares certificates against each other.
@@ -3190,7 +3193,151 @@ function _certify_terminal_bucket!(
     return nfinite
 end
 
-function _process_leaf!(
+"""
+    handle_split_verification!(
+        verification, bucket_iter, split_point, bsp, current_leaf, iter, F,
+        cert_params, cache, d; kwargs...
+    )
+
+Handle the result of verifying one proposed BSP split.
+
+Returns a named tuple with one of three statuses:
+* `status = :invalid`: the split was rejected and refinement should try another cut.
+* `status = :restart`: certification found that `current_leaf` must be merged with neighboring BSP leaves; the returned `entries`, `bucket_size`, and `current_leaf` are the stable data for the merged leaf.
+* `status = :done`: the split was accepted, both child leaves were processed recursively, and `counts` contains the aggregate distinct-solution counts.
+"""
+function handle_split_verification!(
+    verification,
+    bucket_iter::ResultIterator,
+    split_point,
+    bsp::BSPPartition,
+    current_leaf,
+    iter::ResultIterator,
+    F::AbstractSystem,
+    cert_params,
+    cache::CertificationCache,
+    d::DistinctCertifiedSolutions;
+    progress::Union{Nothing,IteratorCertificationProgress} = nothing,
+    bucket_size_bound::Integer = 1000,
+    certify_oversized_buckets::Bool = false,
+    threading::Bool = true,
+    ε::Float64 = 1e-4,
+    coordinate::Int = 1,
+    max_refinement_rounds::Int = 50,
+    depth::Int = 0,
+    max_precision::Int = 256,
+    refine_solution::Bool = true,
+    extended_certificate::Bool = false,
+    certify_solution_kwargs...,
+)
+    if !verification.stable
+        entries, bucket_size, current_leaf = stable_leaf_entries!(
+            bsp,
+            verification.leaf,
+            iter,
+            F,
+            cert_params,
+            cache;
+            progress = progress,
+            threading = threading,
+            coordinate = coordinate,
+            max_entries = nothing,
+            max_precision = max_precision,
+            refine_solution = refine_solution,
+            extended_certificate = extended_certificate,
+            certify_solution_kwargs...,
+        )
+        return (
+            status = :restart,
+            entries = entries,
+            bucket_size = bucket_size,
+            current_leaf = current_leaf,
+        )
+    elseif verification.valid
+        # Reuse the partition computed during verification. Each child gets its own
+        # bucket iterator, so recursion never has to rediscover which entries belong
+        # to the left/right subtree.
+        # The verification output is still indexed relative to `bucket_iter`, so we
+        # reindex it before passing it to the child recursion.
+        left_leaf, right_leaf = split_leaf!(bsp, current_leaf, split_point)
+        left_iter = _bucket_iterator(bucket_iter, verification.left_entries)
+        right_iter = _bucket_iterator(bucket_iter, verification.right_entries)
+        left_entries = reindex_bucket_entries(verification.left_entries)
+        right_entries = reindex_bucket_entries(verification.right_entries)
+        left_counts = process_leaf!(
+            bsp,
+            left_leaf,
+            left_iter,
+            F,
+            cert_params,
+            cache,
+            d;
+            progress = progress,
+            bucket_size_bound = bucket_size_bound,
+            certify_oversized_buckets = certify_oversized_buckets,
+            threading = threading,
+            ε = ε,
+            coordinate = coordinate,
+            max_refinement_rounds = max_refinement_rounds,
+            depth = depth + 1,
+            initial_entries = left_entries,
+            max_precision = max_precision,
+            refine_solution = refine_solution,
+            extended_certificate = extended_certificate,
+            certify_solution_kwargs...,
+        )
+        right_counts = process_leaf!(
+            bsp,
+            right_leaf,
+            right_iter,
+            F,
+            cert_params,
+            cache,
+            d;
+            progress = progress,
+            bucket_size_bound = bucket_size_bound,
+            certify_oversized_buckets = certify_oversized_buckets,
+            threading = threading,
+            ε = ε,
+            coordinate = coordinate,
+            max_refinement_rounds = max_refinement_rounds,
+            depth = depth + 1,
+            initial_entries = right_entries,
+            max_precision = max_precision,
+            refine_solution = refine_solution,
+            extended_certificate = extended_certificate,
+            certify_solution_kwargs...,
+        )
+        return (
+            status = :done,
+            counts = (
+                distinct_certified = left_counts.distinct_certified +
+                                     right_counts.distinct_certified,
+                distinct_real = left_counts.distinct_real + right_counts.distinct_real,
+                distinct_complex = left_counts.distinct_complex +
+                                   right_counts.distinct_complex,
+                refinement_steps = left_counts.refinement_steps +
+                                   right_counts.refinement_steps +
+                                   1,
+                rightmost_leaf = right_counts.rightmost_leaf,
+            ),
+        )
+    end
+    return (status = :invalid,)
+end
+
+"""
+    process_leaf!(
+        bsp, leaf, iter, F, cert_params, cache, d; initial_entries = nothing, kwargs...
+    )
+
+Process one BSP leaf using an iterator that is local to that leaf.
+
+The routine tries to split oversized leaves using certified intervals in the chosen coordinate. Each child is processed recursively with its own bucket iterator. If the leaf is terminal, the routine certifies only that bucket and performs the distinct-solution check.
+
+Returns a named tuple with distinct-solution counts for this leaf subtree, the number of refinement steps, and the rightmost BSP leaf processed.
+"""
+function process_leaf!(
     bsp::BSPPartition,
     leaf,
     iter::ResultIterator,
@@ -3216,7 +3363,7 @@ function _process_leaf!(
     # Step 1: stabilize the current leaf with a tiny sample so we can cheaply decide
     # whether this subtree needs further refinement at all.
     if isnothing(initial_entries)
-        entries, bucket_size, current_leaf = _stable_leaf_entries!(
+        entries, bucket_size, current_leaf = stable_leaf_entries!(
             bsp,
             leaf,
             iter,
@@ -3238,100 +3385,11 @@ function _process_leaf!(
         current_leaf = leaf
     end
 
-    function handle_split_verification!(verification, bucket_iter, split_point)
-        if !verification.stable
-            entries, bucket_size, current_leaf = _stable_leaf_entries!(
-                bsp,
-                verification.leaf,
-                iter,
-                F,
-                cert_params,
-                cache;
-                progress = progress,
-                threading = threading,
-                coordinate = coordinate,
-                max_entries = nothing,
-                max_precision = max_precision,
-                refine_solution = refine_solution,
-                extended_certificate = extended_certificate,
-                certify_solution_kwargs...,
-            )
-            return :restart
-        elseif verification.valid
-            # Step 3: reuse the partition computed during verification. Each child
-            # gets its own bucket iterator, so recursion never has to rediscover
-            # which entries belong to the left/right subtree.
-            # The verification output is still indexed relative to `bucket_iter`,
-            # so we reindex it before passing it to the child recursion.
-            left_leaf, right_leaf = _split_leaf!(bsp, current_leaf, split_point)
-            left_iter = _bucket_iterator(bucket_iter, verification.left_entries)
-            right_iter = _bucket_iterator(bucket_iter, verification.right_entries)
-            left_entries = _reindex_bucket_entries(verification.left_entries)
-            right_entries = _reindex_bucket_entries(verification.right_entries)
-            left_counts = _process_leaf!(
-                bsp,
-                left_leaf,
-                left_iter,
-                F,
-                cert_params,
-                cache,
-                d;
-                progress = progress,
-                bucket_size_bound = bucket_size_bound,
-                certify_oversized_buckets = certify_oversized_buckets,
-                threading = threading,
-                ε = ε,
-                coordinate = coordinate,
-                max_refinement_rounds = max_refinement_rounds,
-                depth = depth + 1,
-                initial_entries = left_entries,
-                max_precision = max_precision,
-                refine_solution = refine_solution,
-                extended_certificate = extended_certificate,
-                certify_solution_kwargs...,
-            )
-            right_counts = _process_leaf!(
-                bsp,
-                right_leaf,
-                right_iter,
-                F,
-                cert_params,
-                cache,
-                d;
-                progress = progress,
-                bucket_size_bound = bucket_size_bound,
-                certify_oversized_buckets = certify_oversized_buckets,
-                threading = threading,
-                ε = ε,
-                coordinate = coordinate,
-                max_refinement_rounds = max_refinement_rounds,
-                depth = depth + 1,
-                initial_entries = right_entries,
-                max_precision = max_precision,
-                refine_solution = refine_solution,
-                extended_certificate = extended_certificate,
-                certify_solution_kwargs...,
-            )
-            return (
-                distinct_certified = left_counts.distinct_certified +
-                                     right_counts.distinct_certified,
-                distinct_real = left_counts.distinct_real + right_counts.distinct_real,
-                distinct_complex = left_counts.distinct_complex +
-                                   right_counts.distinct_complex,
-                refinement_steps = left_counts.refinement_steps +
-                                   right_counts.refinement_steps +
-                                   1,
-                rightmost_leaf = right_counts.rightmost_leaf,
-            )
-        end
-        return nothing
-    end
-
     if bucket_size > bucket_size_bound && depth < max_refinement_rounds
         # Step 2: this leaf is oversized, so recollect the full local bucket and work
         # only with the corresponding bucket iterator from here on.
         if isnothing(initial_entries)
-            entries, bucket_size, current_leaf = _stable_leaf_entries!(
+            entries, bucket_size, current_leaf = stable_leaf_entries!(
                 bsp,
                 current_leaf,
                 iter,
@@ -3361,7 +3419,7 @@ function _process_leaf!(
             restart_from_merged_leaf = false
             for split_point in deterministic_points
                 # Try the deterministic split candidates first.
-                verification = _verify_split!(
+                verification = verify_split!(
                     bsp,
                     current_leaf,
                     split_point,
@@ -3378,13 +3436,38 @@ function _process_leaf!(
                     certify_solution_kwargs...,
                 )
 
-                split_result =
-                    handle_split_verification!(verification, bucket_iter, split_point)
-                if split_result === :restart
+                split_result = handle_split_verification!(
+                    verification,
+                    bucket_iter,
+                    split_point,
+                    bsp,
+                    current_leaf,
+                    iter,
+                    F,
+                    cert_params,
+                    cache,
+                    d;
+                    progress = progress,
+                    bucket_size_bound = bucket_size_bound,
+                    certify_oversized_buckets = certify_oversized_buckets,
+                    threading = threading,
+                    ε = ε,
+                    coordinate = coordinate,
+                    max_refinement_rounds = max_refinement_rounds,
+                    depth = depth,
+                    max_precision = max_precision,
+                    refine_solution = refine_solution,
+                    extended_certificate = extended_certificate,
+                    certify_solution_kwargs...,
+                )
+                if split_result.status === :restart
+                    entries = split_result.entries
+                    bucket_size = split_result.bucket_size
+                    current_leaf = split_result.current_leaf
                     restart_from_merged_leaf = true
                     break
-                elseif !isnothing(split_result)
-                    return split_result
+                elseif split_result.status === :done
+                    return split_result.counts
                 end
             end
 
@@ -3394,7 +3477,7 @@ function _process_leaf!(
                 # in the remaining admissible region before giving up on splitting.
                 random_split = _random_split_point(entries, current_leaf; ε = ε)
                 isnothing(random_split) && break
-                verification = _verify_split!(
+                verification = verify_split!(
                     bsp,
                     current_leaf,
                     random_split,
@@ -3411,12 +3494,37 @@ function _process_leaf!(
                     certify_solution_kwargs...,
                 )
 
-                split_result =
-                    handle_split_verification!(verification, bucket_iter, random_split)
-                if split_result === :restart
+                split_result = handle_split_verification!(
+                    verification,
+                    bucket_iter,
+                    random_split,
+                    bsp,
+                    current_leaf,
+                    iter,
+                    F,
+                    cert_params,
+                    cache,
+                    d;
+                    progress = progress,
+                    bucket_size_bound = bucket_size_bound,
+                    certify_oversized_buckets = certify_oversized_buckets,
+                    threading = threading,
+                    ε = ε,
+                    coordinate = coordinate,
+                    max_refinement_rounds = max_refinement_rounds,
+                    depth = depth,
+                    max_precision = max_precision,
+                    refine_solution = refine_solution,
+                    extended_certificate = extended_certificate,
+                    certify_solution_kwargs...,
+                )
+                if split_result.status === :restart
+                    entries = split_result.entries
+                    bucket_size = split_result.bucket_size
+                    current_leaf = split_result.current_leaf
                     continue
-                elseif !isnothing(split_result)
-                    return split_result
+                elseif split_result.status === :done
+                    return split_result.counts
                 end
             end
 
@@ -3426,7 +3534,7 @@ function _process_leaf!(
                 # a random admissible cut.
                 random_split = _random_split_point(entries, current_leaf; ε = ε)
                 if !isnothing(random_split)
-                    verification = _verify_split!(
+                    verification = verify_split!(
                         bsp,
                         current_leaf,
                         random_split,
@@ -3443,12 +3551,37 @@ function _process_leaf!(
                         certify_solution_kwargs...,
                     )
 
-                    split_result =
-                        handle_split_verification!(verification, bucket_iter, random_split)
-                    if split_result === :restart
+                    split_result = handle_split_verification!(
+                        verification,
+                        bucket_iter,
+                        random_split,
+                        bsp,
+                        current_leaf,
+                        iter,
+                        F,
+                        cert_params,
+                        cache,
+                        d;
+                        progress = progress,
+                        bucket_size_bound = bucket_size_bound,
+                        certify_oversized_buckets = certify_oversized_buckets,
+                        threading = threading,
+                        ε = ε,
+                        coordinate = coordinate,
+                        max_refinement_rounds = max_refinement_rounds,
+                        depth = depth,
+                        max_precision = max_precision,
+                        refine_solution = refine_solution,
+                        extended_certificate = extended_certificate,
+                        certify_solution_kwargs...,
+                    )
+                    if split_result.status === :restart
+                        entries = split_result.entries
+                        bucket_size = split_result.bucket_size
+                        current_leaf = split_result.current_leaf
                         continue
-                    elseif !isnothing(split_result)
-                        return split_result
+                    elseif split_result.status === :done
+                        return split_result.counts
                     end
                 end
             end
@@ -3486,7 +3619,7 @@ function _process_leaf!(
     # Before final joint certification, recollect the full terminal bucket. The
     # one-entry sample above is only for proposing memory-bounded splits.
     if !isempty(entries) && isnothing(initial_entries)
-        entries, bucket_size, current_leaf = _stable_leaf_entries!(
+        entries, bucket_size, current_leaf = stable_leaf_entries!(
             bsp,
             current_leaf,
             iter,
@@ -3507,7 +3640,7 @@ function _process_leaf!(
     # Step 4: the leaf is terminal. Revisit only the current bucket and add its
     # certified solutions to `d`; the distinct check itself stays serial.
     bucket_iter = _bucket_iterator(iter, entries)
-    nfinite = _certify_terminal_bucket!(
+    nfinite = certify_terminal_bucket!(
         d,
         bucket_iter,
         F,
@@ -3634,6 +3767,7 @@ function _certify_iterator_bsp(
         ε = ε,
         coordinate = coordinate,
         bucket_size_bound = bucket_size_bound,
+        boundaries = boundaries,
         max_refinement_rounds = max_refinement_rounds,
     )
     bsp = _build_partition(boundaries)
@@ -3641,7 +3775,7 @@ function _certify_iterator_bsp(
     progress = show_progress ? make_iterator_certification_progress() : nothing
     update_iterator_progress!(progress; iterator_length = iter_length, force = true)
     # First pass over the full iterator: assign certified intervals to the coarse BSP.
-    assignment_stats, bucket_entries = _assign_initial_buckets!(
+    assignment_stats, bucket_entries = assign_initial_buckets!(
         bsp,
         iter,
         F,
@@ -3693,8 +3827,8 @@ function _certify_iterator_bsp(
             continue
         end
         leaf_iter = _bucket_iterator(iter, leaf_entries)
-        local_entries = _reindex_bucket_entries(leaf_entries)
-        counts = _process_leaf!(
+        local_entries = reindex_bucket_entries(leaf_entries)
+        counts = process_leaf!(
             bsp,
             leaf,
             leaf_iter,
