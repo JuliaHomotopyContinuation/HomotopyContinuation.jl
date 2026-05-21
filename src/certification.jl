@@ -2239,6 +2239,65 @@ end
 _bucket_count(bsp::BSPPartition, leaf) = IntervalTrees.value(bsp.tree[leaf])
 _bucket_id(interval) = (first(interval), last(interval))
 
+function _threaded_iterator_data(
+    iter::ResultIterator,
+    F::AbstractSystem,
+    cert_params,
+    cert_cache::CertificationCache,
+    threading::Bool,
+)
+    nthreads = threading ? Threads.nthreads() : 1
+    nthreads = max(1, min(nthreads, length(iter)))
+    nthreads == 1 && return (
+        iters = [iter],
+        indices = [collect(1:length(iter))],
+        systems = [F],
+        params = [cert_params],
+        caches = [cert_cache],
+    )
+
+    current_bitmask = bitmask(iter)
+    masks = if isnothing(current_bitmask)
+        [falses(length(iter)) for _ = 1:nthreads]
+    else
+        [falses(length(current_bitmask)) for _ = 1:nthreads]
+    end
+    indices = [Int[] for _ = 1:nthreads]
+
+    if isnothing(current_bitmask)
+        for output_index = 1:length(iter)
+            tid = mod1(output_index, nthreads)
+            masks[tid][output_index] = true
+            push!(indices[tid], output_index)
+        end
+    else
+        output_index = 0
+        for start_index in eachindex(current_bitmask)
+            current_bitmask[start_index] || continue
+            output_index += 1
+            tid = mod1(output_index, nthreads)
+            masks[tid][start_index] = true
+            push!(indices[tid], output_index)
+        end
+    end
+
+    starts = [deepcopy(start_solutions(iter)) for _ = 1:nthreads]
+    solvers = [deepcopy(solver(iter)) for _ = 1:nthreads]
+    iters = [
+        ResultIterator(starts[tid], solvers[tid]; bitmask = masks[tid]) for tid = 1:nthreads
+    ]
+    systems = [F; [deepcopy(F) for _ = 2:nthreads]]
+    params = [cert_params; [deepcopy(cert_params) for _ = 2:nthreads]]
+    caches = [cert_cache; [deepcopy(cert_cache) for _ = 2:nthreads]]
+    return (
+        iters = iters,
+        indices = indices,
+        systems = systems,
+        params = params,
+        caches = caches,
+    )
+end
+
 function _merge_covering_leaves!(bsp::BSPPartition, interval)
     # Find the block of leaves touched by `interval`.
     # this implementation exploits that the intervals at the leaves of bsp are ordered 
@@ -2353,11 +2412,12 @@ end
 
 function _assign_initial_buckets!(
     bsp::BSPPartition,
-    iter,
+    iter::ResultIterator,
     F,
     cert_params,
     cert_cache;
     progress::Union{Nothing,IteratorCertificationProgress} = nothing,
+    threading::Bool = true,
     coordinate::Int = 1,
     max_precision::Int = 256,
     refine_solution::Bool = true,
@@ -2372,8 +2432,93 @@ function _assign_initial_buckets!(
     #    a certified interval crosses an existing coarse cut.
     stats = BSPAssignmentStats()
     bucket_entries = _bucket_entries_dict()
-    idx = 0
     register_iterator_pass!(progress, "Assign initial BSP buckets", length(iter))
+
+    if threading && Threads.nthreads() > 1 && length(iter) > 1
+        contexts = _threaded_iterator_data(iter, F, cert_params, cert_cache, true)
+        progress_lock = ReentrantLock()
+        nresults = Threads.Atomic{Int}(0)
+        nfinite = Threads.Atomic{Int}(0)
+        certified = Threads.Atomic{Int}(0)
+        certified_real = Threads.Atomic{Int}(0)
+        certified_complex = Threads.Atomic{Int}(0)
+        not_certified = Threads.Atomic{Int}(0)
+        certified_entries = [BSPBucketEntry[] for _ in eachindex(contexts.iters)]
+
+        Threads.@sync begin
+            for tid in eachindex(contexts.iters)
+                Threads.@spawn begin
+                    local_entries = certified_entries[tid]
+                    for (idx, result) in zip(contexts.indices[tid], contexts.iters[tid])
+                        Threads.atomic_add!(nresults, 1)
+                        @lock progress_lock begin
+                            advance_iterator_progress!(
+                                progress;
+                                phase = :assignment,
+                                nresults = nresults[],
+                                nfinite = nfinite[],
+                                certified = certified[],
+                                certified_real = certified_real[],
+                                certified_complex = certified_complex[],
+                                not_certified = not_certified[],
+                            )
+                        end
+                        isfinite(result) || continue
+
+                        Threads.atomic_add!(nfinite, 1)
+                        cert = certify_solution(
+                            contexts.systems[tid],
+                            solution(result),
+                            contexts.params[tid],
+                            contexts.caches[tid],
+                            idx;
+                            max_precision = max_precision,
+                            refine_solution = refine_solution,
+                            extended_certificate = extended_certificate,
+                            certify_solution_kwargs...,
+                        )
+                        if !is_certified(cert)
+                            Threads.atomic_add!(not_certified, 1)
+                            continue
+                        end
+
+                        Threads.atomic_add!(certified, 1)
+                        Threads.atomic_add!(certified_real, Int(is_real(cert)))
+                        Threads.atomic_add!(certified_complex, Int(is_complex(cert)))
+                        push!(
+                            local_entries,
+                            BSPBucketEntry(
+                                idx,
+                                _convert_to_interval(cert; coordinate = coordinate),
+                            ),
+                        )
+                    end
+                end
+            end
+        end
+
+        stats.nresults = nresults[]
+        stats.nfinite = nfinite[]
+        stats.certified = certified[]
+        stats.certified_real = certified_real[]
+        stats.certified_complex = certified_complex[]
+        stats.not_certified = not_certified[]
+
+        for entry in sort!(
+            reduce(vcat, certified_entries; init = BSPBucketEntry[]);
+            by = entry -> entry.index,
+        )
+            match = _ensure_bucket!(bsp, entry.interval)
+            leaf = IntervalTrees.Interval(first(match), last(match))
+            entries = _ensure_bucket_entries!(bucket_entries, leaf)
+            push!(entries, entry)
+            bsp.tree[leaf] = _bucket_count(bsp, leaf) + 1
+        end
+
+        return stats, bucket_entries
+    end
+
+    idx = 0
     for result in iter
         idx += 1
         stats.nresults += 1
@@ -2449,11 +2594,12 @@ end
 function _collect_leaf_entries!(
     bsp::BSPPartition,
     leaf,
-    iter,
+    iter::ResultIterator,
     F,
     cert_params,
     cert_cache;
     progress::Union{Nothing,IteratorCertificationProgress} = nothing,
+    threading::Bool = true,
     coordinate::Int = 1,
     max_entries::Union{Nothing,Int} = nothing,
     max_precision::Int = 256,
@@ -2473,6 +2619,64 @@ function _collect_leaf_entries!(
         isnothing(max_entries) ? "Recollect BSP bucket" : "Sample BSP bucket",
         length(iter),
     )
+
+    if threading && Threads.nthreads() > 1 && isnothing(max_entries) && length(iter) > 1
+        contexts = _threaded_iterator_data(iter, F, cert_params, cert_cache, true)
+        progress_lock = ReentrantLock()
+        local_entries = [BSPBucketEntry[] for _ in eachindex(contexts.iters)]
+        crossing_intervals = [nothing for _ in eachindex(contexts.iters)]
+
+        Threads.@sync begin
+            for tid in eachindex(contexts.iters)
+                Threads.@spawn begin
+                    for (idx, result) in zip(contexts.indices[tid], contexts.iters[tid])
+                        @lock progress_lock begin
+                            advance_iterator_progress!(progress)
+                        end
+                        isfinite(result) || continue
+
+                        cert = certify_solution(
+                            contexts.systems[tid],
+                            solution(result),
+                            contexts.params[tid],
+                            contexts.caches[tid],
+                            idx;
+                            max_precision = max_precision,
+                            refine_solution = refine_solution,
+                            extended_certificate = extended_certificate,
+                            certify_solution_kwargs...,
+                        )
+                        is_certified(cert) || continue
+
+                        interval = _convert_to_interval(cert; coordinate = coordinate)
+                        if last(interval) < first(leaf) || last(leaf) < first(interval)
+                            continue
+                        elseif first(leaf) <= first(interval) &&
+                               last(interval) <= last(leaf)
+                            push!(local_entries[tid], BSPBucketEntry(idx, interval))
+                        elseif isnothing(crossing_intervals[tid])
+                            crossing_intervals[tid] = interval
+                        end
+                    end
+                end
+            end
+        end
+
+        first_crossing = findfirst(!isnothing, crossing_intervals)
+        if !isnothing(first_crossing)
+            interval = crossing_intervals[first_crossing]
+            match = _ensure_bucket!(bsp, interval)
+            merged_leaf = IntervalTrees.Interval(first(match), last(match))
+            return BSPBucketEntry[], 0, merged_leaf, false
+        end
+
+        entries = sort!(
+            reduce(vcat, local_entries; init = BSPBucketEntry[]);
+            by = entry -> entry.index,
+        )
+        return entries, length(entries), leaf, true
+    end
+
     for result in iter
         idx += 1
         advance_iterator_progress!(progress)
@@ -2582,11 +2786,12 @@ function _verify_split!(
     bsp::BSPPartition,
     leaf,
     split_point,
-    iter,
+    iter::ResultIterator,
     F,
     cert_params,
     cert_cache;
     progress::Union{Nothing,IteratorCertificationProgress} = nothing,
+    threading::Bool = true,
     coordinate::Int = 1,
     max_precision::Int = 256,
     refine_solution::Bool = true,
@@ -2603,6 +2808,103 @@ function _verify_split!(
     right_count = 0
     idx = 0
     register_iterator_pass!(progress, "Verify BSP split", length(iter))
+
+    if threading && Threads.nthreads() > 1 && length(iter) > 1
+        contexts = _threaded_iterator_data(iter, F, cert_params, cert_cache, true)
+        progress_lock = ReentrantLock()
+        local_left_entries = [BSPBucketEntry[] for _ in eachindex(contexts.iters)]
+        local_right_entries = [BSPBucketEntry[] for _ in eachindex(contexts.iters)]
+        crossing_intervals = [nothing for _ in eachindex(contexts.iters)]
+        invalid_split = Threads.Atomic{Bool}(false)
+
+        Threads.@sync begin
+            for tid in eachindex(contexts.iters)
+                Threads.@spawn begin
+                    for (idx, result) in zip(contexts.indices[tid], contexts.iters[tid])
+                        @lock progress_lock begin
+                            advance_iterator_progress!(progress)
+                        end
+                        isfinite(result) || continue
+
+                        cert = certify_solution(
+                            contexts.systems[tid],
+                            solution(result),
+                            contexts.params[tid],
+                            contexts.caches[tid],
+                            idx;
+                            max_precision = max_precision,
+                            refine_solution = refine_solution,
+                            extended_certificate = extended_certificate,
+                            certify_solution_kwargs...,
+                        )
+                        is_certified(cert) || continue
+
+                        interval = _convert_to_interval(cert; coordinate = coordinate)
+                        if last(interval) < first(leaf) || last(leaf) < first(interval)
+                            continue
+                        elseif !(
+                            first(leaf) <= first(interval) && last(interval) <= last(leaf)
+                        )
+                            if isnothing(crossing_intervals[tid])
+                                crossing_intervals[tid] = interval
+                            end
+                        elseif last(interval) < split_point
+                            push!(local_left_entries[tid], BSPBucketEntry(idx, interval))
+                        elseif split_point < first(interval)
+                            push!(local_right_entries[tid], BSPBucketEntry(idx, interval))
+                        else
+                            invalid_split[] = true
+                        end
+                    end
+                end
+            end
+        end
+
+        first_crossing = findfirst(!isnothing, crossing_intervals)
+        if !isnothing(first_crossing)
+            interval = crossing_intervals[first_crossing]
+            match = _ensure_bucket!(bsp, interval)
+            merged_leaf = IntervalTrees.Interval(first(match), last(match))
+            return (
+                valid = false,
+                left_entries = BSPBucketEntry[],
+                right_entries = BSPBucketEntry[],
+                left_count = 0,
+                right_count = 0,
+                leaf = merged_leaf,
+                stable = false,
+            )
+        elseif invalid_split[]
+            return (
+                valid = false,
+                left_entries = BSPBucketEntry[],
+                right_entries = BSPBucketEntry[],
+                left_count = 0,
+                right_count = 0,
+                leaf = leaf,
+                stable = true,
+            )
+        end
+
+        left_entries = sort!(
+            reduce(vcat, local_left_entries; init = BSPBucketEntry[]);
+            by = entry -> entry.index,
+        )
+        right_entries = sort!(
+            reduce(vcat, local_right_entries; init = BSPBucketEntry[]);
+            by = entry -> entry.index,
+        )
+        return (
+            valid = !isempty(left_entries) && !isempty(right_entries),
+            left_entries = left_entries,
+            right_entries = right_entries,
+            left_count = length(left_entries),
+            right_count = length(right_entries),
+            leaf = leaf,
+            stable = true,
+        )
+    end
+
     for result in iter
         idx += 1
         advance_iterator_progress!(progress)
@@ -2684,6 +2986,7 @@ function _stable_leaf_entries!(
     cert_params,
     cache;
     progress::Union{Nothing,IteratorCertificationProgress} = nothing,
+    threading::Bool = true,
     coordinate::Int = 1,
     max_entries::Union{Nothing,Int} = nothing,
     max_precision::Int = 256,
@@ -2706,6 +3009,7 @@ function _stable_leaf_entries!(
             cert_params,
             cache;
             progress = progress,
+            threading = threading,
             coordinate = coordinate,
             max_entries = max_entries,
             max_precision = max_precision,
@@ -2770,6 +3074,87 @@ function _leaf_stats(bsp::BSPPartition, bucket_size_bound::Integer)
     return max_bucket_size, oversized_buckets
 end
 
+function _certify_terminal_bucket!(
+    d::DistinctCertifiedSolutions,
+    bucket_iter::ResultIterator,
+    F::AbstractSystem,
+    cert_params,
+    cache::CertificationCache;
+    progress::Union{Nothing,IteratorCertificationProgress} = nothing,
+    threading::Bool = true,
+    max_precision::Int = 256,
+    refine_solution::Bool = true,
+    extended_certificate::Bool = false,
+    certify_solution_kwargs...,
+)
+    empty!(d)
+    register_iterator_pass!(progress, "Certify terminal BSP bucket", length(bucket_iter))
+
+    if threading && Threads.nthreads() > 1 && length(bucket_iter) > 1
+        contexts = _threaded_iterator_data(bucket_iter, F, cert_params, cache, true)
+        progress_lock = ReentrantLock()
+        local_certs = [AbstractSolutionCertificate[] for _ in eachindex(contexts.iters)]
+        nfinite = Threads.Atomic{Int}(0)
+
+        Threads.@sync begin
+            for tid in eachindex(contexts.iters)
+                Threads.@spawn begin
+                    for (idx, result) in zip(contexts.indices[tid], contexts.iters[tid])
+                        @lock progress_lock begin
+                            advance_iterator_progress!(progress)
+                        end
+                        isfinite(result) || continue
+
+                        Threads.atomic_add!(nfinite, 1)
+                        cert = certify_solution(
+                            contexts.systems[tid],
+                            solution(result),
+                            contexts.params[tid],
+                            contexts.caches[tid],
+                            idx;
+                            max_precision = max_precision,
+                            refine_solution = refine_solution,
+                            extended_certificate = extended_certificate,
+                            certify_solution_kwargs...,
+                        )
+                        push!(local_certs[tid], cert)
+                    end
+                end
+            end
+        end
+
+        certs = sort!(
+            reduce(vcat, local_certs; init = AbstractSolutionCertificate[]);
+            by = cert -> something(certificate_index(cert), 0),
+        )
+        for cert in certs
+            is_certified(cert) || continue
+            added, _ = add_certificate!(d.distinct_solution_certificates, cert)
+            record_add_solution_result!(d, added ? :certified_distinct : :duplicate)
+        end
+        return nfinite[]
+    end
+
+    nfinite = 0
+    for result in bucket_iter
+        advance_iterator_progress!(progress)
+        if isfinite(result)
+            nfinite += 1
+            add_solution!(
+                d,
+                solution(result),
+                nfinite,
+                1;
+                max_precision = max_precision,
+                refine_solution = refine_solution,
+                extended_certificate = extended_certificate,
+                certify_solution_kwargs...,
+            )
+        end
+    end
+    return nfinite
+end
+
 function _process_leaf!(
     bsp::BSPPartition,
     leaf,
@@ -2781,6 +3166,7 @@ function _process_leaf!(
     progress::Union{Nothing,IteratorCertificationProgress} = nothing,
     bucket_size_bound::Integer = 1000,
     certify_oversized_buckets::Bool = false,
+    threading::Bool = true,
     ε::Float64 = 1e-4,
     coordinate::Int = 1,
     max_refinement_rounds::Int = 50,
@@ -2803,6 +3189,7 @@ function _process_leaf!(
             cert_params,
             cache;
             progress = progress,
+            threading = threading,
             coordinate = coordinate,
             max_entries = 1,
             max_precision = max_precision,
@@ -2828,6 +3215,7 @@ function _process_leaf!(
                 cert_params,
                 cache;
                 progress = progress,
+                threading = threading,
                 coordinate = coordinate,
                 max_entries = nothing,
                 max_precision = max_precision,
@@ -2858,6 +3246,7 @@ function _process_leaf!(
                     cert_params,
                     cache;
                     progress = progress,
+                    threading = threading,
                     coordinate = coordinate,
                     max_precision = max_precision,
                     refine_solution = refine_solution,
@@ -2876,6 +3265,7 @@ function _process_leaf!(
                         cert_params,
                         cache;
                         progress = progress,
+                        threading = threading,
                         coordinate = coordinate,
                         max_entries = nothing,
                         max_precision = max_precision,
@@ -2907,6 +3297,7 @@ function _process_leaf!(
                         progress = progress,
                         bucket_size_bound = bucket_size_bound,
                         certify_oversized_buckets = certify_oversized_buckets,
+                        threading = threading,
                         ε = ε,
                         coordinate = coordinate,
                         max_refinement_rounds = max_refinement_rounds,
@@ -2928,6 +3319,7 @@ function _process_leaf!(
                         progress = progress,
                         bucket_size_bound = bucket_size_bound,
                         certify_oversized_buckets = certify_oversized_buckets,
+                        threading = threading,
                         ε = ε,
                         coordinate = coordinate,
                         max_refinement_rounds = max_refinement_rounds,
@@ -2968,6 +3360,7 @@ function _process_leaf!(
                     cert_params,
                     cache;
                     progress = progress,
+                    threading = threading,
                     coordinate = coordinate,
                     max_precision = max_precision,
                     refine_solution = refine_solution,
@@ -2986,6 +3379,7 @@ function _process_leaf!(
                         cert_params,
                         cache;
                         progress = progress,
+                        threading = threading,
                         coordinate = coordinate,
                         max_entries = nothing,
                         max_precision = max_precision,
@@ -3014,6 +3408,7 @@ function _process_leaf!(
                         progress = progress,
                         bucket_size_bound = bucket_size_bound,
                         certify_oversized_buckets = certify_oversized_buckets,
+                        threading = threading,
                         ε = ε,
                         coordinate = coordinate,
                         max_refinement_rounds = max_refinement_rounds,
@@ -3035,6 +3430,7 @@ function _process_leaf!(
                         progress = progress,
                         bucket_size_bound = bucket_size_bound,
                         certify_oversized_buckets = certify_oversized_buckets,
+                        threading = threading,
                         ε = ε,
                         coordinate = coordinate,
                         max_refinement_rounds = max_refinement_rounds,
@@ -3075,6 +3471,7 @@ function _process_leaf!(
                         cert_params,
                         cache;
                         progress = progress,
+                        threading = threading,
                         coordinate = coordinate,
                         max_precision = max_precision,
                         refine_solution = refine_solution,
@@ -3091,6 +3488,7 @@ function _process_leaf!(
                             cert_params,
                             cache;
                             progress = progress,
+                            threading = threading,
                             coordinate = coordinate,
                             max_entries = nothing,
                             max_precision = max_precision,
@@ -3118,6 +3516,7 @@ function _process_leaf!(
                             progress = progress,
                             bucket_size_bound = bucket_size_bound,
                             certify_oversized_buckets = certify_oversized_buckets,
+                            threading = threading,
                             ε = ε,
                             coordinate = coordinate,
                             max_refinement_rounds = max_refinement_rounds,
@@ -3139,6 +3538,7 @@ function _process_leaf!(
                             progress = progress,
                             bucket_size_bound = bucket_size_bound,
                             certify_oversized_buckets = certify_oversized_buckets,
+                            threading = threading,
                             ε = ε,
                             coordinate = coordinate,
                             max_refinement_rounds = max_refinement_rounds,
@@ -3206,6 +3606,7 @@ function _process_leaf!(
             cert_params,
             cache;
             progress = progress,
+            threading = threading,
             coordinate = coordinate,
             max_entries = nothing,
             max_precision = max_precision,
@@ -3215,27 +3616,22 @@ function _process_leaf!(
         )
     end
 
-    # Step 4: the leaf is terminal. Revisit only the current bucket and stream its solutions directly into `d`.
-    empty!(d)
+    # Step 4: the leaf is terminal. Revisit only the current bucket and add its
+    # certified solutions to `d`; the distinct check itself stays serial.
     bucket_iter = _bucket_iterator(iter, entries)
-    register_iterator_pass!(progress, "Certify terminal BSP bucket", length(bucket_iter))
-    nfinite = 0
-    for result in bucket_iter
-        advance_iterator_progress!(progress)
-        if isfinite(result)
-            nfinite += 1
-            add_solution!(
-                d,
-                solution(result),
-                nfinite,
-                1;
-                max_precision = max_precision,
-                refine_solution = refine_solution,
-                extended_certificate = extended_certificate,
-                certify_solution_kwargs...,
-            )
-        end
-    end
+    nfinite = _certify_terminal_bucket!(
+        d,
+        bucket_iter,
+        F,
+        cert_params,
+        cache;
+        progress = progress,
+        threading = threading,
+        max_precision = max_precision,
+        refine_solution = refine_solution,
+        extended_certificate = extended_certificate,
+        certify_solution_kwargs...,
+    )
     nfinite == length(entries) || error(
         "Re-tracking a BSP bucket produced $nfinite finite solutions for " *
         "$(length(entries)) expected entries.",
@@ -3313,6 +3709,7 @@ For more details of the implementation see [^BBK26].
 ## Options
 
 * `show_progress = true`: If `true` shows a progress meter for the BSP certification.
+* `threading = true`: If `true`, independent iterator certification passes are threaded. Bucketwise distinct-solution checks are always performed serially.
 * `max_precision = 256`: The maximal accuracy (in bits) that is used in the certification process.
 * `compile = false`: See the [`solve`](@ref) documentation.
 * `bucket_size_bound = 1000`: the algorithm tries to split the real lines into buckets each containing at most `bucket_size_bound` many solutions.
@@ -3333,6 +3730,7 @@ function _certify_iterator_bsp(
     show_progress::Bool = true,
     bucket_size_bound::Integer = 1000,
     certify_oversized_buckets::Bool = false,
+    threading::Bool = true,
     ε::Float64 = 1e-4,
     coordinate::Int = 1,
     boundaries = -10:10,
@@ -3355,6 +3753,7 @@ function _certify_iterator_bsp(
         cert_params,
         cache;
         progress = progress,
+        threading = threading,
         coordinate = coordinate,
         max_precision = max_precision,
         refine_solution = refine_solution,
@@ -3411,6 +3810,7 @@ function _certify_iterator_bsp(
             progress = progress,
             bucket_size_bound = bucket_size_bound,
             certify_oversized_buckets = certify_oversized_buckets,
+            threading = threading,
             ε = ε,
             coordinate = coordinate,
             max_refinement_rounds = max_refinement_rounds,
