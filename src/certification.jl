@@ -2281,6 +2281,7 @@ function _threaded_iterator_data(
         end
     end
 
+    # Each worker gets its own iterator, system, parameters, and cache.
     starts = [deepcopy(start_solutions(iter)) for _ = 1:nthreads]
     solvers = [deepcopy(solver(iter)) for _ = 1:nthreads]
     iters = [
@@ -2437,6 +2438,8 @@ function _assign_initial_buckets!(
     if threading && Threads.nthreads() > 1 && length(iter) > 1
         contexts = _threaded_iterator_data(iter, F, cert_params, cert_cache, true)
         progress_lock = ReentrantLock()
+        # Only counters and progress are shared while certifying. BSP mutation is
+        # deferred until all workers have produced their local bucket entries.
         nresults = Threads.Atomic{Int}(0)
         nfinite = Threads.Atomic{Int}(0)
         certified = Threads.Atomic{Int}(0)
@@ -2508,6 +2511,7 @@ function _assign_initial_buckets!(
             reduce(vcat, certified_entries; init = BSPBucketEntry[]);
             by = entry -> entry.index,
         )
+            # Apply bucket updates serially.
             match = _ensure_bucket!(bsp, entry.interval)
             leaf = IntervalTrees.Interval(first(match), last(match))
             entries = _ensure_bucket_entries!(bucket_entries, leaf)
@@ -2623,6 +2627,7 @@ function _collect_leaf_entries!(
     if threading && Threads.nthreads() > 1 && isnothing(max_entries) && length(iter) > 1
         contexts = _threaded_iterator_data(iter, F, cert_params, cert_cache, true)
         progress_lock = ReentrantLock()
+        # The threaded path is only used for full recollection.
         local_entries = [BSPBucketEntry[] for _ in eachindex(contexts.iters)]
         crossing_intervals = [nothing for _ in eachindex(contexts.iters)]
 
@@ -2664,6 +2669,7 @@ function _collect_leaf_entries!(
 
         first_crossing = findfirst(!isnothing, crossing_intervals)
         if !isnothing(first_crossing)
+            # A thread found a certified interval crossing the current BSP leaf boundary; the leaf partition is outdated for this interval, so the main task merges the affected leaves and restarts processing.
             interval = crossing_intervals[first_crossing]
             match = _ensure_bucket!(bsp, interval)
             merged_leaf = IntervalTrees.Interval(first(match), last(match))
@@ -2812,6 +2818,8 @@ function _verify_split!(
     if threading && Threads.nthreads() > 1 && length(iter) > 1
         contexts = _threaded_iterator_data(iter, F, cert_params, cert_cache, true)
         progress_lock = ReentrantLock()
+        # Workers certify and classify intervals independently. They only report three
+        # outcomes: left child, right child, or "this split/leaf cannot be used".
         local_left_entries = [BSPBucketEntry[] for _ in eachindex(contexts.iters)]
         local_right_entries = [BSPBucketEntry[] for _ in eachindex(contexts.iters)]
         crossing_intervals = [nothing for _ in eachindex(contexts.iters)]
@@ -2894,6 +2902,8 @@ function _verify_split!(
             reduce(vcat, local_right_entries; init = BSPBucketEntry[]);
             by = entry -> entry.index,
         )
+        # Sorting restores iterator order before constructing child bucket iterators.
+        # This keeps threaded and serial bucket membership equivalent.
         return (
             valid = !isempty(left_entries) && !isempty(right_entries),
             left_entries = left_entries,
@@ -3093,6 +3103,8 @@ function _certify_terminal_bucket!(
     if threading && Threads.nthreads() > 1 && length(bucket_iter) > 1
         contexts = _threaded_iterator_data(bucket_iter, F, cert_params, cache, true)
         progress_lock = ReentrantLock()
+        # Certification of individual candidates is independent and can be threaded.
+        # Insertion into the distinct-certificate set is done serially, because it compares certificates against each other.
         local_certs = [AbstractSolutionCertificate[] for _ in eachindex(contexts.iters)]
         nfinite = Threads.Atomic{Int}(0)
 
@@ -3129,6 +3141,7 @@ function _certify_terminal_bucket!(
         )
         for cert in certs
             is_certified(cert) || continue
+            # Distinctness is the non-threaded part of the terminal bucket pass.
             added, _ = add_certificate!(d.distinct_solution_certificates, cert)
             record_add_solution_result!(d, added ? :certified_distinct : :duplicate)
         end
