@@ -1006,7 +1006,7 @@ function certify_solution(
     F::AbstractSystem,
     solution_candidate::AbstractVector,
     cert_params::Union{Nothing,CertificationParameters},
-    cert_cache::CertificationCache,
+    certification_cache::CertificationCache,
     index::Int;
     max_precision::Int = 256,
     refine_solution::Bool = true,
@@ -1016,7 +1016,7 @@ function certify_solution(
         F,
         solution_candidate,
         cert_params,
-        cert_cache,
+        certification_cache,
         index,
         ModelKit.is_real(F);
         max_precision = max_precision,
@@ -1029,14 +1029,14 @@ function certify_solution(
     F::AbstractSystem,
     solution_candidate::AbstractVector,
     cert_params::Union{Nothing,CertificationParameters},
-    cert_cache::CertificationCache,
+    certification_cache::CertificationCache,
     index::Int,
     is_real_system::Bool;
     max_precision::Int = 256,
     refine_solution::Bool = true,
     extended_certificate::Bool = false,
 )
-    @unpack C, arb_C, arb_x̃₀ = cert_cache
+    @unpack C, arb_C, arb_x̃₀ = certification_cache
 
     # refine solution to machine precicision
     if refine_solution
@@ -1045,7 +1045,7 @@ function certify_solution(
             solution_candidate,
             complexF64_params(cert_params),
             InfNorm(),
-            cert_cache.newton_cache;
+            certification_cache.newton_cache;
             rtol = 8 * eps(),
             atol = 0.0,
             # this should already be an approximate zero
@@ -1057,9 +1057,10 @@ function certify_solution(
         x̃₀ = solution_candidate
     end
 
-    LA.inv!(C, cert_cache.newton_cache.J)
+    LA.inv!(C, certification_cache.newton_cache.J)
 
-    certified, x₁, x₀, is_real = ε_inflation_krawczyk(x̃₀, cert_params, C, cert_cache)
+    certified, x₁, x₀, is_real =
+        ε_inflation_krawczyk(x̃₀, cert_params, C, certification_cache)
 
     if !is_real_system
         is_real = false
@@ -1103,7 +1104,7 @@ function certify_solution(
         solution_candidate,
         x̃₀,
         cert_params,
-        cert_cache,
+        certification_cache,
         index,
         is_real_system;
         max_precision = max_precision,
@@ -1116,19 +1117,19 @@ function extended_prec_certify_solution(
     solution_candidate::AbstractVector,
     x̃₀::AbstractVector,
     cert_params::Union{Nothing,CertificationParameters},
-    cert_cache::CertificationCache,
+    certification_cache::CertificationCache,
     index::Int,
     is_real_system::Bool;
     max_precision::Int = 256,
     extended_certificate::Bool = false,
 )
-    @unpack C, arb_C, arb_x̃₀ = cert_cache
+    @unpack C, arb_C, arb_x̃₀ = certification_cache
 
     n = size(C, 1)
 
     # If not certified we do the computation in higher precision using Arb
     prec = 128
-    set_arb_precision!(cert_cache, prec)
+    set_arb_precision!(certification_cache, prec)
 
     # We keep the same C matrix for now.
     for j = 1:n, i = 1:n
@@ -1138,8 +1139,13 @@ function extended_prec_certify_solution(
         arb_x̃₀[i][] = x̃₀_i
     end
     while (prec <= max_precision)
-        certified, arb_x₁, arb_x₀, is_real =
-            arb_ε_inflation_krawczyk(arb_x̃₀, cert_params, arb_C, cert_cache; prec = prec)
+        certified, arb_x₁, arb_x₀, is_real = arb_ε_inflation_krawczyk(
+            arb_x̃₀,
+            cert_params,
+            arb_C,
+            certification_cache;
+            prec = prec,
+        )
 
         if !is_real_system
             is_real = false
@@ -1190,7 +1196,7 @@ function extended_prec_certify_solution(
         end
 
         prec += 64
-        set_arb_precision!(cert_cache, prec)
+        set_arb_precision!(certification_cache, prec)
     end
 
     # certification failed
@@ -1215,15 +1221,20 @@ function Base.Vector{ComplexF64}(A::Arblib.AcbMatrixLike)
     [ComplexF64(Arblib.ref(A, i, 1).acb_ptr) for i = 1:size(A, 1)]
 end
 
-function ε_inflation_krawczyk(x̃₀, p::Union{Nothing,CertificationParameters}, C, cert_cache)
-    @unpack C, r₀, Δx₀, ix̃₀, Jx₀, M, δx = cert_cache
+function ε_inflation_krawczyk(
+    x̃₀,
+    p::Union{Nothing,CertificationParameters},
+    C,
+    certification_cache,
+)
+    @unpack C, r₀, Δx₀, ix̃₀, Jx₀, M, δx = certification_cache
     J_x₀ = Jx₀
 
     ix̃₀ .= IComplexF64.(x̃₀)
     # r₀ = F(ix̃₀)
     ModelKit.execute!(
         r₀,
-        cert_cache.eval_interpreter_F64,
+        certification_cache.eval_interpreter_F64,
         ix̃₀,
         complexF64_interval_params(p),
     )
@@ -1243,7 +1254,7 @@ function ε_inflation_krawczyk(x̃₀, p::Union{Nothing,CertificationParameters}
     ModelKit.execute!(
         nothing,
         J_x₀,
-        cert_cache.jac_interpreter_F64,
+        certification_cache.jac_interpreter_F64,
         x₀,
         complexF64_interval_params(p),
     )
@@ -1278,11 +1289,11 @@ function arb_ε_inflation_krawczyk(
     x̃₀::AcbRefMatrix,
     p::Union{Nothing,CertificationParameters},
     C::Arblib.AcbMatrixLike,
-    cert_cache;
+    certification_cache;
     prec::Int,
 )
     @unpack arb_r₀, arb_Δx₀, arb_x̃₀, arb_J_x₀, arb_M, arb_δx, arb_mag, arb_x₀, arb_x₁ =
-        cert_cache
+        certification_cache
     r₀, Δx₀, x̃₀, x₀, x₁, J_x₀, M, δx, m =
         arb_r₀, arb_Δx₀, arb_x̃₀, arb_x₀, arb_x₁, arb_J_x₀, arb_M, arb_δx, arb_mag
 
@@ -1293,7 +1304,12 @@ function arb_ε_inflation_krawczyk(
     acc = Inf
     max_iters = 10
     for i = 1:max_iters
-        ModelKit.execute!(r₀, cert_cache.eval_interpreter_acb, x̃₀, arb_interval_params(p))
+        ModelKit.execute!(
+            r₀,
+            certification_cache.eval_interpreter_acb,
+            x̃₀,
+            arb_interval_params(p),
+        )
         Arblib.mul!(Δx₀, C, r₀)
 
         acc_new = Arblib.get(Arblib.bound_inf_norm!(m, Δx₀))
@@ -1321,7 +1337,7 @@ function arb_ε_inflation_krawczyk(
     ModelKit.execute!(
         nothing,
         J_x₀,
-        cert_cache.jac_interpreter_acb,
+        certification_cache.jac_interpreter_acb,
         x₀,
         arb_interval_params(p),
     )
@@ -2262,11 +2278,36 @@ function check_iterator_certify_options(
     return nothing
 end
 
+"""
+    IteratorCertificationCache
+
+Carrier for the stable objects and options used while recursively processing BSP
+leaves. The `certification_cache` field is the numerical [`CertificationCache`](@ref)
+used by `certify_solution`; the outer `IteratorCertificationCache` stores only
+references and scalar options for the iterator-certification pass.
+"""
+Base.@kwdef struct IteratorCertificationCache{S<:AbstractSystem,P,C<:CertificationCache,D}
+    F::S
+    cert_params::P
+    certification_cache::C
+    distinct_solutions::D
+    progress::Union{Nothing,IteratorCertificationProgress}
+    bucket_size_bound::Int
+    certify_oversized_buckets::Bool
+    threading::Bool
+    ε::Float64
+    coordinate::Int
+    max_refinement_rounds::Int
+    max_precision::Int
+    refine_solution::Bool
+    extended_certificate::Bool
+end
+
 function threaded_iterator_data(
     iter::ResultIterator,
     F::AbstractSystem,
     cert_params,
-    cert_cache::CertificationCache,
+    certification_cache::CertificationCache,
     threading::Bool,
 )
     nthreads = threading ? Threads.nthreads() : 1
@@ -2276,7 +2317,7 @@ function threaded_iterator_data(
         indices = [collect(1:length(iter))],
         systems = [F],
         params = [cert_params],
-        caches = [cert_cache],
+        caches = [certification_cache],
     )
 
     current_bitmask = bitmask(iter)
@@ -2312,7 +2353,7 @@ function threaded_iterator_data(
     ]
     systems = [F; [deepcopy(F) for _ = 2:nthreads]]
     params = [cert_params; [deepcopy(cert_params) for _ = 2:nthreads]]
-    caches = [cert_cache; [deepcopy(cert_cache) for _ = 2:nthreads]]
+    caches = [certification_cache; [deepcopy(certification_cache) for _ = 2:nthreads]]
     return (
         iters = iters,
         indices = indices,
@@ -2439,7 +2480,7 @@ function assign_initial_buckets!(
     iter::ResultIterator,
     F,
     cert_params,
-    cert_cache;
+    certification_cache;
     progress::Union{Nothing,IteratorCertificationProgress} = nothing,
     threading::Bool = true,
     coordinate::Int = 1,
@@ -2459,7 +2500,7 @@ function assign_initial_buckets!(
     register_iterator_pass!(progress, "Assign initial BSP buckets", length(iter))
 
     if threading && Threads.nthreads() > 1 && length(iter) > 1
-        contexts = threaded_iterator_data(iter, F, cert_params, cert_cache, true)
+        contexts = threaded_iterator_data(iter, F, cert_params, certification_cache, true)
         progress_lock = ReentrantLock()
         # Only counters and progress are shared while certifying. BSP mutation is
         # deferred until all workers have produced their local bucket entries.
@@ -2567,7 +2608,7 @@ function assign_initial_buckets!(
             F,
             solution(result),
             cert_params,
-            cert_cache,
+            certification_cache,
             idx;
             max_precision = max_precision,
             refine_solution = refine_solution,
@@ -2622,16 +2663,8 @@ function collect_leaf_entries!(
     bsp::BSPPartition,
     leaf,
     iter::ResultIterator,
-    F,
-    cert_params,
-    cert_cache;
-    progress::Union{Nothing,IteratorCertificationProgress} = nothing,
-    threading::Bool = true,
-    coordinate::Int = 1,
+    cache::IteratorCertificationCache;
     max_entries::Union{Nothing,Int} = nothing,
-    max_precision::Int = 256,
-    refine_solution::Bool = true,
-    extended_certificate::Bool = false,
     certify_solution_kwargs...,
 )
     # Revisit the iterator and keep projected intervals only for the current leaf.
@@ -2642,13 +2675,22 @@ function collect_leaf_entries!(
     idx = 0
     bucket_size = 0
     register_iterator_pass!(
-        progress,
+        cache.progress,
         isnothing(max_entries) ? "Recollect BSP bucket" : "Sample BSP bucket",
         length(iter),
     )
 
-    if threading && Threads.nthreads() > 1 && isnothing(max_entries) && length(iter) > 1
-        contexts = threaded_iterator_data(iter, F, cert_params, cert_cache, true)
+    if cache.threading &&
+       Threads.nthreads() > 1 &&
+       isnothing(max_entries) &&
+       length(iter) > 1
+        contexts = threaded_iterator_data(
+            iter,
+            cache.F,
+            cache.cert_params,
+            cache.certification_cache,
+            true,
+        )
         progress_lock = ReentrantLock()
         # The threaded path is only used for full recollection.
         local_entries = [BSPBucketEntry[] for _ in eachindex(contexts.iters)]
@@ -2659,7 +2701,7 @@ function collect_leaf_entries!(
                 Threads.@spawn begin
                     for (idx, result) in zip(contexts.indices[tid], contexts.iters[tid])
                         @lock progress_lock begin
-                            advance_iterator_progress!(progress)
+                            advance_iterator_progress!(cache.progress)
                         end
                         isfinite(result) || continue
 
@@ -2669,14 +2711,14 @@ function collect_leaf_entries!(
                             contexts.params[tid],
                             contexts.caches[tid],
                             idx;
-                            max_precision = max_precision,
-                            refine_solution = refine_solution,
-                            extended_certificate = extended_certificate,
+                            max_precision = cache.max_precision,
+                            refine_solution = cache.refine_solution,
+                            extended_certificate = cache.extended_certificate,
                             certify_solution_kwargs...,
                         )
                         is_certified(cert) || continue
 
-                        interval = _convert_to_interval(cert; coordinate = coordinate)
+                        interval = _convert_to_interval(cert; coordinate = cache.coordinate)
                         if last(interval) < first(leaf) || last(leaf) < first(interval)
                             continue
                         elseif first(leaf) <= first(interval) &&
@@ -2708,23 +2750,23 @@ function collect_leaf_entries!(
 
     for result in iter
         idx += 1
-        advance_iterator_progress!(progress)
+        advance_iterator_progress!(cache.progress)
         isfinite(result) || continue
 
         cert = certify_solution(
-            F,
+            cache.F,
             solution(result),
-            cert_params,
-            cert_cache,
+            cache.cert_params,
+            cache.certification_cache,
             idx;
-            max_precision = max_precision,
-            refine_solution = refine_solution,
-            extended_certificate = extended_certificate,
+            max_precision = cache.max_precision,
+            refine_solution = cache.refine_solution,
+            extended_certificate = cache.extended_certificate,
             certify_solution_kwargs...,
         )
         is_certified(cert) || continue
 
-        interval = _convert_to_interval(cert; coordinate = coordinate)
+        interval = _convert_to_interval(cert; coordinate = cache.coordinate)
         # Ignore certified intervals completely outside the leaf.
         if last(interval) < first(leaf) || last(leaf) < first(interval)
             continue
@@ -2816,15 +2858,7 @@ function verify_split!(
     leaf,
     split_point,
     iter::ResultIterator,
-    F,
-    cert_params,
-    cert_cache;
-    progress::Union{Nothing,IteratorCertificationProgress} = nothing,
-    threading::Bool = true,
-    coordinate::Int = 1,
-    max_precision::Int = 256,
-    refine_solution::Bool = true,
-    extended_certificate::Bool = false,
+    cache::IteratorCertificationCache;
     certify_solution_kwargs...,
 )
     # Check one proposed split against every certified interval in the current bucket.
@@ -2836,10 +2870,16 @@ function verify_split!(
     left_count = 0
     right_count = 0
     idx = 0
-    register_iterator_pass!(progress, "Verify BSP split", length(iter))
+    register_iterator_pass!(cache.progress, "Verify BSP split", length(iter))
 
-    if threading && Threads.nthreads() > 1 && length(iter) > 1
-        contexts = threaded_iterator_data(iter, F, cert_params, cert_cache, true)
+    if cache.threading && Threads.nthreads() > 1 && length(iter) > 1
+        contexts = threaded_iterator_data(
+            iter,
+            cache.F,
+            cache.cert_params,
+            cache.certification_cache,
+            true,
+        )
         progress_lock = ReentrantLock()
         # Workers certify and classify intervals independently. They only report three
         # outcomes: left child, right child, or "this split/leaf cannot be used".
@@ -2853,7 +2893,7 @@ function verify_split!(
                 Threads.@spawn begin
                     for (idx, result) in zip(contexts.indices[tid], contexts.iters[tid])
                         @lock progress_lock begin
-                            advance_iterator_progress!(progress)
+                            advance_iterator_progress!(cache.progress)
                         end
                         isfinite(result) || continue
 
@@ -2863,14 +2903,14 @@ function verify_split!(
                             contexts.params[tid],
                             contexts.caches[tid],
                             idx;
-                            max_precision = max_precision,
-                            refine_solution = refine_solution,
-                            extended_certificate = extended_certificate,
+                            max_precision = cache.max_precision,
+                            refine_solution = cache.refine_solution,
+                            extended_certificate = cache.extended_certificate,
                             certify_solution_kwargs...,
                         )
                         is_certified(cert) || continue
 
-                        interval = _convert_to_interval(cert; coordinate = coordinate)
+                        interval = _convert_to_interval(cert; coordinate = cache.coordinate)
                         if last(interval) < first(leaf) || last(leaf) < first(interval)
                             continue
                         elseif !(
@@ -2941,23 +2981,23 @@ function verify_split!(
 
     for result in iter
         idx += 1
-        advance_iterator_progress!(progress)
+        advance_iterator_progress!(cache.progress)
         isfinite(result) || continue
 
         cert = certify_solution(
-            F,
+            cache.F,
             solution(result),
-            cert_params,
-            cert_cache,
+            cache.cert_params,
+            cache.certification_cache,
             idx;
-            max_precision = max_precision,
-            refine_solution = refine_solution,
-            extended_certificate = extended_certificate,
+            max_precision = cache.max_precision,
+            refine_solution = cache.refine_solution,
+            extended_certificate = cache.extended_certificate,
             certify_solution_kwargs...,
         )
         is_certified(cert) || continue
 
-        interval = _convert_to_interval(cert; coordinate = coordinate)
+        interval = _convert_to_interval(cert; coordinate = cache.coordinate)
         # Ignore intervals outside the leaf. This is usually redundant for a bucket
         # iterator, but keeping it here makes the routine safe for broader iterators too.
         if last(interval) < first(leaf) || last(leaf) < first(interval)
@@ -3017,16 +3057,8 @@ function stable_leaf_entries!(
     bsp::BSPPartition,
     leaf,
     iter,
-    F,
-    cert_params,
-    cache;
-    progress::Union{Nothing,IteratorCertificationProgress} = nothing,
-    threading::Bool = true,
-    coordinate::Int = 1,
+    cache::IteratorCertificationCache;
     max_entries::Union{Nothing,Int} = nothing,
-    max_precision::Int = 256,
-    refine_solution::Bool = true,
-    extended_certificate::Bool = false,
     certify_solution_kwargs...,
 )
     # Recollect one leaf until every certified interval seen in `iter` is either fully
@@ -3040,16 +3072,8 @@ function stable_leaf_entries!(
             bsp,
             current_leaf,
             iter,
-            F,
-            cert_params,
             cache;
-            progress = progress,
-            threading = threading,
-            coordinate = coordinate,
             max_entries = max_entries,
-            max_precision = max_precision,
-            refine_solution = refine_solution,
-            extended_certificate = extended_certificate,
             certify_solution_kwargs...,
         )
         current_leaf = updated_leaf
@@ -3110,23 +3134,26 @@ function _leaf_stats(bsp::BSPPartition, bucket_size_bound::Integer)
 end
 
 function certify_terminal_bucket!(
-    d::DistinctCertifiedSolutions,
     bucket_iter::ResultIterator,
-    F::AbstractSystem,
-    cert_params,
-    cache::CertificationCache;
-    progress::Union{Nothing,IteratorCertificationProgress} = nothing,
-    threading::Bool = true,
-    max_precision::Int = 256,
-    refine_solution::Bool = true,
-    extended_certificate::Bool = false,
+    cache::IteratorCertificationCache;
     certify_solution_kwargs...,
 )
+    d = cache.distinct_solutions
     empty!(d)
-    register_iterator_pass!(progress, "Certify terminal BSP bucket", length(bucket_iter))
+    register_iterator_pass!(
+        cache.progress,
+        "Certify terminal BSP bucket",
+        length(bucket_iter),
+    )
 
-    if threading && Threads.nthreads() > 1 && length(bucket_iter) > 1
-        contexts = threaded_iterator_data(bucket_iter, F, cert_params, cache, true)
+    if cache.threading && Threads.nthreads() > 1 && length(bucket_iter) > 1
+        contexts = threaded_iterator_data(
+            bucket_iter,
+            cache.F,
+            cache.cert_params,
+            cache.certification_cache,
+            true,
+        )
         progress_lock = ReentrantLock()
         # Certification of individual candidates is independent and can be threaded.
         # Insertion into the distinct-certificate set is done serially, because it compares certificates against each other.
@@ -3138,7 +3165,7 @@ function certify_terminal_bucket!(
                 Threads.@spawn begin
                     for (idx, result) in zip(contexts.indices[tid], contexts.iters[tid])
                         @lock progress_lock begin
-                            advance_iterator_progress!(progress)
+                            advance_iterator_progress!(cache.progress)
                         end
                         isfinite(result) || continue
 
@@ -3149,9 +3176,9 @@ function certify_terminal_bucket!(
                             contexts.params[tid],
                             contexts.caches[tid],
                             idx;
-                            max_precision = max_precision,
-                            refine_solution = refine_solution,
-                            extended_certificate = extended_certificate,
+                            max_precision = cache.max_precision,
+                            refine_solution = cache.refine_solution,
+                            extended_certificate = cache.extended_certificate,
                             certify_solution_kwargs...,
                         )
                         push!(local_certs[tid], cert)
@@ -3175,7 +3202,7 @@ function certify_terminal_bucket!(
 
     nfinite = 0
     for result in bucket_iter
-        advance_iterator_progress!(progress)
+        advance_iterator_progress!(cache.progress)
         if isfinite(result)
             nfinite += 1
             add_solution!(
@@ -3183,9 +3210,9 @@ function certify_terminal_bucket!(
                 solution(result),
                 nfinite,
                 1;
-                max_precision = max_precision,
-                refine_solution = refine_solution,
-                extended_certificate = extended_certificate,
+                max_precision = cache.max_precision,
+                refine_solution = cache.refine_solution,
+                extended_certificate = cache.extended_certificate,
                 certify_solution_kwargs...,
             )
         end
@@ -3195,8 +3222,8 @@ end
 
 """
     handle_split_verification!(
-        verification, bucket_iter, split_point, bsp, current_leaf, iter, F,
-        cert_params, cache, d; kwargs...
+        verification, bucket_iter, split_point, bsp, current_leaf, iter,
+        cache; kwargs...
     )
 
 Handle the result of verifying one proposed BSP split.
@@ -3213,21 +3240,8 @@ function handle_split_verification!(
     bsp::BSPPartition,
     current_leaf,
     iter::ResultIterator,
-    F::AbstractSystem,
-    cert_params,
-    cache::CertificationCache,
-    d::DistinctCertifiedSolutions;
-    progress::Union{Nothing,IteratorCertificationProgress} = nothing,
-    bucket_size_bound::Integer = 1000,
-    certify_oversized_buckets::Bool = false,
-    threading::Bool = true,
-    ε::Float64 = 1e-4,
-    coordinate::Int = 1,
-    max_refinement_rounds::Int = 50,
+    cache::IteratorCertificationCache;
     depth::Int = 0,
-    max_precision::Int = 256,
-    refine_solution::Bool = true,
-    extended_certificate::Bool = false,
     certify_solution_kwargs...,
 )
     if !verification.stable
@@ -3235,16 +3249,8 @@ function handle_split_verification!(
             bsp,
             verification.leaf,
             iter,
-            F,
-            cert_params,
             cache;
-            progress = progress,
-            threading = threading,
-            coordinate = coordinate,
             max_entries = nothing,
-            max_precision = max_precision,
-            refine_solution = refine_solution,
-            extended_certificate = extended_certificate,
             certify_solution_kwargs...,
         )
         return (
@@ -3268,44 +3274,18 @@ function handle_split_verification!(
             bsp,
             left_leaf,
             left_iter,
-            F,
-            cert_params,
-            cache,
-            d;
-            progress = progress,
-            bucket_size_bound = bucket_size_bound,
-            certify_oversized_buckets = certify_oversized_buckets,
-            threading = threading,
-            ε = ε,
-            coordinate = coordinate,
-            max_refinement_rounds = max_refinement_rounds,
+            cache;
             depth = depth + 1,
             initial_entries = left_entries,
-            max_precision = max_precision,
-            refine_solution = refine_solution,
-            extended_certificate = extended_certificate,
             certify_solution_kwargs...,
         )
         right_counts = process_leaf!(
             bsp,
             right_leaf,
             right_iter,
-            F,
-            cert_params,
-            cache,
-            d;
-            progress = progress,
-            bucket_size_bound = bucket_size_bound,
-            certify_oversized_buckets = certify_oversized_buckets,
-            threading = threading,
-            ε = ε,
-            coordinate = coordinate,
-            max_refinement_rounds = max_refinement_rounds,
+            cache;
             depth = depth + 1,
             initial_entries = right_entries,
-            max_precision = max_precision,
-            refine_solution = refine_solution,
-            extended_certificate = extended_certificate,
             certify_solution_kwargs...,
         )
         return (
@@ -3328,7 +3308,7 @@ end
 
 """
     process_leaf!(
-        bsp, leaf, iter, F, cert_params, cache, d; initial_entries = nothing, kwargs...
+        bsp, leaf, iter, cache; initial_entries = nothing, kwargs...
     )
 
 Process one BSP leaf using an iterator that is local to that leaf.
@@ -3341,22 +3321,9 @@ function process_leaf!(
     bsp::BSPPartition,
     leaf,
     iter::ResultIterator,
-    F::AbstractSystem,
-    cert_params,
-    cache::CertificationCache,
-    d::DistinctCertifiedSolutions;
-    progress::Union{Nothing,IteratorCertificationProgress} = nothing,
-    bucket_size_bound::Integer = 1000,
-    certify_oversized_buckets::Bool = false,
-    threading::Bool = true,
-    ε::Float64 = 1e-4,
-    coordinate::Int = 1,
-    max_refinement_rounds::Int = 50,
+    cache::IteratorCertificationCache;
     depth::Int = 0,
     initial_entries::Union{Nothing,Vector{BSPBucketEntry}} = nothing,
-    max_precision::Int = 256,
-    refine_solution::Bool = true,
-    extended_certificate::Bool = false,
     certify_solution_kwargs...,
 )
     # Process one leaf subtree depth-first so only the current branch lives in memory.
@@ -3367,16 +3334,8 @@ function process_leaf!(
             bsp,
             leaf,
             iter,
-            F,
-            cert_params,
             cache;
-            progress = progress,
-            threading = threading,
-            coordinate = coordinate,
             max_entries = 1,
-            max_precision = max_precision,
-            refine_solution = refine_solution,
-            extended_certificate = extended_certificate,
             certify_solution_kwargs...,
         )
     else
@@ -3385,7 +3344,7 @@ function process_leaf!(
         current_leaf = leaf
     end
 
-    if bucket_size > bucket_size_bound && depth < max_refinement_rounds
+    if bucket_size > cache.bucket_size_bound && depth < cache.max_refinement_rounds
         # Step 2: this leaf is oversized, so recollect the full local bucket and work
         # only with the corresponding bucket iterator from here on.
         if isnothing(initial_entries)
@@ -3393,16 +3352,8 @@ function process_leaf!(
                 bsp,
                 current_leaf,
                 iter,
-                F,
-                cert_params,
                 cache;
-                progress = progress,
-                threading = threading,
-                coordinate = coordinate,
                 max_entries = nothing,
-                max_precision = max_precision,
-                refine_solution = refine_solution,
-                extended_certificate = extended_certificate,
                 certify_solution_kwargs...,
             )
         end
@@ -3415,7 +3366,8 @@ function process_leaf!(
             # This is the key optimization: once we know the current bucket membership,
             # all later work happens on a sparse subiterator for that bucket only.
             bucket_iter = _bucket_iterator(iter, entries)
-            deterministic_points = _left_right_split_points(entries, current_leaf; ε = ε)
+            deterministic_points =
+                _left_right_split_points(entries, current_leaf; ε = cache.ε)
             restart_from_merged_leaf = false
             for split_point in deterministic_points
                 # Try the deterministic split candidates first.
@@ -3424,15 +3376,7 @@ function process_leaf!(
                     current_leaf,
                     split_point,
                     bucket_iter,
-                    F,
-                    cert_params,
                     cache;
-                    progress = progress,
-                    threading = threading,
-                    coordinate = coordinate,
-                    max_precision = max_precision,
-                    refine_solution = refine_solution,
-                    extended_certificate = extended_certificate,
                     certify_solution_kwargs...,
                 )
 
@@ -3443,21 +3387,8 @@ function process_leaf!(
                     bsp,
                     current_leaf,
                     iter,
-                    F,
-                    cert_params,
-                    cache,
-                    d;
-                    progress = progress,
-                    bucket_size_bound = bucket_size_bound,
-                    certify_oversized_buckets = certify_oversized_buckets,
-                    threading = threading,
-                    ε = ε,
-                    coordinate = coordinate,
-                    max_refinement_rounds = max_refinement_rounds,
+                    cache;
                     depth = depth,
-                    max_precision = max_precision,
-                    refine_solution = refine_solution,
-                    extended_certificate = extended_certificate,
                     certify_solution_kwargs...,
                 )
                 if split_result.status === :restart
@@ -3475,22 +3406,14 @@ function process_leaf!(
             if isempty(deterministic_points)
                 # If the sampled interval leaves no deterministic gap, try one random cut
                 # in the remaining admissible region before giving up on splitting.
-                random_split = _random_split_point(entries, current_leaf; ε = ε)
+                random_split = _random_split_point(entries, current_leaf; ε = cache.ε)
                 isnothing(random_split) && break
                 verification = verify_split!(
                     bsp,
                     current_leaf,
                     random_split,
                     bucket_iter,
-                    F,
-                    cert_params,
                     cache;
-                    progress = progress,
-                    threading = threading,
-                    coordinate = coordinate,
-                    max_precision = max_precision,
-                    refine_solution = refine_solution,
-                    extended_certificate = extended_certificate,
                     certify_solution_kwargs...,
                 )
 
@@ -3501,21 +3424,8 @@ function process_leaf!(
                     bsp,
                     current_leaf,
                     iter,
-                    F,
-                    cert_params,
-                    cache,
-                    d;
-                    progress = progress,
-                    bucket_size_bound = bucket_size_bound,
-                    certify_oversized_buckets = certify_oversized_buckets,
-                    threading = threading,
-                    ε = ε,
-                    coordinate = coordinate,
-                    max_refinement_rounds = max_refinement_rounds,
+                    cache;
                     depth = depth,
-                    max_precision = max_precision,
-                    refine_solution = refine_solution,
-                    extended_certificate = extended_certificate,
                     certify_solution_kwargs...,
                 )
                 if split_result.status === :restart
@@ -3528,26 +3438,18 @@ function process_leaf!(
                 end
             end
 
-            bucket_size ≤ bucket_size_bound && break
+            bucket_size ≤ cache.bucket_size_bound && break
             if !isempty(deterministic_points)
                 # Only after both deterministic tries fail do we spend one extra pass on
                 # a random admissible cut.
-                random_split = _random_split_point(entries, current_leaf; ε = ε)
+                random_split = _random_split_point(entries, current_leaf; ε = cache.ε)
                 if !isnothing(random_split)
                     verification = verify_split!(
                         bsp,
                         current_leaf,
                         random_split,
                         bucket_iter,
-                        F,
-                        cert_params,
                         cache;
-                        progress = progress,
-                        threading = threading,
-                        coordinate = coordinate,
-                        max_precision = max_precision,
-                        refine_solution = refine_solution,
-                        extended_certificate = extended_certificate,
                         certify_solution_kwargs...,
                     )
 
@@ -3558,21 +3460,8 @@ function process_leaf!(
                         bsp,
                         current_leaf,
                         iter,
-                        F,
-                        cert_params,
-                        cache,
-                        d;
-                        progress = progress,
-                        bucket_size_bound = bucket_size_bound,
-                        certify_oversized_buckets = certify_oversized_buckets,
-                        threading = threading,
-                        ε = ε,
-                        coordinate = coordinate,
-                        max_refinement_rounds = max_refinement_rounds,
+                        cache;
                         depth = depth,
-                        max_precision = max_precision,
-                        refine_solution = refine_solution,
-                        extended_certificate = extended_certificate,
                         certify_solution_kwargs...,
                     )
                     if split_result.status === :restart
@@ -3590,7 +3479,8 @@ function process_leaf!(
         # No safe gap exists in the chosen projection, so this leaf becomes terminal.
         # We remember that explicitly so the final result can distinguish "oversized
         # because unsplittable in this projection" from "oversized because unchecked".
-        bucket_size > bucket_size_bound && push!(bsp.unsplittable, _bucket_id(current_leaf))
+        bucket_size > cache.bucket_size_bound &&
+            push!(bsp.unsplittable, _bucket_id(current_leaf))
     end
 
     # From here on we treat the leaf as terminal, either because it is small enough or
@@ -3606,7 +3496,7 @@ function process_leaf!(
 
     # Optionally leave oversized terminal buckets uncertified while still recording
     # their size in the final BSP summary.
-    if bucket_size > bucket_size_bound && !certify_oversized_buckets
+    if bucket_size > cache.bucket_size_bound && !cache.certify_oversized_buckets
         return (
             distinct_certified = 0,
             distinct_real = 0,
@@ -3623,16 +3513,8 @@ function process_leaf!(
             bsp,
             current_leaf,
             iter,
-            F,
-            cert_params,
             cache;
-            progress = progress,
-            threading = threading,
-            coordinate = coordinate,
             max_entries = nothing,
-            max_precision = max_precision,
-            refine_solution = refine_solution,
-            extended_certificate = extended_certificate,
             certify_solution_kwargs...,
         )
     end
@@ -3640,19 +3522,7 @@ function process_leaf!(
     # Step 4: the leaf is terminal. Revisit only the current bucket and add its
     # certified solutions to `d`; the distinct check itself stays serial.
     bucket_iter = _bucket_iterator(iter, entries)
-    nfinite = certify_terminal_bucket!(
-        d,
-        bucket_iter,
-        F,
-        cert_params,
-        cache;
-        progress = progress,
-        threading = threading,
-        max_precision = max_precision,
-        refine_solution = refine_solution,
-        extended_certificate = extended_certificate,
-        certify_solution_kwargs...,
-    )
+    nfinite = certify_terminal_bucket!(bucket_iter, cache; certify_solution_kwargs...)
     nfinite == length(entries) || error(
         "Re-tracking a BSP bucket produced $nfinite finite solutions for " *
         "$(length(entries)) expected entries.",
@@ -3660,7 +3530,7 @@ function process_leaf!(
 
     # Distinct counts can be summed across terminal leaves because different leaves
     # are disjoint in the chosen projected coordinate.
-    ndistinct, nreal, ncomplex = _count_distinct_certificates!(d)
+    ndistinct, nreal, ncomplex = _count_distinct_certificates!(cache.distinct_solutions)
     return (
         distinct_certified = ndistinct,
         distinct_real = nreal,
@@ -3747,7 +3617,7 @@ function _certify_iterator_bsp(
     iter::ResultIterator,
     F::AbstractSystem,
     cert_params,
-    cache::CertificationCache;
+    certification_cache::CertificationCache;
     show_progress::Bool = true,
     bucket_size_bound::Integer = 1000,
     certify_oversized_buckets::Bool = false,
@@ -3780,7 +3650,7 @@ function _certify_iterator_bsp(
         iter,
         F,
         cert_params,
-        cache;
+        certification_cache;
         progress = progress,
         threading = threading,
         coordinate = coordinate,
@@ -3795,6 +3665,22 @@ function _certify_iterator_bsp(
     distinct_complex = 0
     params = isnothing(cert_params) ? nothing : complexF64_params(cert_params)
     d = DistinctCertifiedSolutions(F, params; extended_certificate = extended_certificate)
+    cache = IteratorCertificationCache(;
+        F = F,
+        cert_params = cert_params,
+        certification_cache = certification_cache,
+        distinct_solutions = d,
+        progress = progress,
+        bucket_size_bound = Int(bucket_size_bound),
+        certify_oversized_buckets = certify_oversized_buckets,
+        threading = threading,
+        ε = ε,
+        coordinate = coordinate,
+        max_refinement_rounds = max_refinement_rounds,
+        max_precision = max_precision,
+        refine_solution = refine_solution,
+        extended_certificate = extended_certificate,
+    )
 
     refinement_steps = 0
     i = 1
@@ -3832,21 +3718,8 @@ function _certify_iterator_bsp(
             bsp,
             leaf,
             leaf_iter,
-            F,
-            cert_params,
-            cache,
-            d;
-            progress = progress,
-            bucket_size_bound = bucket_size_bound,
-            certify_oversized_buckets = certify_oversized_buckets,
-            threading = threading,
-            ε = ε,
-            coordinate = coordinate,
-            max_refinement_rounds = max_refinement_rounds,
+            cache;
             initial_entries = local_entries,
-            max_precision = max_precision,
-            refine_solution = refine_solution,
-            extended_certificate = extended_certificate,
             certify_solution_kwargs...,
         )
         distinct_certified += counts.distinct_certified
