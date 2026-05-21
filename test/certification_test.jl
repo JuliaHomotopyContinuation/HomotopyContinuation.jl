@@ -489,6 +489,15 @@
         @test ncertified(res) == 2
         @test ndistinct_certified(res) == 2
         @test nnotcertified(res) == 0
+
+        tiny_margin_iter = solve(F; iterator_only = true, start_system = :total_degree)
+        @test_throws ArgumentError certify(
+            F,
+            tiny_margin_iter,
+            nothing;
+            ε = eps(),
+            show_progress = false,
+        )
     end
 
     @testset "BSP certification: bitmasked iterator" begin

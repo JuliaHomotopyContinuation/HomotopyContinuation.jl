@@ -2239,6 +2239,18 @@ end
 _bucket_count(bsp::BSPPartition, leaf) = IntervalTrees.value(bsp.tree[leaf])
 _bucket_id(interval) = (first(interval), last(interval))
 
+const _MIN_BSP_SPLIT_MARGIN = 1e-12
+
+function _check_bsp_split_margin(ε)
+    isfinite(ε) || throw(ArgumentError("`ε` must be finite."))
+    ε >= _MIN_BSP_SPLIT_MARGIN || throw(
+        ArgumentError(
+            "`ε` must be at least $_MIN_BSP_SPLIT_MARGIN so verified BSP splits stay separated from certification-scale numerical variation.",
+        ),
+    )
+    ε
+end
+
 function _threaded_iterator_data(
     iter::ResultIterator,
     F::AbstractSystem,
@@ -3727,7 +3739,7 @@ For more details of the implementation see [^BBK26].
 * `compile = false`: See the [`solve`](@ref) documentation.
 * `bucket_size_bound = 1000`: the algorithm tries to split the real lines into buckets each containing at most `bucket_size_bound` many solutions.
 * `certify_oversized_buckets = false`: if a bucket contains more than `bucket_size_bound` solutions, only certify them when `certify_oversized_buckets` is true.
-* `ε = 1e-4`: when proposing a split from one sampled certified interval, place the split at distance `ε` from that interval.
+* `ε = 1e-4`: when proposing a split from one sampled certified interval, place the split at distance `ε` from that interval. Values below `1e-12` are rejected so accepted splits remain separated from certification-scale numerical variation.
 * `coordinate = 1`: the coordinate of the solutions we project to to compute the binary spatial partition tree.
 * `boundaries = -10:10`: the initial boundaries of the spatial partition.
 * `max_refinement_rounds = 50`: the maximal number of times we split buckets to get all buckets containing at most `bucket_size_bound` solutions
@@ -3754,6 +3766,7 @@ function _certify_iterator_bsp(
     extended_certificate::Bool = false,
     certify_solution_kwargs...,
 )
+    ε = _check_bsp_split_margin(ε)
     bsp = _build_partition(boundaries)
     iter_length = length(iter)
     progress = show_progress ? make_iterator_certification_progress() : nothing
