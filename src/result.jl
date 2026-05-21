@@ -348,8 +348,8 @@ function ResultIterator(
     bitmask = nothing,
     predicate = nothing,
 ) where {Iter}
-
-    if first(starts) isa Number # to allow passing a single start solution
+    first_start = iterate(starts)
+    if !isnothing(first_start) && first_start[1] isa Number # to allow passing a single start solution
         return ResultIterator([starts], S; bitmask = bitmask, predicate = predicate)
     end
 
