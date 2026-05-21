@@ -11,7 +11,22 @@ struct PolyhedralStartSolutionsIterator{Iter}
     start_coefficients::Vector{Vector{ComplexF64}}
     lifting::Vector{Vector{Int32}}
     mixed_cells::Iter
-    BSS::BinomialSystemSolver
+
+    function PolyhedralStartSolutionsIterator(
+        support::Vector{Matrix{Int32}},
+        start_coefficients::Vector{Vector{ComplexF64}},
+        lifting::Vector{Vector{Int32}},
+        mixed_cells,
+    )
+        if isnothing(iterate(mixed_cells))
+            res = MixedSubdivisions.fine_mixed_cells(support)
+            if isnothing(res) || isempty(res[1])
+                throw(OverflowError("Cannot compute a start system."))
+            end
+            mixed_cells, lifting = res
+        end
+        new{typeof(mixed_cells)}(support, start_coefficients, lifting, mixed_cells)
+    end
 end
 
 function PolyhedralStartSolutionsIterator(
@@ -20,14 +35,11 @@ function PolyhedralStartSolutionsIterator(
     lifting = map(c -> zeros(Int32, length(c)), coeffs),
     mixed_cells = MixedCell[],
 )
-    BSS = BinomialSystemSolver(length(support))
-    PolyhedralStartSolutionsIterator(
-        convert(Vector{Matrix{Int32}}, support),
-        coeffs,
-        lifting,
-        mixed_cells,
-        BSS,
-    )
+    support = convert(Vector{Matrix{Int32}}, support)
+    start_coefficients = convert(Vector{Vector{ComplexF64}}, coeffs)
+    lifting = convert(Vector{Vector{Int32}}, lifting)
+
+    PolyhedralStartSolutionsIterator(support, start_coefficients, lifting, mixed_cells)
 end
 
 Base.show(io::IO, C::PolyhedralStartSolutionsIterator) =
@@ -42,59 +54,48 @@ Base.IteratorEltype(::Type{<:PolyhedralStartSolutionsIterator}) = Base.HasEltype
 Base.eltype(iter::PolyhedralStartSolutionsIterator) = Tuple{MixedCell,Vector{ComplexF64}}
 
 function compute_mixed_cells!(iter::PolyhedralStartSolutionsIterator)
-    first_cell = iterate(iter.mixed_cells)
-    if isnothing(first_cell)
-        res = MixedSubdivisions.fine_mixed_cells(iter.support)
-        if isnothing(res) || isempty(res[1])
-            throw(OverflowError("Cannot compute a start system."))
-        end
-        mixed_cells, lifting = res
-        empty!(iter.mixed_cells)
-        append!(iter.mixed_cells, mixed_cells)
-
-        for (i, w) in enumerate(lifting)
-            empty!(iter.lifting[i])
-            append!(iter.lifting[i], w)
-        end
-    end
+    # Mixed cells are computed at construction time. Keep this method as a cheap
+    # compatibility hook for callers that used to force lazy initialization.
     iter
 end
 
 
 function Base.iterate(iter::PolyhedralStartSolutionsIterator)
-    compute_mixed_cells!(iter)
-
     first_cell = iterate(iter.mixed_cells)
     isnothing(first_cell) && return nothing
     cell, inner_state = first_cell
 
-    solve(iter.BSS, iter.support, iter.start_coefficients, cell)
-    x = [iter.BSS.X[i, 1] for i = 1:length(iter.support)]
+    BSS = BinomialSystemSolver(length(iter.support))
+    solve(BSS, iter.support, iter.start_coefficients, cell)
+    x = [BSS.X[i, 1] for i = 1:length(iter.support)]
 
     # return the value _and_ the combined state:
-    # (cell, inner_state, column_index)
-    return (cell, x), (cell, inner_state, 1)
+    # (BSS, cell, inner_state, column_index)
+    return (cell, x), (BSS, cell, inner_state, 1)
 end
 
-function Base.iterate(iter::PolyhedralStartSolutionsIterator, state::Tuple{Any,Any,Int})
-    cell, inner_state, j = state
-    ncol = size(iter.BSS.X, 2)
+function Base.iterate(
+    iter::PolyhedralStartSolutionsIterator,
+    state::Tuple{BinomialSystemSolver,Any,Any,Int},
+)
+    BSS, cell, inner_state, j = state
+    ncol = size(BSS.X, 2)
 
     if j < ncol
         # we still have more columns to emit for the current cell
         new_j = j + 1
-        x = [iter.BSS.X[i, new_j] for i = 1:length(iter.support)]
-        return (cell, x), (cell, inner_state, new_j)
+        x = [BSS.X[i, new_j] for i = 1:length(iter.support)]
+        return (cell, x), (BSS, cell, inner_state, new_j)
     else
         # we finished the last column for `cell`, advance to the next cell
         next_cell = iterate(iter.mixed_cells, inner_state)
         next_cell === nothing && return nothing
         cell2, new_inner_state = next_cell
 
-        solve(iter.BSS, iter.support, iter.start_coefficients, cell2)
-        x = [iter.BSS.X[i, 1] for i = 1:length(iter.support)]
+        solve(BSS, iter.support, iter.start_coefficients, cell2)
+        x = [BSS.X[i, 1] for i = 1:length(iter.support)]
 
-        return (cell2, x), (cell2, new_inner_state, 1)
+        return (cell2, x), (BSS, cell2, new_inner_state, 1)
     end
 end
 
