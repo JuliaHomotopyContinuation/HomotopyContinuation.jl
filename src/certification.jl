@@ -2346,11 +2346,10 @@ function threaded_iterator_data(
     end
 
     # Each worker gets its own iterator, system, parameters, and cache.
-    starts = [deepcopy(start_solutions(iter)) for _ = 1:nthreads]
+    starts = start_solutions(iter)
     solvers = [deepcopy(solver(iter)) for _ = 1:nthreads]
-    iters = [
-        ResultIterator(starts[tid], solvers[tid]; bitmask = masks[tid]) for tid = 1:nthreads
-    ]
+    iters =
+        [ResultIterator(starts, solvers[tid]; bitmask = masks[tid]) for tid = 1:nthreads]
     systems = [F; [deepcopy(F) for _ = 2:nthreads]]
     params = [cert_params; [deepcopy(cert_params) for _ = 2:nthreads]]
     caches = [certification_cache; [deepcopy(certification_cache) for _ = 2:nthreads]]
