@@ -116,7 +116,7 @@ function is_irreducible(W::WitnessSet)
         W.is_irreducible
     end
 end
-
+_is_irreducible(W::WitnessSet) = W.is_irreducible === true
 
 ### Construct witness sets
 """
