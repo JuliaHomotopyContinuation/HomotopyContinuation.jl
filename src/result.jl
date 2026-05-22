@@ -366,9 +366,12 @@ function ResultIterator(
 
     if isnothing(bitmask)
         if isnothing(indices)
-            bitmask =
-                isnothing(predicate) ? nothing :
-                BitVector([predicate(S(x)) for x in starts])
+            if !isnothing(predicate)
+                indices = Int[]
+                for (i, x) in enumerate(starts)
+                    predicate(track(S.trackers[1], x)) && push!(indices, i)
+                end
+            end
         elseif !isnothing(predicate)
             @warn "The keyword predicate will be ignored, since both indices and predicate are given."
         end
@@ -409,6 +412,25 @@ Returns the bitmask of `ri`.
 """
 bitmask(ri::ResultIterator) = ri.bitmask
 indices(ri::ResultIterator) = ri.indices
+
+function selected_start_indices(ri::ResultIterator)
+    if !isnothing(ri.indices)
+        return ri.indices
+    elseif !isnothing(ri.bitmask)
+        return findall(ri.bitmask)
+    else
+        return nothing
+    end
+end
+
+function filter_result_indices(ri::ResultIterator, output_indices::Vector{Int})
+    base_indices = selected_start_indices(ri)
+    if isnothing(base_indices)
+        return ResultIterator(ri.starts, ri.S; indices = output_indices)
+    else
+        return ResultIterator(ri.starts, ri.S; indices = base_indices[output_indices])
+    end
+end
 
 function Base.show(io::IO, ri::ResultIterator{Iter}) where {Iter}
     header = "ResultIterator"
@@ -538,8 +560,11 @@ ResultIterator
 ```
 """
 function bitmask_filter(f::Function, ri::ResultIterator)
-    bm = bitmask(f, ri)
-    return ResultIterator(ri.starts, ri.S; bitmask = bm)
+    selected = Int[]
+    for (i, result) in enumerate(ri)
+        f(result) && push!(selected, i)
+    end
+    filter_result_indices(ri, selected)
 end
 
 """
