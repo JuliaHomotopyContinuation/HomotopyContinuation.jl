@@ -2303,63 +2303,91 @@ Base.@kwdef struct IteratorCertificationCache{S<:AbstractSystem,P,C<:Certificati
     extended_certificate::Bool
 end
 
-function threaded_iterator_data(
+function threaded_certification_data(
     iter::ResultIterator,
     F::AbstractSystem,
     cert_params,
     certification_cache::CertificationCache,
-    threading::Bool,
+    nworkers::Int,
 )
-    nthreads = threading ? Threads.nthreads() : 1
-    nthreads = max(1, min(nthreads, length(iter)))
-    nthreads == 1 && return (
-        iters = [iter],
-        indices = [collect(1:length(iter))],
+    nworkers = max(1, nworkers)
+    nworkers == 1 && return (
+        trackers = [solver(iter).trackers[1]],
         systems = [F],
         params = [cert_params],
         caches = [certification_cache],
     )
 
-    current_bitmask = bitmask(iter)
-    masks = if isnothing(current_bitmask)
-        [falses(length(iter)) for _ = 1:nthreads]
-    else
-        [falses(length(current_bitmask)) for _ = 1:nthreads]
-    end
-    indices = [Int[] for _ = 1:nthreads]
+    # These are the mutable numerical workspaces used by `certify_solution`.
+    # The start iterator itself is consumed once by the caller and is not copied.
+    tracker = solver(iter).trackers[1]
+    trackers = [tracker; [deepcopy(tracker) for _ = 2:nworkers]]
+    systems = [F; [deepcopy(F) for _ = 2:nworkers]]
+    params = fill(cert_params, nworkers)
+    caches = [certification_cache; [deepcopy(certification_cache) for _ = 2:nworkers]]
+    return (trackers = trackers, systems = systems, params = params, caches = caches)
+end
 
-    if isnothing(current_bitmask)
-        for output_index = 1:length(iter)
-            tid = mod1(output_index, nthreads)
-            masks[tid][output_index] = true
-            push!(indices[tid], output_index)
-        end
-    else
-        output_index = 0
-        for start_index in eachindex(current_bitmask)
-            current_bitmask[start_index] || continue
-            output_index += 1
-            tid = mod1(output_index, nthreads)
-            masks[tid][start_index] = true
-            push!(indices[tid], output_index)
-        end
-    end
-
-    # Each worker gets its own iterator, system, parameters, and cache.
+function foreach_threaded_result(f, iter::ResultIterator, trackers)
+    nworkers = length(trackers)
     starts = start_solutions(iter)
-    solvers = [deepcopy(solver(iter)) for _ = 1:nthreads]
-    iters =
-        [ResultIterator(starts, solvers[tid]; bitmask = masks[tid]) for tid = 1:nthreads]
-    systems = [F; [deepcopy(F) for _ = 2:nthreads]]
-    params = [cert_params; [deepcopy(cert_params) for _ = 2:nthreads]]
-    caches = [certification_cache; [deepcopy(certification_cache) for _ = 2:nthreads]]
-    return (
-        iters = iters,
-        indices = indices,
-        systems = systems,
-        params = params,
-        caches = caches,
-    )
+    selected_indices = indices(iter)
+    current_bitmask = bitmask(iter)
+    starts_lock = ReentrantLock()
+    started = Ref(false)
+    state = Ref{Any}(nothing)
+    start_index = Ref(0)
+    output_index = Ref(0)
+    selected_index = Ref(1)
+
+    Threads.@sync begin
+        for tid = 1:nworkers
+            Threads.@spawn begin
+                while true
+                    item = lock(starts_lock) do
+                        while true
+                            if !isnothing(selected_indices) &&
+                               selected_index[] > length(selected_indices)
+                                return nothing
+                            end
+
+                            next = if started[]
+                                iterate(starts, state[])
+                            else
+                                started[] = true
+                                iterate(starts)
+                            end
+                            isnothing(next) && return nothing
+
+                            start_value, next_state = next
+                            state[] = next_state
+                            start_index[] += 1
+
+                            if !isnothing(selected_indices)
+                                target_index = selected_indices[selected_index[]]
+                                start_index[] < target_index && continue
+                                start_index[] == target_index || error(
+                                    "ResultIterator indices must be sorted increasingly.",
+                                )
+                                selected_index[] += 1
+                            elseif !isnothing(current_bitmask) &&
+                                   !current_bitmask[start_index[]]
+                                continue
+                            end
+
+                            output_index[] += 1
+                            return (output_index[], start_value)
+                        end
+                    end
+                    isnothing(item) && break
+                    result = track(trackers[tid], item[2])
+                    finite = isfinite(result)
+                    f(tid, item[1], finite, finite ? copy(solution(result)) : nothing)
+                end
+            end
+        end
+    end
+    nothing
 end
 
 function merge_covering_leaves!(bsp::BSPPartition, interval)
@@ -2499,7 +2527,14 @@ function assign_initial_buckets!(
     register_iterator_pass!(progress, "Assign initial BSP buckets", length(iter))
 
     if threading && Threads.nthreads() > 1 && length(iter) > 1
-        contexts = threaded_iterator_data(iter, F, cert_params, certification_cache, true)
+        worker_count = min(Threads.nthreads(), length(iter))
+        workers = threaded_certification_data(
+            iter,
+            F,
+            cert_params,
+            certification_cache,
+            worker_count,
+        )
         progress_lock = ReentrantLock()
         # Only counters and progress are shared while certifying. BSP mutation is
         # deferred until all workers have produced their local bucket entries.
@@ -2509,58 +2544,49 @@ function assign_initial_buckets!(
         certified_real = Threads.Atomic{Int}(0)
         certified_complex = Threads.Atomic{Int}(0)
         not_certified = Threads.Atomic{Int}(0)
-        certified_entries = [BSPBucketEntry[] for _ in eachindex(contexts.iters)]
+        certified_entries = [BSPBucketEntry[] for _ in eachindex(workers.systems)]
 
-        Threads.@sync begin
-            for tid in eachindex(contexts.iters)
-                Threads.@spawn begin
-                    local_entries = certified_entries[tid]
-                    for (idx, result) in zip(contexts.indices[tid], contexts.iters[tid])
-                        Threads.atomic_add!(nresults, 1)
-                        @lock progress_lock begin
-                            advance_iterator_progress!(
-                                progress;
-                                phase = :assignment,
-                                nresults = nresults[],
-                                nfinite = nfinite[],
-                                certified = certified[],
-                                certified_real = certified_real[],
-                                certified_complex = certified_complex[],
-                                not_certified = not_certified[],
-                            )
-                        end
-                        isfinite(result) || continue
-
-                        Threads.atomic_add!(nfinite, 1)
-                        cert = certify_solution(
-                            contexts.systems[tid],
-                            solution(result),
-                            contexts.params[tid],
-                            contexts.caches[tid],
-                            idx;
-                            max_precision = max_precision,
-                            refine_solution = refine_solution,
-                            extended_certificate = extended_certificate,
-                            certify_solution_kwargs...,
-                        )
-                        if !is_certified(cert)
-                            Threads.atomic_add!(not_certified, 1)
-                            continue
-                        end
-
-                        Threads.atomic_add!(certified, 1)
-                        Threads.atomic_add!(certified_real, Int(is_real(cert)))
-                        Threads.atomic_add!(certified_complex, Int(is_complex(cert)))
-                        push!(
-                            local_entries,
-                            BSPBucketEntry(
-                                idx,
-                                _convert_to_interval(cert; coordinate = coordinate),
-                            ),
-                        )
-                    end
-                end
+        foreach_threaded_result(iter, workers.trackers) do tid, idx, finite, sol
+            local_entries = certified_entries[tid]
+            Threads.atomic_add!(nresults, 1)
+            @lock progress_lock begin
+                advance_iterator_progress!(
+                    progress;
+                    phase = :assignment,
+                    nresults = nresults[],
+                    nfinite = nfinite[],
+                    certified = certified[],
+                    certified_real = certified_real[],
+                    certified_complex = certified_complex[],
+                    not_certified = not_certified[],
+                )
             end
+            finite || return
+
+            Threads.atomic_add!(nfinite, 1)
+            cert = certify_solution(
+                workers.systems[tid],
+                sol,
+                workers.params[tid],
+                workers.caches[tid],
+                idx;
+                max_precision = max_precision,
+                refine_solution = refine_solution,
+                extended_certificate = extended_certificate,
+                certify_solution_kwargs...,
+            )
+            if !is_certified(cert)
+                Threads.atomic_add!(not_certified, 1)
+                return
+            end
+
+            Threads.atomic_add!(certified, 1)
+            Threads.atomic_add!(certified_real, Int(is_real(cert)))
+            Threads.atomic_add!(certified_complex, Int(is_complex(cert)))
+            push!(
+                local_entries,
+                BSPBucketEntry(idx, _convert_to_interval(cert; coordinate = coordinate)),
+            )
         end
 
         stats.nresults = nresults[]
@@ -2683,51 +2709,45 @@ function collect_leaf_entries!(
        Threads.nthreads() > 1 &&
        isnothing(max_entries) &&
        length(iter) > 1
-        contexts = threaded_iterator_data(
+        worker_count = min(Threads.nthreads(), length(iter))
+        workers = threaded_certification_data(
             iter,
             cache.F,
             cache.cert_params,
             cache.certification_cache,
-            true,
+            worker_count,
         )
         progress_lock = ReentrantLock()
         # The threaded path is only used for full recollection.
-        local_entries = [BSPBucketEntry[] for _ in eachindex(contexts.iters)]
-        crossing_intervals = [nothing for _ in eachindex(contexts.iters)]
+        local_entries = [BSPBucketEntry[] for _ in eachindex(workers.systems)]
+        crossing_intervals = [nothing for _ in eachindex(workers.systems)]
 
-        Threads.@sync begin
-            for tid in eachindex(contexts.iters)
-                Threads.@spawn begin
-                    for (idx, result) in zip(contexts.indices[tid], contexts.iters[tid])
-                        @lock progress_lock begin
-                            advance_iterator_progress!(cache.progress)
-                        end
-                        isfinite(result) || continue
+        foreach_threaded_result(iter, workers.trackers) do tid, idx, finite, sol
+            @lock progress_lock begin
+                advance_iterator_progress!(cache.progress)
+            end
+            finite || return
 
-                        cert = certify_solution(
-                            contexts.systems[tid],
-                            solution(result),
-                            contexts.params[tid],
-                            contexts.caches[tid],
-                            idx;
-                            max_precision = cache.max_precision,
-                            refine_solution = cache.refine_solution,
-                            extended_certificate = cache.extended_certificate,
-                            certify_solution_kwargs...,
-                        )
-                        is_certified(cert) || continue
+            cert = certify_solution(
+                workers.systems[tid],
+                sol,
+                workers.params[tid],
+                workers.caches[tid],
+                idx;
+                max_precision = cache.max_precision,
+                refine_solution = cache.refine_solution,
+                extended_certificate = cache.extended_certificate,
+                certify_solution_kwargs...,
+            )
+            is_certified(cert) || return
 
-                        interval = _convert_to_interval(cert; coordinate = cache.coordinate)
-                        if last(interval) < first(leaf) || last(leaf) < first(interval)
-                            continue
-                        elseif first(leaf) <= first(interval) &&
-                               last(interval) <= last(leaf)
-                            push!(local_entries[tid], BSPBucketEntry(idx, interval))
-                        elseif isnothing(crossing_intervals[tid])
-                            crossing_intervals[tid] = interval
-                        end
-                    end
-                end
+            interval = _convert_to_interval(cert; coordinate = cache.coordinate)
+            if last(interval) < first(leaf) || last(leaf) < first(interval)
+                return
+            elseif first(leaf) <= first(interval) && last(interval) <= last(leaf)
+                push!(local_entries[tid], BSPBucketEntry(idx, interval))
+            elseif isnothing(crossing_intervals[tid])
+                crossing_intervals[tid] = interval
             end
         end
 
@@ -2872,61 +2892,54 @@ function verify_split!(
     register_iterator_pass!(cache.progress, "Verify BSP split", length(iter))
 
     if cache.threading && Threads.nthreads() > 1 && length(iter) > 1
-        contexts = threaded_iterator_data(
+        worker_count = min(Threads.nthreads(), length(iter))
+        workers = threaded_certification_data(
             iter,
             cache.F,
             cache.cert_params,
             cache.certification_cache,
-            true,
+            worker_count,
         )
         progress_lock = ReentrantLock()
         # Workers certify and classify intervals independently. They only report three
         # outcomes: left child, right child, or "this split/leaf cannot be used".
-        local_left_entries = [BSPBucketEntry[] for _ in eachindex(contexts.iters)]
-        local_right_entries = [BSPBucketEntry[] for _ in eachindex(contexts.iters)]
-        crossing_intervals = [nothing for _ in eachindex(contexts.iters)]
+        local_left_entries = [BSPBucketEntry[] for _ in eachindex(workers.systems)]
+        local_right_entries = [BSPBucketEntry[] for _ in eachindex(workers.systems)]
+        crossing_intervals = [nothing for _ in eachindex(workers.systems)]
         invalid_split = Threads.Atomic{Bool}(false)
 
-        Threads.@sync begin
-            for tid in eachindex(contexts.iters)
-                Threads.@spawn begin
-                    for (idx, result) in zip(contexts.indices[tid], contexts.iters[tid])
-                        @lock progress_lock begin
-                            advance_iterator_progress!(cache.progress)
-                        end
-                        isfinite(result) || continue
+        foreach_threaded_result(iter, workers.trackers) do tid, idx, finite, sol
+            @lock progress_lock begin
+                advance_iterator_progress!(cache.progress)
+            end
+            finite || return
 
-                        cert = certify_solution(
-                            contexts.systems[tid],
-                            solution(result),
-                            contexts.params[tid],
-                            contexts.caches[tid],
-                            idx;
-                            max_precision = cache.max_precision,
-                            refine_solution = cache.refine_solution,
-                            extended_certificate = cache.extended_certificate,
-                            certify_solution_kwargs...,
-                        )
-                        is_certified(cert) || continue
+            cert = certify_solution(
+                workers.systems[tid],
+                sol,
+                workers.params[tid],
+                workers.caches[tid],
+                idx;
+                max_precision = cache.max_precision,
+                refine_solution = cache.refine_solution,
+                extended_certificate = cache.extended_certificate,
+                certify_solution_kwargs...,
+            )
+            is_certified(cert) || return
 
-                        interval = _convert_to_interval(cert; coordinate = cache.coordinate)
-                        if last(interval) < first(leaf) || last(leaf) < first(interval)
-                            continue
-                        elseif !(
-                            first(leaf) <= first(interval) && last(interval) <= last(leaf)
-                        )
-                            if isnothing(crossing_intervals[tid])
-                                crossing_intervals[tid] = interval
-                            end
-                        elseif last(interval) < split_point
-                            push!(local_left_entries[tid], BSPBucketEntry(idx, interval))
-                        elseif split_point < first(interval)
-                            push!(local_right_entries[tid], BSPBucketEntry(idx, interval))
-                        else
-                            invalid_split[] = true
-                        end
-                    end
+            interval = _convert_to_interval(cert; coordinate = cache.coordinate)
+            if last(interval) < first(leaf) || last(leaf) < first(interval)
+                return
+            elseif !(first(leaf) <= first(interval) && last(interval) <= last(leaf))
+                if isnothing(crossing_intervals[tid])
+                    crossing_intervals[tid] = interval
                 end
+            elseif last(interval) < split_point
+                push!(local_left_entries[tid], BSPBucketEntry(idx, interval))
+            elseif split_point < first(interval)
+                push!(local_right_entries[tid], BSPBucketEntry(idx, interval))
+            else
+                invalid_split[] = true
             end
         end
 
@@ -3146,44 +3159,39 @@ function certify_terminal_bucket!(
     )
 
     if cache.threading && Threads.nthreads() > 1 && length(bucket_iter) > 1
-        contexts = threaded_iterator_data(
+        worker_count = min(Threads.nthreads(), length(bucket_iter))
+        workers = threaded_certification_data(
             bucket_iter,
             cache.F,
             cache.cert_params,
             cache.certification_cache,
-            true,
+            worker_count,
         )
         progress_lock = ReentrantLock()
         # Certification of individual candidates is independent and can be threaded.
         # Insertion into the distinct-certificate set is done serially, because it compares certificates against each other.
-        local_certs = [AbstractSolutionCertificate[] for _ in eachindex(contexts.iters)]
+        local_certs = [AbstractSolutionCertificate[] for _ in eachindex(workers.systems)]
         nfinite = Threads.Atomic{Int}(0)
 
-        Threads.@sync begin
-            for tid in eachindex(contexts.iters)
-                Threads.@spawn begin
-                    for (idx, result) in zip(contexts.indices[tid], contexts.iters[tid])
-                        @lock progress_lock begin
-                            advance_iterator_progress!(cache.progress)
-                        end
-                        isfinite(result) || continue
-
-                        Threads.atomic_add!(nfinite, 1)
-                        cert = certify_solution(
-                            contexts.systems[tid],
-                            solution(result),
-                            contexts.params[tid],
-                            contexts.caches[tid],
-                            idx;
-                            max_precision = cache.max_precision,
-                            refine_solution = cache.refine_solution,
-                            extended_certificate = cache.extended_certificate,
-                            certify_solution_kwargs...,
-                        )
-                        push!(local_certs[tid], cert)
-                    end
-                end
+        foreach_threaded_result(bucket_iter, workers.trackers) do tid, idx, finite, sol
+            @lock progress_lock begin
+                advance_iterator_progress!(cache.progress)
             end
+            finite || return
+
+            Threads.atomic_add!(nfinite, 1)
+            cert = certify_solution(
+                workers.systems[tid],
+                sol,
+                workers.params[tid],
+                workers.caches[tid],
+                idx;
+                max_precision = cache.max_precision,
+                refine_solution = cache.refine_solution,
+                extended_certificate = cache.extended_certificate,
+                certify_solution_kwargs...,
+            )
+            push!(local_certs[tid], cert)
         end
 
         certs = sort!(
@@ -3539,21 +3547,28 @@ function process_leaf!(
     )
 end
 
-function _bucket_bitmask(iter::ResultIterator, entries::Vector{BSPBucketEntry})
+function _bucket_indices(iter::ResultIterator, entries::Vector{BSPBucketEntry})
     # We sort the live bucket vector in place here and rely on the same order later in
     # the terminal certification step when pairing recollected solutions back with their
     # bucket entries.
     sort!(entries; by = entry -> entry.index)
+    current_indices = indices(iter)
     current_bitmask = bitmask(iter)
     # The bucket indices live in the output index space of `iter`.
-    # For an unfiltered iterator this is just `1:length(iter)`, while for a filtered
-    # iterator we have to map those output indices back to the underlying start indices.
-    selected = falses(isnothing(current_bitmask) ? length(iter) : length(current_bitmask))
+    # For an unfiltered iterator this is just `1:length(iter)`. For filtered iterators
+    # we map those output indices back to the underlying start indices without
+    # allocating a dense mask of length `length(iter)`.
+    selected = Int[]
+    sizehint!(selected, length(entries))
 
-    if isnothing(current_bitmask)
-        # No existing filter: the bucket indices can be used directly as a sparse bitmask.
+    if !isnothing(current_indices)
         for entry in entries
-            selected[entry.index] = true
+            push!(selected, current_indices[entry.index])
+        end
+        return selected
+    elseif isnothing(current_bitmask)
+        for entry in entries
+            push!(selected, entry.index)
         end
         return selected
     end
@@ -3568,7 +3583,7 @@ function _bucket_bitmask(iter::ResultIterator, entries::Vector{BSPBucketEntry})
         if target > length(entries)
             break
         elseif yielded_index == entries[target].index
-            selected[start_index] = true
+            push!(selected, start_index)
             target += 1
         end
     end
@@ -3580,8 +3595,11 @@ function _bucket_iterator(iter::ResultIterator, entries::Vector{BSPBucketEntry})
     # selected paths instead of rescanning the full iterator.
     # This is what makes the refinement phase scale with the current bucket size rather
     # than the size of the original iterator.
-    bucket_mask = _bucket_bitmask(iter, entries)
-    ResultIterator(start_solutions(iter), solver(iter); bitmask = bucket_mask)
+    ResultIterator(
+        start_solutions(iter),
+        solver(iter);
+        indices = _bucket_indices(iter, entries),
+    )
 end
 
 """
