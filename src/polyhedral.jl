@@ -53,6 +53,20 @@ Base.IteratorSize(::Type{<:PolyhedralStartSolutionsIterator}) = Base.SizeUnknown
 Base.IteratorEltype(::Type{<:PolyhedralStartSolutionsIterator}) = Base.HasEltype()
 Base.eltype(iter::PolyhedralStartSolutionsIterator) = Tuple{MixedCell,Vector{ComplexF64}}
 
+start_solution_workspace(_) = nothing
+iterate_start_solution(iter, ::Nothing) = iterate(iter)
+iterate_start_solution(iter, ::Nothing, state) = iterate(iter, state)
+
+struct PolyhedralStartSolutionsWorkspace
+    BSS::BinomialSystemSolver
+end
+
+PolyhedralStartSolutionsWorkspace(iter::PolyhedralStartSolutionsIterator) =
+    PolyhedralStartSolutionsWorkspace(BinomialSystemSolver(length(iter.support)))
+
+start_solution_workspace(iter::PolyhedralStartSolutionsIterator) =
+    PolyhedralStartSolutionsWorkspace(iter)
+
 function compute_mixed_cells!(iter::PolyhedralStartSolutionsIterator)
     Base.depwarn(
         "`compute_mixed_cells!` is deprecated. Mixed cells are computed when the `PolyhedralStartSolutionsIterator` is constructed.",
@@ -62,32 +76,35 @@ function compute_mixed_cells!(iter::PolyhedralStartSolutionsIterator)
 end
 
 
-function Base.iterate(iter::PolyhedralStartSolutionsIterator)
+function iterate_start_solution(
+    iter::PolyhedralStartSolutionsIterator,
+    workspace::PolyhedralStartSolutionsWorkspace,
+)
     first_cell = iterate(iter.mixed_cells)
     isnothing(first_cell) && return nothing
     cell, inner_state = first_cell
 
-    BSS = BinomialSystemSolver(length(iter.support))
+    BSS = workspace.BSS
     solve(BSS, iter.support, iter.start_coefficients, cell)
     x = [BSS.X[i, 1] for i = 1:length(iter.support)]
 
-    # return the value _and_ the combined state:
-    # (BSS, cell, inner_state, column_index)
-    return (cell, x), (BSS, cell, inner_state, 1)
+    return (cell, x), (cell, inner_state, 1)
 end
 
-function Base.iterate(
+function iterate_start_solution(
     iter::PolyhedralStartSolutionsIterator,
-    state::Tuple{BinomialSystemSolver,Any,Any,Int},
+    workspace::PolyhedralStartSolutionsWorkspace,
+    state::Tuple{Any,Any,Int},
 )
-    BSS, cell, inner_state, j = state
+    cell, inner_state, j = state
+    BSS = workspace.BSS
     ncol = size(BSS.X, 2)
 
     if j < ncol
         # we still have more columns to emit for the current cell
         new_j = j + 1
         x = [BSS.X[i, new_j] for i = 1:length(iter.support)]
-        return (cell, x), (BSS, cell, inner_state, new_j)
+        return (cell, x), (cell, inner_state, new_j)
     else
         # we finished the last column for `cell`, advance to the next cell
         next_cell = iterate(iter.mixed_cells, inner_state)
@@ -97,8 +114,27 @@ function Base.iterate(
         solve(BSS, iter.support, iter.start_coefficients, cell2)
         x = [BSS.X[i, 1] for i = 1:length(iter.support)]
 
-        return (cell2, x), (BSS, cell2, new_inner_state, 1)
+        return (cell2, x), (cell2, new_inner_state, 1)
     end
+end
+
+function Base.iterate(iter::PolyhedralStartSolutionsIterator)
+    workspace = start_solution_workspace(iter)
+    next = iterate_start_solution(iter, workspace)
+    isnothing(next) && return nothing
+    value, state = next
+    return value, (workspace, state)
+end
+
+function Base.iterate(
+    iter::PolyhedralStartSolutionsIterator,
+    state::Tuple{PolyhedralStartSolutionsWorkspace,Any},
+)
+    workspace, inner_state = state
+    next = iterate_start_solution(iter, workspace, inner_state)
+    isnothing(next) && return nothing
+    value, next_inner_state = next
+    return value, (workspace, next_inner_state)
 end
 
 # Tracker
