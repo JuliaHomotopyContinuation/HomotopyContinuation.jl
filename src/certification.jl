@@ -2301,6 +2301,7 @@ Base.@kwdef struct IteratorCertificationCache{S<:AbstractSystem,P,C<:Certificati
     max_precision::Int
     refine_solution::Bool
     extended_certificate::Bool
+    result_predicate::Function
 end
 
 function threaded_certification_data(
@@ -2328,7 +2329,7 @@ function threaded_certification_data(
     return (trackers = trackers, systems = systems, params = params, caches = caches)
 end
 
-function foreach_threaded_result(f, iter::ResultIterator, trackers)
+function foreach_threaded_result(f, iter::ResultIterator, trackers, result_predicate)
     nworkers = length(trackers)
     starts = start_solutions(iter)
     starts_workspace = start_solution_workspace(starts)
@@ -2382,8 +2383,10 @@ function foreach_threaded_result(f, iter::ResultIterator, trackers)
                     end
                     isnothing(item) && break
                     result = track(trackers[tid], item[2])
+                    selected = result_predicate(result)
                     finite = isfinite(result)
-                    f(tid, item[1], finite, finite ? copy(solution(result)) : nothing)
+                    sol = selected && finite ? copy(solution(result)) : nothing
+                    f(tid, item[1], selected, finite, sol)
                 end
             end
         end
@@ -2515,6 +2518,7 @@ function assign_initial_buckets!(
     max_precision::Int = 256,
     refine_solution::Bool = true,
     extended_certificate::Bool = false,
+    result_predicate::Function = Returns(true),
     certify_solution_kwargs...,
 )
     # Phase 1:
@@ -2547,9 +2551,15 @@ function assign_initial_buckets!(
         not_certified = Threads.Atomic{Int}(0)
         certified_entries = [BSPBucketEntry[] for _ in eachindex(workers.systems)]
 
-        foreach_threaded_result(iter, workers.trackers) do tid, idx, finite, sol
+        foreach_threaded_result(
+            iter,
+            workers.trackers,
+            result_predicate,
+        ) do tid, idx, selected, finite, sol
             local_entries = certified_entries[tid]
-            Threads.atomic_add!(nresults, 1)
+            if selected
+                Threads.atomic_add!(nresults, 1)
+            end
             @lock progress_lock begin
                 advance_iterator_progress!(
                     progress;
@@ -2562,6 +2572,7 @@ function assign_initial_buckets!(
                     not_certified = not_certified[],
                 )
             end
+            selected || return
             finite || return
 
             Threads.atomic_add!(nfinite, 1)
@@ -2615,7 +2626,8 @@ function assign_initial_buckets!(
     idx = 0
     for result in iter
         idx += 1
-        stats.nresults += 1
+        selected = result_predicate(result)
+        stats.nresults += Int(selected)
         advance_iterator_progress!(
             progress;
             phase = :assignment,
@@ -2626,6 +2638,7 @@ function assign_initial_buckets!(
             certified_complex = stats.certified_complex,
             not_certified = stats.not_certified,
         )
+        selected || continue
         # Non-finite results contribute to the global counts but never enter the BSP.
         isfinite(result) || continue
 
@@ -2723,10 +2736,15 @@ function collect_leaf_entries!(
         local_entries = [BSPBucketEntry[] for _ in eachindex(workers.systems)]
         crossing_intervals = [nothing for _ in eachindex(workers.systems)]
 
-        foreach_threaded_result(iter, workers.trackers) do tid, idx, finite, sol
+        foreach_threaded_result(
+            iter,
+            workers.trackers,
+            cache.result_predicate,
+        ) do tid, idx, selected, finite, sol
             @lock progress_lock begin
                 advance_iterator_progress!(cache.progress)
             end
+            selected || return
             finite || return
 
             cert = certify_solution(
@@ -2771,6 +2789,7 @@ function collect_leaf_entries!(
     for result in iter
         idx += 1
         advance_iterator_progress!(cache.progress)
+        cache.result_predicate(result) || continue
         isfinite(result) || continue
 
         cert = certify_solution(
@@ -2909,10 +2928,15 @@ function verify_split!(
         crossing_intervals = [nothing for _ in eachindex(workers.systems)]
         invalid_split = Threads.Atomic{Bool}(false)
 
-        foreach_threaded_result(iter, workers.trackers) do tid, idx, finite, sol
+        foreach_threaded_result(
+            iter,
+            workers.trackers,
+            cache.result_predicate,
+        ) do tid, idx, selected, finite, sol
             @lock progress_lock begin
                 advance_iterator_progress!(cache.progress)
             end
+            selected || return
             finite || return
 
             cert = certify_solution(
@@ -2995,6 +3019,7 @@ function verify_split!(
     for result in iter
         idx += 1
         advance_iterator_progress!(cache.progress)
+        cache.result_predicate(result) || continue
         isfinite(result) || continue
 
         cert = certify_solution(
@@ -3174,10 +3199,15 @@ function certify_terminal_bucket!(
         local_certs = [AbstractSolutionCertificate[] for _ in eachindex(workers.systems)]
         nfinite = Threads.Atomic{Int}(0)
 
-        foreach_threaded_result(bucket_iter, workers.trackers) do tid, idx, finite, sol
+        foreach_threaded_result(
+            bucket_iter,
+            workers.trackers,
+            Returns(true),
+        ) do tid, idx, selected, finite, sol
             @lock progress_lock begin
                 advance_iterator_progress!(cache.progress)
             end
+            selected || return
             finite || return
 
             Threads.atomic_add!(nfinite, 1)
@@ -3648,6 +3678,7 @@ function _certify_iterator_bsp(
     max_precision::Int = 256,
     refine_solution::Bool = true,
     extended_certificate::Bool = false,
+    result_predicate::Function = Returns(true),
     certify_solution_kwargs...,
 )
     check_iterator_certify_options(
@@ -3675,6 +3706,7 @@ function _certify_iterator_bsp(
         max_precision = max_precision,
         refine_solution = refine_solution,
         extended_certificate = extended_certificate,
+        result_predicate = result_predicate,
         certify_solution_kwargs...,
     )
 
@@ -3698,6 +3730,7 @@ function _certify_iterator_bsp(
         max_precision = max_precision,
         refine_solution = refine_solution,
         extended_certificate = extended_certificate,
+        result_predicate = result_predicate,
     )
 
     refinement_steps = 0
@@ -3803,6 +3836,42 @@ function certify(
     kwargs...,
 )
     certify(fixed(F; compile = compile), iter, args...; kwargs...)
+end
+
+_as_result_iterator(iter::ResultIterator) = (iter = iter, result_predicate = Returns(true))
+function _as_result_iterator(iter::Base.Iterators.Filter)
+    base = _as_result_iterator(iter.itr)
+    return (
+        iter = base.iter,
+        result_predicate = result -> base.result_predicate(result) && iter.flt(result),
+    )
+end
+_as_result_iterator(iter) = throw(
+    ArgumentError(
+        "`certify` only supports filtered iterators that are ultimately built from a `ResultIterator`; got $(typeof(iter)).",
+    ),
+)
+
+function certify(
+    F::System,
+    iter::Base.Iterators.Filter,
+    args...;
+    compile::Union{Bool,Symbol} = false,
+    kwargs...,
+)
+    base = _as_result_iterator(iter)
+    certify(
+        fixed(F; compile = compile),
+        base.iter,
+        args...;
+        result_predicate = base.result_predicate,
+        kwargs...,
+    )
+end
+
+function certify(F::AbstractSystem, iter::Base.Iterators.Filter, args...; kwargs...)
+    base = _as_result_iterator(iter)
+    certify(F, base.iter, args...; result_predicate = base.result_predicate, kwargs...)
 end
 
 function certify(
