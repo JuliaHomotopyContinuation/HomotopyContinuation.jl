@@ -60,6 +60,24 @@ function Base.length(iter::PolyhedralStartSolutionsIterator)
     n
 end
 
+"""
+    start_solution_workspace(starts)
+    iterate_start_solution(starts, workspace[, state])
+
+Internal workspace-aware start-solution iteration.
+
+The ordinary Julia `iterate(starts)` interface remains the public/default path used by `collect` or other iterator functions. It creates any traversal-local workspace and stores it in the iterator state.
+
+The sequence is:
+* `iterate(starts)`: This creates one workspace: `workspace = start_solution_workspace(starts).
+* Then iterate returns state containing that workspace: `return value, (workspace, state)`.
+* After that, collect repeatedly calls: `iterate(starts, state)`
+and that reuses the same workspace stored in state.
+
+This is especially useful when using a `PolyhedralStartSolutionsIterator`, because this iterator needs a `BinomialSystemSolver` for iteration. The `BinomialSystemSolver` is stored in the workspace so that the iterator can call it.  
+
+Specialized drivers that want to manage mutable start-generation workspace explicitly can instead create `workspace = start_solution_workspace(starts)` once and call `iterate_start_solution`. For polyhedral starts this keeps the shared iterator read-only while reusing a traversal-local `BinomialSystemSolver`.
+"""
 start_solution_workspace(_) = nothing
 iterate_start_solution(iter, ::Nothing) = iterate(iter)
 iterate_start_solution(iter, ::Nothing, state) = iterate(iter, state)
