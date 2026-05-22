@@ -2331,6 +2331,7 @@ end
 function foreach_threaded_result(f, iter::ResultIterator, trackers)
     nworkers = length(trackers)
     starts = start_solutions(iter)
+    starts_workspace = start_solution_workspace(starts)
     selected_indices = indices(iter)
     current_bitmask = bitmask(iter)
     starts_lock = ReentrantLock()
@@ -2352,10 +2353,10 @@ function foreach_threaded_result(f, iter::ResultIterator, trackers)
                             end
 
                             next = if started[]
-                                iterate(starts, state[])
+                                iterate_start_solution(starts, starts_workspace, state[])
                             else
                                 started[] = true
-                                iterate(starts)
+                                iterate_start_solution(starts, starts_workspace)
                             end
                             isnothing(next) && return nothing
 
