@@ -367,7 +367,8 @@ function ResultIterator(
     if isnothing(bitmask)
         if isnothing(indices)
             bitmask =
-                isnothing(predicate) ? nothing : BitVector([predicate(S(x)) for x in starts])
+                isnothing(predicate) ? nothing :
+                BitVector([predicate(S(x)) for x in starts])
         elseif !isnothing(predicate)
             @warn "The keyword predicate will be ignored, since both indices and predicate are given."
         end
