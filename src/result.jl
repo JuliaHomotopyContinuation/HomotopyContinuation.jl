@@ -341,27 +341,42 @@ struct ResultIterator{Iter} <: AbstractResult
     starts::Iter                       # The start solution iterator
     S::AbstractSolver
     bitmask::Union{BitVector,Nothing}  # `nothing` means no filtering
+    indices::Union{Vector{Int},Nothing}
 end
 function ResultIterator(
     starts::Iter,
     S::AbstractSolver;
     bitmask = nothing,
+    indices = nothing,
     predicate = nothing,
 ) where {Iter}
     first_start = iterate(starts)
     if !isnothing(first_start) && first_start[1] isa Number # to allow passing a single start solution
-        return ResultIterator([starts], S; bitmask = bitmask, predicate = predicate)
+        return ResultIterator(
+            [starts],
+            S;
+            bitmask = bitmask,
+            indices = indices,
+            predicate = predicate,
+        )
+    end
+    if !isnothing(bitmask) && !isnothing(indices)
+        throw(ArgumentError("Only one of `bitmask` and `indices` may be provided."))
     end
 
     if isnothing(bitmask)
-        bitmask =
-            isnothing(predicate) ? nothing : BitVector([predicate(S(x)) for x in starts])
+        if isnothing(indices)
+            bitmask =
+                isnothing(predicate) ? nothing : BitVector([predicate(S(x)) for x in starts])
+        elseif !isnothing(predicate)
+            @warn "The keyword predicate will be ignored, since both indices and predicate are given."
+        end
     else
         if !isnothing(predicate)
             @warn "The keyword predicate will be ignored, since both bitmask and predicate are given."
         end
     end
-    ResultIterator{Iter}(starts, S, bitmask)
+    ResultIterator{Iter}(starts, S, bitmask, indices)
 end
 
 seed(ri::ResultIterator) = ri.S.seed
@@ -392,6 +407,7 @@ solver(ri::ResultIterator) = ri.S
 Returns the bitmask of `ri`.
 """
 bitmask(ri::ResultIterator) = ri.bitmask
+indices(ri::ResultIterator) = ri.indices
 
 function Base.show(io::IO, ri::ResultIterator{Iter}) where {Iter}
     header = "ResultIterator"
@@ -406,13 +422,18 @@ function Base.show(io::IO, ri::ResultIterator{Iter}) where {Iter}
         println(io, "•  homotopy: Polyhedral")
     end
     !isnothing(ri.bitmask) && println("•  filtering bitmask")
+    !isnothing(ri.indices) && println("•  filtering indices")
 end
 
 function Base.IteratorSize(ri::ResultIterator)
     if ri.starts isa Vector
         return Base.HasLength()
     else
-        ri.bitmask === nothing ? Base.IteratorSize(ri.starts) : Base.HasLength()
+        if ri.bitmask !== nothing || ri.indices !== nothing
+            return Base.HasLength()
+        else
+            return Base.IteratorSize(ri.starts)
+        end
     end
 end
 Base.IteratorEltype(::ResultIterator) = Base.HasEltype()
@@ -421,6 +442,28 @@ Base.eltype(::ResultIterator) = PathResult
 
 
 function Base.iterate(ri::ResultIterator, state = nothing) #States of the induced iterator are pairs (i::Int,state) 
+    if ri.indices !== nothing
+        selected_index, starts_state, start_index =
+            state === nothing ? (1, nothing, 0) : state
+        selected_index > length(ri.indices) && return nothing
+
+        target_index = ri.indices[selected_index]
+        while start_index < target_index
+            next_ss =
+                isnothing(starts_state) ? iterate(ri.starts) :
+                iterate(ri.starts, starts_state)
+            next_ss === nothing && return nothing
+
+            start_value, starts_state = next_ss
+            start_index += 1
+            if start_index == target_index
+                new_state = (selected_index + 1, starts_state, start_index)
+                return (track(ri.S.trackers[1], start_value), new_state)
+            end
+        end
+        return nothing
+    end
+
     native_state = state === nothing ? 0 : state[1]
     next_ss = state === nothing ? iterate(ri.starts) : iterate(ri.starts, state[2])
     next_ss === nothing && return nothing  # End of iteration
@@ -445,7 +488,9 @@ end
 
 
 function Base.length(ri::ResultIterator)
-    if Base.IteratorSize(ri) == Base.SizeUnknown()
+    if ri.indices !== nothing
+        return length(ri.indices)
+    elseif Base.IteratorSize(ri) == Base.SizeUnknown()
         k = 0
         for _ in ri.starts
             k += 1
@@ -493,7 +538,7 @@ ResultIterator
 """
 function bitmask_filter(f::Function, ri::ResultIterator)
     bm = bitmask(f, ri)
-    return (ResultIterator(ri.starts, ri.S, bm))
+    return ResultIterator(ri.starts, ri.S; bitmask = bm)
 end
 
 """
