@@ -49,9 +49,16 @@ Base.show(
     ::MIME"application/prs.juno.inline",
     x::PolyhedralStartSolutionsIterator,
 ) = x
-Base.IteratorSize(::Type{<:PolyhedralStartSolutionsIterator}) = Base.SizeUnknown()
+Base.IteratorSize(::Type{<:PolyhedralStartSolutionsIterator}) = Base.HasLength()
 Base.IteratorEltype(::Type{<:PolyhedralStartSolutionsIterator}) = Base.HasEltype()
 Base.eltype(iter::PolyhedralStartSolutionsIterator) = Tuple{MixedCell,Vector{ComplexF64}}
+function Base.length(iter::PolyhedralStartSolutionsIterator)
+    n = 0
+    for cell in iter.mixed_cells
+        n += Int(MixedSubdivisions.volume(cell))
+    end
+    n
+end
 
 function compute_mixed_cells!(iter::PolyhedralStartSolutionsIterator)
     Base.depwarn(
