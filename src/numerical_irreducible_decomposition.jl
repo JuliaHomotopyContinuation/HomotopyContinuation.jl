@@ -1859,7 +1859,7 @@ function numerical_irreducible_decomposition(
     show_monodromy_progress::Bool = false,
     show_monodromy_for_regeneration_progress::Bool = false,
     show_monodromy_for_decompose_progress::Bool = false,
-    max_iters::Int = 50,
+    max_iters::Int = 20,
     sorted::Bool = true,
     max_codim::Union{Int,Nothing} = nothing,
     warning::Bool = true,

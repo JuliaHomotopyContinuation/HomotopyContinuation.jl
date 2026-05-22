@@ -1011,7 +1011,7 @@ end
 
 function initialize_start_solutions(MS::MonodromySolver, X)
     results = PathResult[]
-    for (i, x) in enumerate(X)
+    for x in X
         p = convert(Vector{ComplexF64}, x)
         res = PathResult(
             return_code = :success,
@@ -1033,8 +1033,10 @@ function initialize_start_solutions(MS::MonodromySolver, X)
             rejected_steps = 0,
             extended_precision_used = false,
         )
-        add!(MS, res, i)
-        push!(results, res)
+        _, added = add!(MS, res, length(results) + 1)
+        if added
+            push!(results, res)
+        end
     end
     results
 end
