@@ -783,7 +783,7 @@ function _certify(
     show_progress::Bool = true,
     check_distinct::Bool = true,
     extended_certificate::Bool = false,
-    threading::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
     certify_solution_kwargs...,
 )
     N = length(solution_candidates)
@@ -1742,7 +1742,7 @@ function Base.merge!(dest::DistinctCertifiedSolutions, src::DistinctCertifiedSol
 end
 
 """
-    distinct_certified_solutions(F, S, p = nothing; threading::Bool = true, show_progress::Bool = true, certify_solution_kwargs...)
+    distinct_certified_solutions(F, S, p = nothing; threading::Bool = Threads.nthreads() > 1, show_progress::Bool = true, certify_solution_kwargs...)
 
 Return a `DistinctCertifiedSolutions` struct containing distinct certified solutions obtained from a vector of solutions `S` of a system `F`.
 Compared to `certify` this only keeps the distinct certified solutions and not all certificates. This in in particular
@@ -1752,7 +1752,7 @@ function distinct_certified_solutions(
     F::Union{System,AbstractSystem},
     S::AbstractVector{Vector{ComplexF64}},
     p = nothing;
-    threading::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
     kwargs...,
 )
     d = DistinctCertifiedSolutions(F, p; thread_safe = threading)
@@ -1760,14 +1760,14 @@ function distinct_certified_solutions(
 end
 
 """
-    distinct_certified_solutions!(d::DistinctCertifiedSolutions, S; threading::Bool = true, show_progress::Bool = true, certify_solution_kwargs...)
+    distinct_certified_solutions!(d::DistinctCertifiedSolutions, S; threading::Bool = Threads.nthreads() > 1, show_progress::Bool = true, certify_solution_kwargs...)
 
 Add a vector of solutions `S` to a `DistinctCertifiedSolutions` struct `d`.
 """
 function distinct_certified_solutions!(
     d::DistinctCertifiedSolutions,
     S::AbstractVector{Vector{ComplexF64}};
-    threading::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
     show_progress::Bool = true,
     kwargs...,
 )
@@ -2294,7 +2294,6 @@ Base.@kwdef struct IteratorCertificationCache{S<:AbstractSystem,P,C<:Certificati
     progress::Union{Nothing,IteratorCertificationProgress}
     bucket_size_bound::Int
     certify_oversized_buckets::Bool
-    threading::Bool
     ε::Float64
     coordinate::Int
     max_refinement_rounds::Int
@@ -2513,7 +2512,7 @@ function assign_initial_buckets!(
     cert_params,
     certification_cache;
     progress::Union{Nothing,IteratorCertificationProgress} = nothing,
-    threading::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
     coordinate::Int = 1,
     max_precision::Int = 256,
     refine_solution::Bool = true,
@@ -2703,6 +2702,7 @@ function collect_leaf_entries!(
     leaf,
     iter::ResultIterator,
     cache::IteratorCertificationCache;
+    threading::Bool = Threads.nthreads() > 1,
     max_entries::Union{Nothing,Int} = nothing,
     certify_solution_kwargs...,
 )
@@ -2719,10 +2719,7 @@ function collect_leaf_entries!(
         length(iter),
     )
 
-    if cache.threading &&
-       Threads.nthreads() > 1 &&
-       isnothing(max_entries) &&
-       length(iter) > 1
+    if threading && Threads.nthreads() > 1 && isnothing(max_entries) && length(iter) > 1
         worker_count = min(Threads.nthreads(), length(iter))
         workers = threaded_certification_data(
             iter,
@@ -2898,6 +2895,7 @@ function verify_split!(
     split_point,
     iter::ResultIterator,
     cache::IteratorCertificationCache;
+    threading::Bool = Threads.nthreads() > 1,
     certify_solution_kwargs...,
 )
     # Check one proposed split against every certified interval in the current bucket.
@@ -2911,7 +2909,7 @@ function verify_split!(
     idx = 0
     register_iterator_pass!(cache.progress, "Verify BSP split", length(iter))
 
-    if cache.threading && Threads.nthreads() > 1 && length(iter) > 1
+    if threading && Threads.nthreads() > 1 && length(iter) > 1
         worker_count = min(Threads.nthreads(), length(iter))
         workers = threaded_certification_data(
             iter,
@@ -3096,6 +3094,7 @@ function stable_leaf_entries!(
     leaf,
     iter,
     cache::IteratorCertificationCache;
+    threading::Bool = Threads.nthreads() > 1,
     max_entries::Union{Nothing,Int} = nothing,
     certify_solution_kwargs...,
 )
@@ -3111,6 +3110,7 @@ function stable_leaf_entries!(
             current_leaf,
             iter,
             cache;
+            threading = threading,
             max_entries = max_entries,
             certify_solution_kwargs...,
         )
@@ -3174,6 +3174,7 @@ end
 function certify_terminal_bucket!(
     bucket_iter::ResultIterator,
     cache::IteratorCertificationCache;
+    threading::Bool = Threads.nthreads() > 1,
     certify_solution_kwargs...,
 )
     d = cache.distinct_solutions
@@ -3184,7 +3185,7 @@ function certify_terminal_bucket!(
         length(bucket_iter),
     )
 
-    if cache.threading && Threads.nthreads() > 1 && length(bucket_iter) > 1
+    if threading && Threads.nthreads() > 1 && length(bucket_iter) > 1
         worker_count = min(Threads.nthreads(), length(bucket_iter))
         workers = threaded_certification_data(
             bucket_iter,
@@ -3279,6 +3280,7 @@ function handle_split_verification!(
     current_leaf,
     iter::ResultIterator,
     cache::IteratorCertificationCache;
+    threading::Bool = Threads.nthreads() > 1,
     depth::Int = 0,
     certify_solution_kwargs...,
 )
@@ -3288,6 +3290,7 @@ function handle_split_verification!(
             verification.leaf,
             iter,
             cache;
+            threading = threading,
             max_entries = nothing,
             certify_solution_kwargs...,
         )
@@ -3313,6 +3316,7 @@ function handle_split_verification!(
             left_leaf,
             left_iter,
             cache;
+            threading = threading,
             depth = depth + 1,
             initial_entries = left_entries,
             certify_solution_kwargs...,
@@ -3322,6 +3326,7 @@ function handle_split_verification!(
             right_leaf,
             right_iter,
             cache;
+            threading = threading,
             depth = depth + 1,
             initial_entries = right_entries,
             certify_solution_kwargs...,
@@ -3360,6 +3365,7 @@ function process_leaf!(
     leaf,
     iter::ResultIterator,
     cache::IteratorCertificationCache;
+    threading::Bool = Threads.nthreads() > 1,
     depth::Int = 0,
     initial_entries::Union{Nothing,Vector{BSPBucketEntry}} = nothing,
     certify_solution_kwargs...,
@@ -3373,6 +3379,7 @@ function process_leaf!(
             leaf,
             iter,
             cache;
+            threading = threading,
             max_entries = 1,
             certify_solution_kwargs...,
         )
@@ -3391,6 +3398,7 @@ function process_leaf!(
                 current_leaf,
                 iter,
                 cache;
+                threading = threading,
                 max_entries = nothing,
                 certify_solution_kwargs...,
             )
@@ -3415,6 +3423,7 @@ function process_leaf!(
                     split_point,
                     bucket_iter,
                     cache;
+                    threading = threading,
                     certify_solution_kwargs...,
                 )
 
@@ -3426,6 +3435,7 @@ function process_leaf!(
                     current_leaf,
                     iter,
                     cache;
+                    threading = threading,
                     depth = depth,
                     certify_solution_kwargs...,
                 )
@@ -3452,6 +3462,7 @@ function process_leaf!(
                     random_split,
                     bucket_iter,
                     cache;
+                    threading = threading,
                     certify_solution_kwargs...,
                 )
 
@@ -3463,6 +3474,7 @@ function process_leaf!(
                     current_leaf,
                     iter,
                     cache;
+                    threading = threading,
                     depth = depth,
                     certify_solution_kwargs...,
                 )
@@ -3488,6 +3500,7 @@ function process_leaf!(
                         random_split,
                         bucket_iter,
                         cache;
+                        threading = threading,
                         certify_solution_kwargs...,
                     )
 
@@ -3499,6 +3512,7 @@ function process_leaf!(
                         current_leaf,
                         iter,
                         cache;
+                        threading = threading,
                         depth = depth,
                         certify_solution_kwargs...,
                     )
@@ -3552,6 +3566,7 @@ function process_leaf!(
             current_leaf,
             iter,
             cache;
+            threading = threading,
             max_entries = nothing,
             certify_solution_kwargs...,
         )
@@ -3560,7 +3575,12 @@ function process_leaf!(
     # Step 4: the leaf is terminal. Revisit only the current bucket and add its
     # certified solutions to `d`; the distinct check itself stays serial.
     bucket_iter = _bucket_iterator(iter, entries)
-    nfinite = certify_terminal_bucket!(bucket_iter, cache; certify_solution_kwargs...)
+    nfinite = certify_terminal_bucket!(
+        bucket_iter,
+        cache;
+        threading = threading,
+        certify_solution_kwargs...,
+    )
     nfinite == length(entries) || error(
         "Re-tracking a BSP bucket produced $nfinite finite solutions for " *
         "$(length(entries)) expected entries.",
@@ -3669,7 +3689,7 @@ function _certify_iterator_bsp(
     show_progress::Bool = true,
     bucket_size_bound::Integer = 1000,
     certify_oversized_buckets::Bool = false,
-    threading::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
     ε::Float64 = 1e-4,
     coordinate::Int = 1,
     boundaries = -10:10,
@@ -3723,7 +3743,6 @@ function _certify_iterator_bsp(
         progress = progress,
         bucket_size_bound = Int(bucket_size_bound),
         certify_oversized_buckets = certify_oversized_buckets,
-        threading = threading,
         ε = ε,
         coordinate = coordinate,
         max_refinement_rounds = max_refinement_rounds,
@@ -3770,6 +3789,7 @@ function _certify_iterator_bsp(
             leaf,
             leaf_iter,
             cache;
+            threading = threading,
             initial_entries = local_entries,
             certify_solution_kwargs...,
         )
