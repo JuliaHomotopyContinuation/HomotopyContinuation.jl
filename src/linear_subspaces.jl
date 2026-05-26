@@ -474,9 +474,11 @@ function rand_subspace(
         k = n - codim
     end
     T = real ? Float64 : ComplexF64
+    A = zeros(T, n - k, n)
+    b = zeros(T, n - k)
     rand_subspace!(
-        Matrix{T}(undef, n - k, n),
-        Vector{T}(undef, n - k);
+        A,
+        b;
         affine = affine,
     )
 end
@@ -499,10 +501,11 @@ function rand_subspace(
         0 < codim < n || throw(ArgumentError("`codim` has to be between 0 and `n`."))
         k = n - codim
     end
-
+    A = zeros(eltype(x), n - k, n)
+    b = zeros(eltype(x), n - k)
     rand_subspace!(
-        Matrix{eltype(x)}(undef, n - k, n),
-        Vector{eltype(x)}(undef, n - k),
+        A,
+        b,
         x;
         affine = affine,
     )
@@ -538,13 +541,13 @@ function rand_subspace!(
     else
         fill!(b, zero(eltype(b)))
         Random.randn!(A)
-        x′x = sum(abs2, x)
+        nrmsq = sum(abs2, x)
         for i = 1:size(A, 1)
             α = zero(eltype(A))
             for j = 1:size(A, 2)
                 α += A[i, j] * x[j]
             end
-            α /= x′x
+            α /= nrmsq
             for j = 1:size(A, 2)
                 A[i, j] -= α * conj(x[j])
             end
