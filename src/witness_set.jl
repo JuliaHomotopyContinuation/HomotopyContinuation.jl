@@ -352,7 +352,7 @@ function is_contained(
     endgame_options = cache.endgame_options
     projective = Y.projective
     LY = linear_subspace(Y)
-    Hom = linear_subspace_homotopy(F, LY, LY; intrinsic = false)
+    Hom = linear_subspace_homotopy(F, LY, LY)
     tracker =
         EndgameTracker(Hom; tracker_options = tracker_options, options = endgame_options)
 
@@ -365,69 +365,15 @@ function is_contained(
 
     out
 end
-function target_subspace_through(A, b, x, ::Val{false})
-    LA.mul!(b, A, x)
-    LinearSubspace(ExtrinsicDescription(copy(A), copy(b); orthonormal = true))
-end
-function target_subspace_through(A, b, x, ::Val{true})
-    r, n = size(A)
-    Aₓ = zeros(ComplexF64, r, n)
-    bₓ = zeros(ComplexF64, r)
-    x′x = sum(abs2, x)
-    z = conj.(x)
-
-    nrows = 0
-    for i = 1:r
-        nrows += add_projective_row!(Aₓ, nrows, view(A, i, :), x, z, x′x)
-    end
-    while nrows < r
-        nrows += add_projective_row!(Aₓ, nrows, randn(ComplexF64, n), x, z, x′x)
-    end
-
-    LinearSubspace(ExtrinsicDescription(Aₓ, bₓ; orthonormal = true))
-end
-function add_projective_row!(A, nrows, row, x, z, x′x)
-    candidate = Vector{ComplexF64}(undef, length(x))
-    α = zero(ComplexF64)
-    for j = 1:length(x)
-        α += row[j] * x[j]
-    end
-    α /= x′x
-    for j = 1:length(x)
-        candidate[j] = row[j] - α * z[j]
-    end
-
-    if LA.norm(candidate) < 1e-12
-        return 0
-    end
-    if nrows > 0
-        B = A[1:nrows, :]
-        for i = 1:nrows
-            β = zero(ComplexF64)
-            for j = 1:length(candidate)
-                β += candidate[j] * conj(B[i, j])
-            end
-            for j = 1:length(candidate)
-                candidate[j] -= β * B[i, j]
-            end
-        end
-    end
-
-    norm_candidate = LA.norm(candidate)
-    if norm_candidate < 1e-12
-        return 0
-    end
-    for j = 1:length(candidate)
-        A[nrows+1, j] = candidate[j] / norm_candidate
-    end
-    1
-end
 membership_representative(x, tracker, ::Val{false}) = x
 function membership_representative(x, tracker, ::Val{true})
     x_chart = copy(x)
-    set_solution!(x_chart, tracker.tracker.homotopy, x, 1)
+    membership_representative!(x_chart, tracker.tracker.homotopy, x)
     x_chart
 end
+membership_representative!(x_chart, H, x) = set_solution!(x_chart, H, x, 1)
+membership_representative!(x_chart, H::IntrinsicSubspaceHomotopy, x) =
+    set_solution!(x_chart, H.system, x)
 
 function serial_x_in_Y(
     P,
@@ -467,7 +413,12 @@ function serial_x_in_Y(
         end
 
         # second check
-        L = target_subspace_through(A, b, x, projective)
+        if projective isa Val{true}
+            L = rand_subspace!(A, b, x; affine = false)
+        else
+            LA.mul!(b, A, x)
+            L = LinearSubspace(ExtrinsicDescription(copy(A), copy(b); orthonormal = true))
+        end
         # set L as the target for homotopy continuation
         target_parameters!(tracker, L)
         x_target = membership_representative(x, tracker, projective)
@@ -519,6 +470,7 @@ function threaded_x_in_Y(
     trackers = [deepcopy(tracker) for _ = 1:nthr]
     y0_bufs = [zeros(ComplexF64, length(cache.y0)) for _ = 1:nthr]
     y_bufs = [zeros(ComplexF64, length(cache.y)) for _ = 1:nthr]
+    A_bufs = [copy(A) for _ = 1:nthr]
     b_bufs = [deepcopy(b) for _ = 1:nthr]
     F_bufs = [deepcopy(F) for _ = 1:nthr]
 
@@ -530,6 +482,7 @@ function threaded_x_in_Y(
             let local_tracker = trackers[tid],
                 local_y0 = y0_bufs[tid],
                 local_y = y_bufs[tid],
+                local_A = A_bufs[tid],
                 local_b = b_bufs[tid]
 
                 local_F = F_bufs[tid]
@@ -553,7 +506,18 @@ function threaded_x_in_Y(
                         result = false
                         if norm(local_y, Inf) <= 1e-2 * norm(local_y0, Inf)
                             # second check
-                            L = target_subspace_through(A, local_b, x, projective)
+                            if projective isa Val{true}
+                                L = rand_subspace!(local_A, local_b, x; affine = false)
+                            else
+                                LA.mul!(local_b, A, x)
+                                L = LinearSubspace(
+                                    ExtrinsicDescription(
+                                        copy(A),
+                                        copy(local_b);
+                                        orthonormal = true,
+                                    ),
+                                )
+                            end
                             # set L as the target for homotopy continuation
                             target_parameters!(local_tracker, L)
                             x_target =

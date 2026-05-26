@@ -278,13 +278,10 @@ function linear_subspace_homotopy(
     gamma = cis(2 * pi * randn()),
 )
 
-
-    use_intrinsic = isnothing(intrinsic) ? dim(V) <= codim(V) : intrinsic
-
-    if use_intrinsic
+    if dim(V) <= codim(V) || something(intrinsic, false)
         if is_linear(V) && is_linear(W) && is_homogeneous(System(F))
             IntrinsicSubspaceHomotopy(
-                F isa System ? on_affine_chart(F; compile = compile) : on_affine_chart(F),
+                on_affine_chart(F; compile = compile),
                 V,
                 W;
                 gamma = gamma,
