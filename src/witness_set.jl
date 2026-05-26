@@ -365,16 +365,6 @@ function is_contained(
 
     out
 end
-membership_representative(x, tracker, ::Val{false}) = x
-function membership_representative(x, tracker, ::Val{true})
-    x_chart = copy(x)
-    membership_representative!(x_chart, tracker.tracker.homotopy, x)
-    x_chart
-end
-membership_representative!(x_chart, H, x) = set_solution!(x_chart, H, x, 1)
-membership_representative!(x_chart, H::IntrinsicSubspaceHomotopy, x) =
-    set_solution!(x_chart, H.system, x)
-
 function serial_x_in_Y(
     P,
     Y,
@@ -421,7 +411,13 @@ function serial_x_in_Y(
         end
         # set L as the target for homotopy continuation
         target_parameters!(tracker, L)
-        x_target = membership_representative(x, tracker, projective)
+        if projective isa Val{true}
+            H = tracker.tracker.homotopy
+            set_solution!(tracker.tracker.state.x, H, x, 0)
+            x_target = get_solution(H, tracker.tracker.state.x, 0)
+        else
+            x_target = x
+        end
 
         rad = max(atol, norm(x_target, Inf) * rtol)
 
@@ -520,8 +516,13 @@ function threaded_x_in_Y(
                             end
                             # set L as the target for homotopy continuation
                             target_parameters!(local_tracker, L)
-                            x_target =
-                                membership_representative(x, local_tracker, projective)
+                            if projective isa Val{true}
+                                H = local_tracker.tracker.homotopy
+                                set_solution!(local_tracker.tracker.state.x, H, x, 0)
+                                x_target = get_solution(H, local_tracker.tracker.state.x, 0)
+                            else
+                                x_target = x
+                            end
 
                             rad = max(atol, norm(x_target, Inf) * rtol)
 
