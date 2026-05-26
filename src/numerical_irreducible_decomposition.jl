@@ -438,7 +438,7 @@ function _regeneration(
     # prepare codim witness sets for the output
     # internally we represent a witness superset by WitnessPoints
     # the i-th witness superset out[i] is for codimension i
-    out = initialize_witness_sets(codim, n; projective = projective)
+    out = initialize_witness_sets(codim, n; affine = !projective)
 
     # we compute witness (super)sets for the hypersurfaces f[1]=0,...,f[c]=0.
     # it is covenient to use the WitnessSet wrapper here, because this also keeps track of the equation
@@ -570,69 +570,32 @@ function get_flag(iter, L₀)
     # type 1 does not use u, so we set the last column to zero
     Aᵤ = [A₀ zeros(n - 1)]
     bᵤ = b₀
-    # type 2 sets the linear equation u=c. We add this as the first equation
-    c = randn(ComplexF64)
+    # type 2 sets the linear equation u=c. If L₀ is linear, keep the augmented
+    # subspaces linear as well.
+    c = is_linear(L₀) ? zero(ComplexF64) : randn(ComplexF64)
     A = [zeros(1, m) 1.0; A₀ zeros(n - 1)]
     b = [c; b₀]
 
     map(iter) do i
-        j = i + 1
         # type 1 linear equation for out[i] takes the last i rows of Aᵤ
-        Eᵤ = ExtrinsicDescription(Aᵤ[i:end, :], bᵤ[i:end]; orthonormal = true)
+        idx = i <= n - 1 ? (i:n-1) : (n:n-1)
+        Eᵤ = ExtrinsicDescription(Aᵤ[idx, :], bᵤ[idx]; orthonormal = true)
         Lᵤ = LinearSubspace(Eᵤ)
         # type 2 linear equation for out[i] takes the last i-1 rows and the first row of A
-        E = ExtrinsicDescription(A[[1; j:n], :], b[[1; j:n]]; orthonormal = true)
+        rows = [1; idx .+ 1]
+        E = ExtrinsicDescription(A[rows, :], b[rows]; orthonormal = true)
         L = LinearSubspace(E)
         L, Lᵤ
     end
 end
-function get_projective_flag(iter, L₀)
-    A₀ = extrinsic(L₀).A
-    r = size(A₀, 1)
-    m = size(A₀, 2)
-    Aᵤ = [A₀ zeros(r)]
 
-    map(iter) do i
-        Aᵤᵢ = i <= r ? Aᵤ[i:r, :] : zeros(eltype(Aᵤ), 0, m + 1)
-        Lᵤ = LinearSubspace(
-            ExtrinsicDescription(Aᵤᵢ, zeros(ComplexF64, size(Aᵤᵢ, 1)); orthonormal = true),
-        )
-
-        idx = i <= r ? (i:r) : ((r+1):r)
-        Aᵢ = [zeros(1, m) 1.0; A₀[idx, :] zeros(length(idx), 1)]
-        L = LinearSubspace(
-            ExtrinsicDescription(Aᵢ, zeros(ComplexF64, size(Aᵢ, 1)); orthonormal = true),
-        )
-        L, Lᵤ
-    end
-end
-
-function initial_projective_slice(n)
-    if n == 2
-        LinearSubspace(zeros(ComplexF64, 0, n))
-    else
-        rand_subspace(n; dim = 2, affine = false)
-    end
-end
-
-function projective_drop_u(L::LinearSubspace)
-    E = extrinsic(L)
-    A = E.A[2:end, 1:(end-1)]
-    b = E.b[2:end]
-    LinearSubspace(ExtrinsicDescription(A, b; orthonormal = false))
-end
-
-function linear_equations(L::LinearSubspace, vars)
-    A = extrinsic(L).A
-    map(1:size(A, 1)) do i
-        sum(A[i, j] * vars[j] for j = 1:length(vars))
-    end
-end
-
-function initialize_witness_sets(codim, n; projective::Bool = false)
-    # we need a flag containing a linear space of dimension 1
-    L₀ = projective ? initial_projective_slice(n) : rand_subspace(n; dim = 1)
-    flag = projective ? get_projective_flag(1:codim, L₀) : get_flag(1:codim, L₀)
+function initialize_witness_sets(codim, n; affine::Bool = true)
+    # we need an initial slice from which the u-regeneration flag is derived
+    dim = affine ? 1 : 2
+    L₀ =
+        dim == n ? LinearSubspace(zeros(ComplexF64, 0, n)) :
+        rand_subspace(n; dim = dim, affine = affine)
+    flag = get_flag(1:codim, L₀)
 
     map(flag) do F
         L, Lᵤ = F
@@ -659,9 +622,14 @@ function initialize_hypersurfaces(
         xvars = vars[1:(end-1)]
         projective = !isnothing(variable_groups)
         if projective
-            Lx = projective_drop_u(L)
+            E = extrinsic(L)
+            A = E.A[2:end, 1:(end-1)]
+            b = E.b[2:end]
+            L_eqs = map(1:size(A, 1)) do i
+                sum(A[i, j] * xvars[j] for j = 1:length(xvars)) - b[i]
+            end
             res = solve(
-                System([pᵢ; linear_equations(Lx, xvars)], variables = xvars);
+                System([pᵢ; L_eqs], variables = xvars);
                 start_system = :total_degree,
                 show_progress = false,
                 threading = threading,
