@@ -972,10 +972,10 @@ function set_up_u_homotopy(
     F = fixed(System([f; h0], variables = vars, variable_groups = variable_groups); compile = false)
     G = fixed(System([f; h], variables = vars, variable_groups = variable_groups); compile = false)
 
-    Hom1 = linear_subspace_homotopy(F, L, L1)
+    Hom1 = linear_subspace_homotopy(F, L, L1; homogeneous = projective)
     Hom2 = StraightLineHomotopy(slice(F, L1), slice(G, L1); gamma = cis(2 * pi * rand()))
     projective && (Hom2 = on_affine_chart(Hom2))
-    Hom3 = linear_subspace_homotopy(G, L1, L2)
+    Hom3 = linear_subspace_homotopy(G, L1, L2; homogeneous = projective)
 
     return (Hom1, Hom2, Hom3), d
 end
