@@ -256,6 +256,10 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
     u::Variable
     i::Int
     codim::Int
+    projective::Bool
+    variable_groups::Union{Nothing,Vector{Vector{Variable}}}
+    ℓ::Expression
+    ℓ_coeffs::Vector{ComplexF64}
 
     endgame_options::EndgameOptions
     tracker_options::TrackerOptions
@@ -263,7 +267,20 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
     progress::Union{WitnessSetsProgress,Nothing}
 end
 
-function RegenerationCache(u, f, F, h, codim, EO, TO, progress)
+function RegenerationCache(
+    u,
+    f,
+    F,
+    h,
+    codim,
+    projective,
+    variable_groups,
+    ℓ,
+    ℓ_coeffs,
+    EO,
+    TO,
+    progress,
+)
     m, N = size(F)
     A = zeros(ComplexF64, N - 1, N)
     b = zeros(ComplexF64, N - 1)
@@ -271,10 +288,32 @@ function RegenerationCache(u, f, F, h, codim, EO, TO, progress)
     y0 = zeros(ComplexF64, m)
     y = zeros(ComplexF64, m)
 
-    RegenerationCache(A, b, x0, y0, y, f, F, h, u, 0, codim, EO, TO, progress)
+    RegenerationCache(
+        A,
+        b,
+        x0,
+        y0,
+        y,
+        f,
+        F,
+        h,
+        u,
+        0,
+        codim,
+        projective,
+        variable_groups,
+        ℓ,
+        ℓ_coeffs,
+        EO,
+        TO,
+        progress,
+    )
 end
 function update_Fᵢ!(cache, fᵢ, vars)
-    Fᵢ = fixed(System(fᵢ, variables = vars), compile = false)
+    Fᵢ = fixed(
+        System(fᵢ, variables = vars, variable_groups = cache.variable_groups),
+        compile = false,
+    )
     cache.fᵢ = fᵢ
     cache.Fᵢ = Fᵢ
     m = length(Fᵢ)
@@ -287,6 +326,18 @@ function update_Fᵢ!(cache, fᵢ, vars)
 end
 update_hᵢ!(cache, h) = cache.h = h
 update_i!(cache, i) = cache.i = i
+
+function single_projective_variable_group(F::System)
+    is_homogeneous(F) || return nothing
+    groups = variable_groups(F)
+    if isnothing(groups)
+        return variables(F)
+    elseif length(groups) == 1
+        return only(groups)
+    else
+        error("NID for systems with multiple variable groups is not implemented yet.")
+    end
+end
 
 """
     regeneration(F::System; options...) 
@@ -348,10 +399,13 @@ function _regeneration(
     # the algorithm is u-regeneration as proposed 
     # by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869
 
-    vars = variables(F)
+    xvars = variables(F)
+    projective_group = single_projective_variable_group(F)
+    projective = !isnothing(projective_group)
+    vars = copy(xvars)
     n = size(F, 2) # ambient dimension
     c = size(F, 1) # we can have witness sets of codimesion at most min(c,n)
-    expected_max_codim = min(c, n)
+    expected_max_codim = min(c, n - projective)
     if !isnothing(max_codim) && max_codim < expected_max_codim
         # if max_codim is smaller than the expected codimension we must compute witness points for one more codimension, so that we can remove spurious points
         codim = max_codim + 1
@@ -361,6 +415,9 @@ function _regeneration(
     # u-regeneration adds another variable u to F
     @unique_var u
     push!(vars, u)
+    variable_groups = projective ? [vars] : nothing
+    ℓ_coeffs = randn(ComplexF64, length(xvars))
+    ℓ = sum(ℓ_coeffs .* xvars)
 
     # progress bar
     if show_progress
@@ -381,13 +438,19 @@ function _regeneration(
     # prepare codim witness sets for the output
     # internally we represent a witness superset by WitnessPoints
     # the i-th witness superset out[i] is for codimension i
-    out = initialize_witness_sets(codim, n)
+    out = initialize_witness_sets(codim, n; projective = projective)
 
     # we compute witness (super)sets for the hypersurfaces f[1]=0,...,f[c]=0.
     # it is covenient to use the WitnessSet wrapper here, because this also keeps track of the equation
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
     update_progress!(progress; is_computing_hypersurfaces = true)
-    H = initialize_hypersurfaces(F, vars, linear_subspace(out[1]); threading = threading)
+    H = initialize_hypersurfaces(
+        F,
+        vars,
+        linear_subspace(out[1]);
+        variable_groups = variable_groups,
+        threading = threading,
+    )
     if any(isnothing, H)
         return nothing
     end
@@ -402,13 +465,20 @@ function _regeneration(
     end
 
     # Initialize a cache
-    Fᵢ = fixed(System(f[1:1], variables = vars), compile = false)
+    Fᵢ = fixed(
+        System(f[1:1], variables = vars, variable_groups = variable_groups),
+        compile = false,
+    )
     cache = RegenerationCache(
         u,
         f[1:1],
         Fᵢ,
         f[1],
         codim,
+        projective,
+        variable_groups,
+        ℓ,
+        ℓ_coeffs,
         endgame_options,
         tracker_options,
         progress,
@@ -476,7 +546,7 @@ function _regeneration(
         ws = map(out) do W
             update_progress!(progress)
             P, L = u_transform(W)
-            WitnessSet(fixed(F, compile = false), L, P)
+            WitnessSet(fixed(F, compile = false), L, P; projective = projective)
         end
     else
         return ws = Vector{WitnessSet}()
@@ -516,10 +586,53 @@ function get_flag(iter, L₀)
         L, Lᵤ
     end
 end
-function initialize_witness_sets(codim, n)
+function get_projective_flag(iter, L₀)
+    A₀ = extrinsic(L₀).A
+    r = size(A₀, 1)
+    m = size(A₀, 2)
+    Aᵤ = [A₀ zeros(r)]
+
+    map(iter) do i
+        Aᵤᵢ = i <= r ? Aᵤ[i:r, :] : zeros(eltype(Aᵤ), 0, m + 1)
+        Lᵤ = LinearSubspace(
+            ExtrinsicDescription(Aᵤᵢ, zeros(ComplexF64, size(Aᵤᵢ, 1)); orthonormal = true),
+        )
+
+        idx = i <= r ? (i:r) : ((r+1):r)
+        Aᵢ = [zeros(1, m) 1.0; A₀[idx, :] zeros(length(idx), 1)]
+        L = LinearSubspace(
+            ExtrinsicDescription(Aᵢ, zeros(ComplexF64, size(Aᵢ, 1)); orthonormal = true),
+        )
+        L, Lᵤ
+    end
+end
+
+function initial_projective_slice(n)
+    if n == 2
+        LinearSubspace(zeros(ComplexF64, 0, n))
+    else
+        rand_subspace(n; dim = 2, affine = false)
+    end
+end
+
+function projective_drop_u(L::LinearSubspace)
+    E = extrinsic(L)
+    A = E.A[2:end, 1:(end-1)]
+    b = E.b[2:end]
+    LinearSubspace(ExtrinsicDescription(A, b; orthonormal = false))
+end
+
+function linear_equations(L::LinearSubspace, vars)
+    A = extrinsic(L).A
+    map(1:size(A, 1)) do i
+        sum(A[i, j] * vars[j] for j = 1:length(vars))
+    end
+end
+
+function initialize_witness_sets(codim, n; projective::Bool = false)
     # we need a flag containing a linear space of dimension 1
-    L₀ = rand_subspace(n; dim = 1)
-    flag = get_flag(1:codim, L₀)
+    L₀ = projective ? initial_projective_slice(n) : rand_subspace(n; dim = 1)
+    flag = projective ? get_projective_flag(1:codim, L₀) : get_flag(1:codim, L₀)
 
     map(flag) do F
         L, Lᵤ = F
@@ -530,6 +643,7 @@ function initialize_hypersurfaces(
     F::System,
     vars,
     L;
+    variable_groups = nothing,
     threading::Bool = Threads.nthreads() > 1,
 )
     f = expressions(F)
@@ -537,20 +651,35 @@ function initialize_hypersurfaces(
     out = Vector{WitnessSet}(undef, c)
     for i = 1:c
         fᵢ = f[i]
-        h = fixed(System([fᵢ], variables = vars), compile = false)
-        pᵢ, qᵢ = get_num_den(fᵢ) # fᵢ = pᵢ / qᵢ
-        res = solve(
-            System([pᵢ], variables = vars),
-            target_subspace = L;
-            start_system = :total_degree,
-            show_progress = false,
-            threading = threading,
+        h = fixed(
+            System([fᵢ], variables = vars, variable_groups = variable_groups),
+            compile = false,
         )
+        pᵢ, qᵢ = get_num_den(fᵢ) # fᵢ = pᵢ / qᵢ
+        xvars = vars[1:(end-1)]
+        projective = !isnothing(variable_groups)
+        if projective
+            Lx = projective_drop_u(L)
+            res = solve(
+                System([pᵢ; linear_equations(Lx, xvars)], variables = xvars);
+                start_system = :total_degree,
+                show_progress = false,
+                threading = threading,
+            )
+        else
+            res = solve(
+                System([pᵢ], variables = vars),
+                target_subspace = L;
+                start_system = :total_degree,
+                show_progress = false,
+                threading = threading,
+            )
+        end
         # if fᵢ is rational we check which zeros of pᵢ are also zeros of fᵢ
         if qᵢ != 1
             res = solve(
                 h,
-                solutions(res);
+                projective ? map(x -> [x; 0], solutions(res)) : solutions(res);
                 start_subspace = L,
                 target_subspace = L,
                 show_progress = false,
@@ -560,7 +689,9 @@ function initialize_hypersurfaces(
         if isnothing(res)
             return nothing
         end
-        S = solutions(res, only_nonsingular = true)
+        S =
+            projective && qᵢ == 1 ? map(x -> [x; 0], solutions(res, only_nonsingular = true)) :
+            solutions(res, only_nonsingular = true)
         out[i] = WitnessSet(h, L, S)
     end
     out
@@ -695,7 +826,17 @@ function intersect_with_hypersurface!(
     # Step 2:
     # the points in P_next are used as starting points for a homotopy.
     # where u^d-1 (u is the extra variable in u-regeneration) is deformed into g 
-    Hom, d = set_up_u_homotopy(W, f, X, h, vars, u)
+    Hom, d = set_up_u_homotopy(
+        W,
+        f,
+        X,
+        h,
+        vars,
+        u;
+        projective = cache.projective,
+        variable_groups = cache.variable_groups,
+        ℓ = cache.ℓ,
+    )
 
     trackers = map(Hom) do H
         EndgameTracker(
@@ -717,9 +858,25 @@ function intersect_with_hypersurface!(
         is_monodromy = false,
     )
     if threading
-        threaded_intersection!(X, P_next, roots, trackers, progress)
+        threaded_intersection!(
+            X,
+            P_next,
+            roots,
+            trackers,
+            progress,
+            Val(cache.projective),
+            cache.ℓ_coeffs,
+        )
     else
-        serial_intersection!(X, P_next, roots, trackers, progress)
+        serial_intersection!(
+            X,
+            P_next,
+            roots,
+            trackers,
+            progress,
+            Val(cache.projective),
+            cache.ℓ_coeffs,
+        )
     end
     nothing
 end
@@ -750,30 +907,36 @@ function track_intersection_path(egtrackers, p)
     q
 end
 
-function serial_intersection!(X, P, roots, egtrackers, progress)
-    start = Iterators.product(P, roots)
-    l_start = length(P) * length(roots)
+start_values(p, roots, ::Val{false}, ℓ_coeffs) = roots
+start_values(p, roots, ::Val{true}, ℓ_coeffs) =
+    roots .* sum(ℓ_coeffs[j] * p[j] for j = 1:length(ℓ_coeffs))
 
-    for (i, s) in enumerate(start)
-        update_progress_paths!(progress, i, l_start)
+function serial_intersection!(X, P, roots, egtrackers, progress, projective::Val, ℓ_coeffs)
+    l_start = sum(length(start_values(p, roots, projective, ℓ_coeffs)) for p in P)
 
-        p = s[1]
-        p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
+    i = 0
+    for p₀ in P
+        for r in start_values(p₀, roots, projective, ℓ_coeffs)
+            i += 1
+            update_progress_paths!(progress, i, l_start)
 
-        q = track_intersection_path(egtrackers, p)
-        if !isnothing(q)
-            push!(X, q)
+            p = copy(p₀)
+            p[end] = r
+
+            q = track_intersection_path(egtrackers, p)
+            if !isnothing(q)
+                push!(X, q)
+            end
         end
     end
 
     nothing
 end
 
-function threaded_intersection!(X, P, roots, trackers, progress)
+function threaded_intersection!(X, P, roots, trackers, progress, projective::Val, ℓ_coeffs)
 
-    l_P = length(P)
-    l_roots = length(roots)
-    l_start = l_P * l_roots
+    starts = [(p, r) for p in P for r in start_values(p, roots, projective, ℓ_coeffs)]
+    l_start = length(starts)
 
     # Pre-allocate one tracker per thread
     nthr = Threads.nthreads()
@@ -798,10 +961,8 @@ function threaded_intersection!(X, P, roots, trackers, progress)
                             update_progress_paths!(progress, idx, l_start)
                         end
 
-                        p_idx = rem(idx - 1, l_P) + 1
-                        r_idx = div(idx - 1, l_P) + 1
-                        p = copy(P[p_idx])
-                        p[end] = roots[r_idx] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
+                        p = copy(starts[idx][1])
+                        p[end] = starts[idx][2]
 
                         q = track_intersection_path(local_egtrackers, p)
                         if !isnothing(q)
@@ -818,23 +979,34 @@ function threaded_intersection!(X, P, roots, trackers, progress)
     nothing
 end
 
-function set_up_u_homotopy(W, f, X, h, vars, u)
+function set_up_u_homotopy(
+    W,
+    f,
+    X,
+    h,
+    vars,
+    u;
+    projective::Bool = false,
+    variable_groups = nothing,
+    ℓ = 1,
+)
 
     P, Q = get_num_den(h)
     d = degree(P)
-    h0 = (u^d - 1) / Q
+    h0 = projective ? (u^d - ℓ^d) / Q : (u^d - 1) / Q
 
     # we start with the linear space L which does not use pose conditions on u, so that u^d=1
     # we end with the linear space L2 with u=c.
     L = linear_subspace_u(W)
-    L1 = rand_subspace(ambient_dim(L); dim = dim(L))
+    L1 = rand_subspace(ambient_dim(L); dim = dim(L), affine = !projective)
     L2 = linear_subspace(X)
 
-    F = fixed(System([f; h0], variables = vars); compile = false)
-    G = fixed(System([f; h], variables = vars); compile = false)
+    F = fixed(System([f; h0], variables = vars, variable_groups = variable_groups); compile = false)
+    G = fixed(System([f; h], variables = vars, variable_groups = variable_groups); compile = false)
 
     Hom1 = linear_subspace_homotopy(F, L, L1)
     Hom2 = StraightLineHomotopy(slice(F, L1), slice(G, L1); gamma = cis(2 * pi * rand()))
+    projective && (Hom2 = on_affine_chart(Hom2))
     Hom3 = linear_subspace_homotopy(G, L1, L2)
 
     return (Hom1, Hom2, Hom3), d
@@ -859,12 +1031,33 @@ function is_contained(X::WitnessPoints, Y::WitnessSet, F, cache; kwargs...)
     end
 
     set_up_linear_spaces!(cache, LX, LY)
-    out = is_contained(points(X), Y::WitnessSet, F, cache; kwargs...)
+    out =
+        cache.projective ? is_contained_projective(points(X), Y, F, cache; kwargs...) :
+        is_contained(points(X), Y::WitnessSet, F, cache; kwargs...)
 
     out
 end
 function is_contained(V::WitnessPoints, W::WitnessSet, cache; kwargs...)
     is_contained(V, W, system(W), cache; kwargs...)
+end
+
+function is_contained_projective(
+    P::Vector{Vector{T}},
+    Y::WitnessSet,
+    F,
+    cache;
+    threading::Bool = Threads.nthreads() > 1,
+    kwargs...,
+) where {T<:Number}
+    Hom = linear_subspace_homotopy(on_affine_chart(F), linear_subspace(Y), linear_subspace(Y))
+    tracker = EndgameTracker(
+        Hom;
+        tracker_options = cache.tracker_options,
+        options = cache.endgame_options,
+    )
+
+    threading ? threaded_x_in_Y(P, Y, F, tracker, cache; kwargs...) :
+    serial_x_in_Y(P, Y, F, tracker, cache; kwargs...)
 end
 
 function set_up_linear_spaces!(cache, LX, LY)

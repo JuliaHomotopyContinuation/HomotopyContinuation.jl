@@ -121,6 +121,51 @@
         @test ncomponents(N_Curve) == 1
     end
 
+    @testset "Homogeneous systems" begin
+        @var x[1:4]
+
+        Quadric = System([x[1]^2 + x[2]^2 + x[3]^2 + x[4]^2], x)
+        W_Quadric = regeneration(
+            Quadric;
+            show_progress = false,
+            threading = false,
+            seed = 0x12345678,
+        )
+        @test degree.(W_Quadric) == [2]
+        @test dim.(W_Quadric) == [2]
+        @test all(W -> W.projective, W_Quadric)
+        @test all(W -> is_linear(linear_subspace(W)), W_Quadric)
+
+        W_GroupedQuadric = regeneration(
+            System(expressions(Quadric), variable_groups = [x]);
+            show_progress = false,
+            threading = false,
+            seed = 0x12345678,
+        )
+        @test degree.(W_GroupedQuadric) == [2]
+        @test dim.(W_GroupedQuadric) == [2]
+        @test all(W -> W.projective, W_GroupedQuadric)
+        @test all(W -> is_linear(linear_subspace(W)), W_GroupedQuadric)
+
+        CompleteIntersection = System(
+            [
+                x[1]^2 + x[2]^2 + x[3]^2 + x[4]^2,
+                x[1]^3 + x[2]^3 + 2x[3]^3 + 3x[4]^3,
+            ],
+            x,
+        )
+        W_CI = regeneration(
+            CompleteIntersection;
+            show_progress = false,
+            threading = false,
+            seed = 0x12345678,
+        )
+        @test degree.(W_CI) == [6]
+        @test dim.(W_CI) == [1]
+        @test all(W -> W.projective, W_CI)
+        @test all(W -> is_linear(linear_subspace(W)), W_CI)
+    end
+
     @testset "Overdetermined Test" begin
         @var x y z
         TwistedCubicSphere =
