@@ -2205,6 +2205,10 @@ mutable struct IntersectCache{Sys<:AbstractSystem}
     Fᵢ::Sys
     h::Expression
     u::Variable
+    projective::Bool
+    variable_groups::Union{Nothing,Vector{Vector{Variable}}}
+    ℓ::Expression
+    ℓ_coeffs::Vector{ComplexF64}
 
     endgame_options::EndgameOptions
     tracker_options::TrackerOptions
@@ -2212,7 +2216,7 @@ mutable struct IntersectCache{Sys<:AbstractSystem}
     progress::Union{IntersectProgress,Nothing}
 end
 
-function IntersectCache(u, f, F, h, EO, TO, progress)
+function IntersectCache(u, f, F, h, projective, variable_groups, ℓ, ℓ_coeffs, EO, TO, progress)
     m, N = size(F)
     A = zeros(ComplexF64, N - 1, N)
     b = zeros(ComplexF64, N - 1)
@@ -2220,7 +2224,24 @@ function IntersectCache(u, f, F, h, EO, TO, progress)
     y0 = zeros(ComplexF64, m)
     y = zeros(ComplexF64, m)
 
-    IntersectCache(A, b, x0, y0, y, f, F, h, u, EO, TO, progress)
+    IntersectCache(
+        A,
+        b,
+        x0,
+        y0,
+        y,
+        f,
+        F,
+        h,
+        u,
+        projective,
+        variable_groups,
+        ℓ,
+        ℓ_coeffs,
+        EO,
+        TO,
+        progress,
+    )
 end
 
 
@@ -2290,6 +2311,7 @@ function _intersect(
 )
     @assert size(system(H), 1) == 1 "The second argument must be defined by a single polynomial."
     @assert size(system(W), 2) == size(system(H), 2) "Witness sets must be in the same ambient space."
+    W.projective == H.projective || throw(ArgumentError("Witness sets must both be affine or projective."))
 
     # progress bar
     if show_progress
@@ -2310,10 +2332,34 @@ function _intersect(
     n = ambient_dim(W.L)
     @unique_var u
     @unique_var vars[1:n]
-    W₁, W₂, Hᵤ, f, F, h, vars_u = prepare_for_u_homotopy(H, W, vars, u)
+    vars_u = [vars; u]
+    projective = W.projective
+    variable_groups = projective ? [vars_u] : nothing
+    ℓ_coeffs = randn(ComplexF64, n)
+    ℓ = sum(ℓ_coeffs .* vars)
+    W₁, W₂, Hᵤ, f, F, h = prepare_for_u_homotopy(
+        H,
+        W,
+        vars,
+        vars_u,
+        variable_groups,
+        projective,
+    )
 
     # cache
-    cache = IntersectCache(u, f, F, h, endgame_options, tracker_options, progress)
+    cache = IntersectCache(
+        u,
+        f,
+        F,
+        h,
+        projective,
+        variable_groups,
+        ℓ,
+        ℓ_coeffs,
+        endgame_options,
+        tracker_options,
+        progress,
+    )
 
     # intersect
     intersect_with_hypersurface!(W₁, Hᵤ, W₂, cache; threading = threading, kwargs...)
@@ -2321,12 +2367,15 @@ function _intersect(
     fill_up!([W₁; W₂], monodromy_options, cache, show_monodromy_progress, threading)
 
     # return data 
-    G = fixed(System([f; h], variables = vars); compile = false)
+    G = fixed(
+        System([f; h], variables = vars, variable_groups = projective ? [vars] : nothing);
+        compile = false,
+    )
     P1, L1 = u_transform(W₁)
-    out = [WitnessSet(G, L1, P1)]
+    out = [WitnessSet(G, L1, P1; projective = projective)]
     if !isnothing(W₂)
         P2, L2 = u_transform(W₂)
-        push!(out, WitnessSet(G, L2, P2))
+        push!(out, WitnessSet(G, L2, P2; projective = projective))
 
     end
     filter!(X -> degree(X) > 0, out)
@@ -2337,15 +2386,14 @@ end
 
 
 
-function prepare_for_u_homotopy(H, W, vars, u)
+function prepare_for_u_homotopy(H, W, vars, vars_u, variable_groups, projective)
     # prepare polynomials 
     FH0 = deepcopy(System(system(H)))
     FW0 = deepcopy(System(system(W)))
     h = subs(expressions(FH0), variables(FH0) => vars)
     f = subs(expressions(FW0), variables(FW0) => vars)
-    vars_u = [vars; u]
-    FH = System(h, variables = vars_u)
-    FW = System(f, variables = vars_u)
+    FH = System(h, variables = vars_u, variable_groups = variable_groups)
+    FW = System(f, variables = vars_u, variable_groups = variable_groups)
 
     # prepare flags
     LW = linear_subspace(W)
@@ -2363,8 +2411,13 @@ function prepare_for_u_homotopy(H, W, vars, u)
         W₂ = WitnessPoints(flagW[2][1], flagW[2][2], Vector{Vector{ComplexF64}}())
     end
     Hᵤ =
-        WitnessSet(fixed(FH; compile = false), flagH[1][1], map(x -> [x; cH], solutions(H)))
+        WitnessSet(
+            fixed(FH; compile = false),
+            flagH[1][1],
+            map(x -> [x; cH], solutions(H));
+            projective = projective,
+        )
 
-    W₁, W₂, Hᵤ, f, fixed(FW; compile = false), first(h), vars_u
+    W₁, W₂, Hᵤ, f, fixed(FW; compile = false), first(h)
 end
 get_c(flag) = extrinsic((flag[1][1])).b[1] # the first entry of b is the right-hand side of "u=c"
