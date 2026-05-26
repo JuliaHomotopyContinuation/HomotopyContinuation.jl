@@ -1031,33 +1031,12 @@ function is_contained(X::WitnessPoints, Y::WitnessSet, F, cache; kwargs...)
     end
 
     set_up_linear_spaces!(cache, LX, LY)
-    out =
-        cache.projective ? is_contained_projective(points(X), Y, F, cache; kwargs...) :
-        is_contained(points(X), Y::WitnessSet, F, cache; kwargs...)
+    out = is_contained(points(X), Y::WitnessSet, F, cache; kwargs...)
 
     out
 end
 function is_contained(V::WitnessPoints, W::WitnessSet, cache; kwargs...)
     is_contained(V, W, system(W), cache; kwargs...)
-end
-
-function is_contained_projective(
-    P::Vector{Vector{T}},
-    Y::WitnessSet,
-    F,
-    cache;
-    threading::Bool = Threads.nthreads() > 1,
-    kwargs...,
-) where {T<:Number}
-    Hom = linear_subspace_homotopy(on_affine_chart(F), linear_subspace(Y), linear_subspace(Y))
-    tracker = EndgameTracker(
-        Hom;
-        tracker_options = cache.tracker_options,
-        options = cache.endgame_options,
-    )
-
-    threading ? threaded_x_in_Y(P, Y, F, tracker, cache; kwargs...) :
-    serial_x_in_Y(P, Y, F, tracker, cache; kwargs...)
 end
 
 function set_up_linear_spaces!(cache, LX, LY)

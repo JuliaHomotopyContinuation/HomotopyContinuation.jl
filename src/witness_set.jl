@@ -350,21 +350,95 @@ function is_contained(
     # set up homotopy
     tracker_options = cache.tracker_options
     endgame_options = cache.endgame_options
+    projective = Y.projective
     LY = linear_subspace(Y)
-    Hom = linear_subspace_homotopy(F, LY, LY)
+    Hom = linear_subspace_homotopy(F, LY, LY; intrinsic = false)
     tracker =
         EndgameTracker(Hom; tracker_options = tracker_options, options = endgame_options)
 
     # tracking
     if threading
-        out = threaded_x_in_Y(P, Y, F, tracker, cache; kwargs...)
+        out = threaded_x_in_Y(P, Y, F, tracker, cache, Val(projective); kwargs...)
     else
-        out = serial_x_in_Y(P, Y, F, tracker, cache; kwargs...)
+        out = serial_x_in_Y(P, Y, F, tracker, cache, Val(projective); kwargs...)
     end
 
     out
 end
-function serial_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
+function target_subspace_through(A, b, x, ::Val{false})
+    LA.mul!(b, A, x)
+    LinearSubspace(ExtrinsicDescription(copy(A), copy(b); orthonormal = true))
+end
+function target_subspace_through(A, b, x, ::Val{true})
+    r, n = size(A)
+    Aₓ = zeros(ComplexF64, r, n)
+    bₓ = zeros(ComplexF64, r)
+    x′x = sum(abs2, x)
+    z = conj.(x)
+
+    nrows = 0
+    for i = 1:r
+        nrows += add_projective_row!(Aₓ, nrows, view(A, i, :), x, z, x′x)
+    end
+    while nrows < r
+        nrows += add_projective_row!(Aₓ, nrows, randn(ComplexF64, n), x, z, x′x)
+    end
+
+    LinearSubspace(ExtrinsicDescription(Aₓ, bₓ; orthonormal = true))
+end
+function add_projective_row!(A, nrows, row, x, z, x′x)
+    candidate = Vector{ComplexF64}(undef, length(x))
+    α = zero(ComplexF64)
+    for j = 1:length(x)
+        α += row[j] * x[j]
+    end
+    α /= x′x
+    for j = 1:length(x)
+        candidate[j] = row[j] - α * z[j]
+    end
+
+    if LA.norm(candidate) < 1e-12
+        return 0
+    end
+    if nrows > 0
+        B = A[1:nrows, :]
+        for i = 1:nrows
+            β = zero(ComplexF64)
+            for j = 1:length(candidate)
+                β += candidate[j] * conj(B[i, j])
+            end
+            for j = 1:length(candidate)
+                candidate[j] -= β * B[i, j]
+            end
+        end
+    end
+
+    norm_candidate = LA.norm(candidate)
+    if norm_candidate < 1e-12
+        return 0
+    end
+    for j = 1:length(candidate)
+        A[nrows+1, j] = candidate[j] / norm_candidate
+    end
+    1
+end
+membership_representative(x, tracker, ::Val{false}) = x
+function membership_representative(x, tracker, ::Val{true})
+    x_chart = copy(x)
+    set_solution!(x_chart, tracker.tracker.homotopy, x, 1)
+    x_chart
+end
+
+function serial_x_in_Y(
+    P,
+    Y,
+    F,
+    tracker,
+    cache,
+    projective::Val;
+    atol = 1e-14,
+    rtol = sqrt(eps()),
+)
 
     progress = cache.progress
     x0 = cache.x0
@@ -373,7 +447,9 @@ function serial_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
     y = cache.y
     l_X = length(P)
 
-    A, b = cache.A, cache.b
+    cY = codim(linear_subspace(Y))
+    A = view(cache.A, 1:cY, :)
+    b = view(cache.b, 1:cY)
 
     # Pre-allocate output
     out = Vector{Bool}(undef, l_X)
@@ -391,20 +467,18 @@ function serial_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
         end
 
         # second check
-        LA.mul!(b, A, x)
-        # set up the corresponding LinearSubspace L
-        E = ExtrinsicDescription(A, b; orthonormal = true)
-        L = LinearSubspace(E)
+        L = target_subspace_through(A, b, x, projective)
         # set L as the target for homotopy continuation
         target_parameters!(tracker, L)
+        x_target = membership_representative(x, tracker, projective)
 
-        rad = max(atol, norm(x, Inf) * rtol)
+        rad = max(atol, norm(x_target, Inf) * rtol)
 
         # add the points in Y to U after we have moved them towards L 
         for p in points(Y)
             track!(tracker, p, 1)
             q = solution(tracker)
-            d = distance(q, x, InfNorm())
+            d = distance(q, x_target, InfNorm())
             if d < rad
                 return true
             end
@@ -415,7 +489,16 @@ function serial_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
 
     out
 end
-function threaded_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
+function threaded_x_in_Y(
+    P,
+    Y,
+    F,
+    tracker,
+    cache,
+    projective::Val;
+    atol = 1e-14,
+    rtol = sqrt(eps()),
+)
 
     progress = cache.progress
     x0 = cache.x0
@@ -424,7 +507,9 @@ function threaded_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps(
     y = cache.y
     l_X = length(P)
 
-    A, b = cache.A, cache.b
+    cY = codim(linear_subspace(Y))
+    A = view(cache.A, 1:cY, :)
+    b = view(cache.b, 1:cY)
 
     # Pre-allocate output
     out = Vector{Bool}(undef, l_X)
@@ -468,20 +553,19 @@ function threaded_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps(
                         result = false
                         if norm(local_y, Inf) <= 1e-2 * norm(local_y0, Inf)
                             # second check
-                            LA.mul!(local_b, A, x)
-                            # set up the corresponding LinearSubspace L
-                            E = ExtrinsicDescription(A, local_b; orthonormal = true)
-                            L = LinearSubspace(E)
+                            L = target_subspace_through(A, local_b, x, projective)
                             # set L as the target for homotopy continuation
                             target_parameters!(local_tracker, L)
+                            x_target =
+                                membership_representative(x, local_tracker, projective)
 
-                            rad = max(atol, norm(x, Inf) * rtol)
+                            rad = max(atol, norm(x_target, Inf) * rtol)
 
                             # add the points in Y to U after we have moved them towards L 
                             for p in points(Y)
                                 track!(local_tracker, p, 1)
                                 q = solution(local_tracker)
-                                if distance(q, x, InfNorm()) < rad
+                                if distance(q, x_target, InfNorm()) < rad
                                     result = true
                                     break
                                 end

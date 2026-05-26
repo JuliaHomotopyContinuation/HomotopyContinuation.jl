@@ -135,6 +135,7 @@
         @test dim.(W_Quadric) == [2]
         @test all(W -> W.projective, W_Quadric)
         @test all(W -> is_linear(linear_subspace(W)), W_Quadric)
+        @test membership(solutions(only(W_Quadric))[1], only(W_Quadric); show_progress = false)
 
         W_GroupedQuadric = regeneration(
             System(expressions(Quadric), variable_groups = [x]);
@@ -164,6 +165,14 @@
         @test dim.(W_CI) == [1]
         @test all(W -> W.projective, W_CI)
         @test all(W -> is_linear(linear_subspace(W)), W_CI)
+
+        a = x[1]^2 + x[2]^2 + x[3]^2 + x[4]^2
+        b = x[1]^3 + x[2]^3 + 2x[3]^3 + 3x[4]^3
+        c = x[1]^4 + 2x[2]^4 + 4x[3]^4 - x[4]^4
+        ProductSystem = System([a * c; b * c], x)
+        N_Product = nid(ProductSystem; show_progress = false, threading = false)
+        @test degrees(N_Product) == Dict(2 => [4], 1 => [6])
+        @test ncomponents(N_Product) == 2
     end
 
     @testset "Overdetermined Test" begin
