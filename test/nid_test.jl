@@ -18,6 +18,9 @@
         # sorting
         W = regeneration(F; sorted = false, show_progress = false)
         @test degree.(W) == [2, 8, 8]
+        
+        N = NumericalIrreducibleDecomposition(decompose(W))
+        @test seed(N) == s
 
         # limited codimension
         W = regeneration(F; max_codim = 2, show_progress = false)
@@ -36,7 +39,7 @@
         @test isnothing(seed(N))
 
         # bad seed
-        N = nid(F; seed = 0xc770fa47, show_progress = false)
+        N = nid(F; seed = UInt32(62), show_progress = false)
         degs = degrees(N)
         @test degs[2] == [2]
         @test degs[1] == [4, 4]
@@ -47,6 +50,16 @@
 
         N = nid(F; warning = false, show_progress = false)
         @test isa(N, NumericalIrreducibleDecomposition)
+
+        N = nid(
+            F;
+            seed = UInt32(62),
+            sorted = true,
+            threading = false,
+            show_progress = false,
+        )
+        @test degrees(N)[2] == [2]
+        @test degrees(N)[1] == [4, 4]
 
         # options
         N_fails = nid(
