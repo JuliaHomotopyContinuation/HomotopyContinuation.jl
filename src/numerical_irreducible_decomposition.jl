@@ -351,9 +351,7 @@ function _regeneration(
         max_endgame_extended_steps = 100,
         sing_cond = 1e12,
     ),
-    monodromy_options::MonodromyOptions = MonodromyOptions(;
-        parameter_sampler = weighted_normal,
-    ),
+    monodromy_options::MonodromyOptions = MonodromyOptions(),
     max_trials_u_homotopy::Int = 5,
     show_monodromy_progress::Bool = false,
     threading::Bool = Threads.nthreads() > 1,
@@ -1746,9 +1744,7 @@ function decompose(
     Ws::Vector{WP};
     show_progress::Bool = true,
     show_monodromy_progress::Bool = false,
-    monodromy_options::MonodromyOptions = MonodromyOptions(;
-        parameter_sampler = weighted_normal,
-    ),
+    monodromy_options::MonodromyOptions = MonodromyOptions(),
     max_iters::Int = 200,
     warning::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
@@ -2088,12 +2084,8 @@ function numerical_irreducible_decomposition(
         max_endgame_extended_steps = 100,
         sing_accuracy = 1e-10,
     ),
-    monodromy_options_for_regeneration = MonodromyOptions(;
-        parameter_sampler = weighted_normal,
-    ),
-    monodromy_options_for_decompose::MonodromyOptions = MonodromyOptions(;
-        parameter_sampler = weighted_normal,
-    ),
+    monodromy_options_for_regeneration = MonodromyOptions(),
+    monodromy_options_for_decompose::MonodromyOptions = MonodromyOptions(),
     show_monodromy_progress::Bool = false,
     show_monodromy_for_regeneration_progress::Bool = false,
     show_monodromy_for_decompose_progress::Bool = false,
@@ -2384,9 +2376,7 @@ function _intersect(
         max_endgame_extended_steps = 100,
         sing_cond = 1e12,
     ),
-    monodromy_options::MonodromyOptions = MonodromyOptions(;
-        parameter_sampler = weighted_normal,
-    ),
+    monodromy_options::MonodromyOptions = MonodromyOptions(),
     max_trials_u_homotopy::Int = 5,
     show_monodromy_progress::Bool = false,
     threading = Threads.nthreads() > 1,
