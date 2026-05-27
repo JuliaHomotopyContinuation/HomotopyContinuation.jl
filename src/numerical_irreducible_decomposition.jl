@@ -844,7 +844,7 @@ function track_intersection!(X, P, roots, trackers, u_data, cache, progress, thr
         all(accepted) && break
     end
 
-    track_hom2_hom3!(X, P1, accepted2, trackers[2], trackers[3], progress, threading)
+    track_hom2_hom3!(X, P1, trackers[2], trackers[3], progress, threading)
 
     nothing
 end
