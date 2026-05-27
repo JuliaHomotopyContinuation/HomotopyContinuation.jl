@@ -550,7 +550,7 @@ function initialize_hypersurfaces(
         if qᵢ != 1
             res = solve(
                 h,
-                solutions(res);
+                solution.(results(res));
                 start_subspace = L,
                 target_subspace = L,
                 show_progress = false,
@@ -560,7 +560,7 @@ function initialize_hypersurfaces(
         if isnothing(res)
             return nothing
         end
-        S = solutions(res, only_nonsingular = true)
+        S = solution.(results(res))
         out[i] = WitnessSet(h, L, S)
     end
     out
@@ -624,7 +624,7 @@ function fill_up!(out, monodromy_options, cache, show_monodromy_progress, thread
             if nsolutions(res) == 0
                 W.R = Vector{Vector{ComplexF64}}()
             else
-                W.R = unique_points(solutions(res))
+                W.R = solution.(results(res))
             end
             update_progress!(progress, W)
         end
