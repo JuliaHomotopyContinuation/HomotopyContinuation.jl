@@ -256,6 +256,7 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
     u::Variable
     i::Int
     codim::Int
+    max_trials_u_homotopy::Int
 
     endgame_options::EndgameOptions
     tracker_options::TrackerOptions
@@ -263,7 +264,7 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
     progress::Union{WitnessSetsProgress,Nothing}
 end
 
-function RegenerationCache(u, f, F, h, codim, EO, TO, progress)
+function RegenerationCache(u, f, F, h, codim, max_trials_u_homotopy, EO, TO, progress)
     m, N = size(F)
     A = zeros(ComplexF64, N - 1, N)
     b = zeros(ComplexF64, N - 1)
@@ -271,7 +272,23 @@ function RegenerationCache(u, f, F, h, codim, EO, TO, progress)
     y0 = zeros(ComplexF64, m)
     y = zeros(ComplexF64, m)
 
-    RegenerationCache(A, b, x0, y0, y, f, F, h, u, 0, codim, EO, TO, progress)
+    RegenerationCache(
+        A,
+        b,
+        x0,
+        y0,
+        y,
+        f,
+        F,
+        h,
+        u,
+        0,
+        codim,
+        max_trials_u_homotopy,
+        EO,
+        TO,
+        progress,
+    )
 end
 function update_Fᵢ!(cache, fᵢ, vars)
     Fᵢ = fixed(System(fᵢ, variables = vars), compile = false)
@@ -304,6 +321,7 @@ The implementation is based on the algorithm [u-regeneration](https://arxiv.org/
 * `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
 * `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
 * `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
+* `max_trials_u_homotopy = 5`: maximal number of random subspaces tried until an intermediate u-regeneration intersection step succeeds.
 * `atol = 1e-14` and `rtol = sqrt(eps())`: a point `y` is considered equal to `x` when the distance between `x`and `y` is smaller than `max(atol, norm(x, Inf) * rtol).`
 * `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
 * `seed`: choose the random seed.
@@ -336,6 +354,7 @@ function _regeneration(
     monodromy_options::MonodromyOptions = MonodromyOptions(;
         parameter_sampler = weighted_normal,
     ),
+    max_trials_u_homotopy::Int = 5,
     show_monodromy_progress::Bool = false,
     threading::Bool = Threads.nthreads() > 1,
     seed = nothing,
@@ -409,6 +428,7 @@ function _regeneration(
         Fᵢ,
         f[1],
         codim,
+        max_trials_u_homotopy,
         endgame_options,
         tracker_options,
         progress,
@@ -695,15 +715,8 @@ function intersect_with_hypersurface!(
     # Step 2:
     # the points in P_next are used as starting points for a homotopy.
     # where u^d-1 (u is the extra variable in u-regeneration) is deformed into g 
-    Hom, d = set_up_u_homotopy(W, f, X, h, vars, u)
-
-    trackers = map(Hom) do H
-        EndgameTracker(
-            H;
-            tracker_options = cache.tracker_options,
-            options = cache.endgame_options,
-        )
-    end
+    u_data, d = set_up_u_homotopy(W, f, X, h, vars, u)
+    trackers = initialize_u_homotopy_trackers(u_data, cache)
 
 
     # the start solutions are the Cartesian product between P_next and the d-th roots of unity.
@@ -717,9 +730,9 @@ function intersect_with_hypersurface!(
         is_monodromy = false,
     )
     if threading
-        threaded_intersection!(X, P_next, roots, trackers, progress)
+        threaded_intersection!(X, P_next, roots, trackers, u_data, cache, progress)
     else
-        serial_intersection!(X, P_next, roots, trackers, progress)
+        serial_intersection!(X, P_next, roots, trackers, u_data, cache, progress)
     end
     nothing
 end
@@ -729,117 +742,6 @@ function manage_initial_points!(P, m)
     deleteat!(P, m)
     return P_next
 end
-
-function track_intersection_path(egtrackers, p)
-    # Stage 1: L -> random linear space L1
-    res1 = track(egtrackers[1], p, 1)
-    is_success(res1) && is_finite(res1) && is_nonsingular(res1) || return nothing
-
-    # Stage 2: replace u^d - 1 by hypersurface equation
-    p1 = solution(egtrackers[1])
-    res2 = track(egtrackers[2], p1, 1)
-    is_success(res2) && is_finite(res2) && is_nonsingular(res2) || return nothing
-
-    # Stage 3: L1 -> {u = c}
-    p2 = solution(egtrackers[2])
-    res3 = track(egtrackers[3], p2, 1)
-    is_success(res3) && is_finite(res3) && is_nonsingular(res3) || return nothing
-
-    q = copy(solution(egtrackers[3]))
-
-    q
-end
-
-function serial_intersection!(X, P, roots, egtrackers, progress)
-    start = Iterators.product(P, roots)
-    l_start = length(P) * length(roots)
-
-    for (i, s) in enumerate(start)
-        update_progress_paths!(progress, i, l_start)
-
-        p = s[1]
-        p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
-
-        q = track_intersection_path(egtrackers, p)
-        if !isnothing(q)
-            push!(X, q)
-        end
-    end
-
-    nothing
-end
-
-function threaded_intersection!(X, P, roots, trackers, progress)
-
-    l_P = length(P)
-    l_roots = length(roots)
-    l_start = l_P * l_roots
-
-    # Pre-allocate one tracker per thread
-    nthr = Threads.nthreads()
-    trackers_per_thread = [deepcopy(trackers) for _ = 1:nthr]
-
-    # Use a lock for thread-safe operations on X and progress
-    progress_lock = ReentrantLock()
-
-    next_idx = Threads.Atomic{Int}(1)
-    Threads.@sync begin
-        for tid = 1:nthr
-            let local_egtrackers = trackers_per_thread[tid]
-                Threads.@spawn begin
-                    while true
-
-                        idx = Threads.atomic_add!(next_idx, 1)
-                        if idx > l_start
-                            break
-                        end
-
-                        lock(progress_lock) do
-                            update_progress_paths!(progress, idx, l_start)
-                        end
-
-                        p_idx = rem(idx - 1, l_P) + 1
-                        r_idx = div(idx - 1, l_P) + 1
-                        p = copy(P[p_idx])
-                        p[end] = roots[r_idx] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
-
-                        q = track_intersection_path(local_egtrackers, p)
-                        if !isnothing(q)
-                            lock(progress_lock) do
-                                push!(X, q)
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    nothing
-end
-
-function set_up_u_homotopy(W, f, X, h, vars, u)
-
-    P, Q = get_num_den(h)
-    d = degree(P)
-    h0 = (u^d - 1) / Q
-
-    # we start with the linear space L which does not use pose conditions on u, so that u^d=1
-    # we end with the linear space L2 with u=c.
-    L = linear_subspace_u(W)
-    L1 = rand_subspace(ambient_dim(L); dim = dim(L))
-    L2 = linear_subspace(X)
-
-    F = fixed(System([f; h0], variables = vars); compile = false)
-    G = fixed(System([f; h], variables = vars); compile = false)
-
-    Hom1 = linear_subspace_homotopy(F, L, L1)
-    Hom2 = StraightLineHomotopy(slice(F, L1), slice(G, L1); gamma = cis(2 * pi * rand()))
-    Hom3 = linear_subspace_homotopy(G, L1, L2)
-
-    return (Hom1, Hom2, Hom3), d
-end
-
 
 
 function is_contained(X::WitnessPoints, Y::WitnessSet, F, cache; kwargs...)
@@ -900,6 +802,329 @@ function set_up_linear_spaces!(cache, LX, LY)
         end
         b[ℓ] = bX[i]
     end
+end
+
+
+# The following piece of the code implements the core part of u-regeneration
+# It consists of three subhomotopies: Hom1, Hom2, Hom3.
+# Hom1 moves the linear equation u = c to a random linear space L1 involving (x,u), where x are the variables of F.
+# Hom2 moves u^d - 1 to the new polynomial fᵢ with deg(fᵢ) = d.
+# Hom3 moves the linear space L1 to the linear space given by the initial witness sets. 
+# We first run Hom1. Then we check if the output of Hom1 works as input for Hom2. If this fails, resampel L1. Only then track Hom2 and Hom3. 
+
+const HOM2_START_CHECK_TARGET = 0.95
+
+is_accepted(T::EndgameTracker, code) =
+    is_success(code) && !T.state.singular && !T.state.at_infinity
+
+function start_solution(P, roots, idx)
+    l_P = length(P)
+    p_idx = rem(idx - 1, l_P) + 1
+    r_idx = div(idx - 1, l_P) + 1
+    p = copy(P[p_idx])
+    p[end] = roots[r_idx]
+
+    p
+end
+
+function track_intersection!(X, P, roots, trackers, u_data, cache, progress, threading)
+    l_start = length(P) * length(roots)
+    P1 = Vector{Vector{ComplexF64}}(undef, l_start)
+    accepted1 = falses(l_start)
+    accepted2 = falses(l_start)
+
+    ntrials = max(cache.max_trials_u_homotopy, 1)
+    for trial = 1:ntrials
+        trial > 1 && reset_u_homotopy_trackers!(trackers, u_data, cache)
+        fill!(accepted1, false)
+        fill!(accepted2, false)
+
+        track_hom1!(P1, accepted1, P, roots, trackers[1], progress, threading)
+        check_hom2_starts!(accepted2, P1, accepted1, trackers[2], progress, threading)
+
+        all(accepted2) && break
+    end
+
+    track_hom2_hom3!(X, P1, accepted2, trackers[2], trackers[3], progress, threading)
+
+    nothing
+end
+
+function serial_intersection!(X, P, roots, trackers, u_data, cache, progress)
+    track_intersection!(X, P, roots, trackers, u_data, cache, progress, false)
+end
+
+function threaded_intersection!(X, P, roots, trackers, u_data, cache, progress)
+    track_intersection!(X, P, roots, trackers, u_data, cache, progress, true)
+end
+
+function u_homotopy_tracker(H, cache)
+    EndgameTracker(
+        H;
+        tracker_options = cache.tracker_options,
+        options = cache.endgame_options,
+    )
+end
+
+function initialize_u_homotopy_trackers(u_data, cache)
+    F, G, L, L2 = u_data
+    L1 = rand_subspace(ambient_dim(L); dim = dim(L))
+
+    Hom1 = linear_subspace_homotopy(F, L, L1)
+    Hom2 = StraightLineHomotopy(slice(F, L1), slice(G, L1); gamma = cis(2 * pi * rand()))
+    Hom3 = linear_subspace_homotopy(G, L1, L2)
+
+    [
+        u_homotopy_tracker(Hom1, cache),
+        u_homotopy_tracker(Hom2, cache),
+        u_homotopy_tracker(Hom3, cache),
+    ]
+end
+
+function reset_u_homotopy_trackers!(trackers, u_data, cache)
+    F, G, L, L2 = u_data
+    L1 = rand_subspace(ambient_dim(L); dim = dim(L))
+
+    target_parameters!(trackers[1], L1)
+    trackers[2] = u_homotopy_tracker(
+        StraightLineHomotopy(slice(F, L1), slice(G, L1); gamma = cis(2 * pi * rand())),
+        cache,
+    )
+    start_parameters!(trackers[3], L1)
+
+    trackers
+end
+
+function set_up_u_homotopy(W, f, X, h, vars, u)
+
+    P, Q = get_num_den(h)
+    d = degree(P)
+    h0 = (u^d - 1) / Q
+
+    # we start with the linear space L which does not use pose conditions on u, so that u^d=1
+    # we end with the linear space L2 with u=c.
+    L = linear_subspace_u(W)
+    L2 = linear_subspace(X)
+
+    F = fixed(System([f; h0], variables = vars); compile = false)
+    G = fixed(System([f; h], variables = vars); compile = false)
+
+    return (F, G, L, L2), d
+end
+
+
+function track_hom1!(P1, accepted1, P, roots, tracker, progress, threading)
+    if threading
+        threaded_track_hom1!(P1, accepted1, P, roots, tracker, progress)
+    else
+        serial_track_hom1!(P1, accepted1, P, roots, tracker, progress)
+    end
+end
+
+function check_hom2_starts!(accepted2, P1, accepted1, tracker, progress, threading)
+    if threading
+        threaded_check_hom2_starts!(accepted2, P1, accepted1, tracker, progress)
+    else
+        serial_check_hom2_starts!(accepted2, P1, accepted1, tracker, progress)
+    end
+end
+
+function track_hom2_hom3!(X, P1, accepted2, tracker2, tracker3, progress, threading)
+    if threading
+        threaded_track_hom2_hom3!(X, P1, accepted2, tracker2, tracker3, progress)
+    else
+        serial_track_hom2_hom3!(X, P1, accepted2, tracker2, tracker3, progress)
+    end
+end
+
+function serial_track_hom1!(P1, accepted, P, roots, tracker, progress)
+    l_start = length(P) * length(roots)
+
+    for i = 1:l_start
+        update_progress_paths!(progress, i, l_start)
+
+        p = start_solution(P, roots, i)
+        code = track!(tracker, p, 1)
+        if is_accepted(tracker, code)
+            accepted[i] = true
+            P1[i] = solution(tracker)
+        else
+            accepted[i] = false
+        end
+    end
+
+    nothing
+end
+
+function serial_check_hom2_starts!(accepted, P1, accepted1, tracker, progress)
+    l_start = length(P1)
+
+    for i = 1:l_start
+        update_progress_paths!(progress, i, l_start)
+
+        if accepted1[i]
+            code = track!(tracker.tracker, P1[i], 1, HOM2_START_CHECK_TARGET)
+            accepted[i] = is_success(code)
+        else
+            accepted[i] = false
+        end
+    end
+
+    nothing
+end
+
+function serial_track_hom2_hom3!(X, P1, accepted2, tracker2, tracker3, progress)
+    l_start = length(P1)
+
+    for i = 1:l_start
+        update_progress_paths!(progress, i, l_start)
+
+        if accepted2[i]
+            code2 = track!(tracker2, P1[i], 1)
+            if is_accepted(tracker2, code2)
+                p2 = solution(tracker2)
+                code3 = track!(tracker3, p2, 1)
+                if is_accepted(tracker3, code3)
+                    push!(X, solution(tracker3))
+                end
+            end
+        end
+    end
+
+    nothing
+end
+
+function threaded_track_hom1!(P1, accepted, P, roots, tracker, progress)
+
+    l_P = length(P)
+    l_roots = length(roots)
+    l_start = l_P * l_roots
+
+    nthr = Threads.nthreads()
+    trackers = [deepcopy(tracker) for _ = 1:nthr]
+
+    progress_lock = ReentrantLock()
+
+    next_idx = Threads.Atomic{Int}(1)
+    Threads.@sync begin
+        for tid = 1:nthr
+            let local_tracker = trackers[tid]
+                Threads.@spawn begin
+                    while true
+
+                        idx = Threads.atomic_add!(next_idx, 1)
+                        if idx > l_start
+                            break
+                        end
+
+                        lock(progress_lock) do
+                            update_progress_paths!(progress, idx, l_start)
+                        end
+
+                        p = start_solution(P, roots, idx)
+                        code = track!(local_tracker, p, 1)
+                        if is_accepted(local_tracker, code)
+                            accepted[idx] = true
+                            P1[idx] = solution(local_tracker)
+                        else
+                            accepted[idx] = false
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    nothing
+end
+
+function threaded_check_hom2_starts!(accepted, P1, accepted1, tracker, progress)
+
+    l_start = length(P1)
+
+    nthr = Threads.nthreads()
+    trackers = [deepcopy(tracker.tracker) for _ = 1:nthr]
+
+    progress_lock = ReentrantLock()
+
+    next_idx = Threads.Atomic{Int}(1)
+    Threads.@sync begin
+        for tid = 1:nthr
+            let local_tracker = trackers[tid]
+                Threads.@spawn begin
+                    while true
+
+                        idx = Threads.atomic_add!(next_idx, 1)
+                        if idx > l_start
+                            break
+                        end
+
+                        lock(progress_lock) do
+                            update_progress_paths!(progress, idx, l_start)
+                        end
+
+                        if accepted1[idx]
+                            code =
+                                track!(local_tracker, P1[idx], 1, HOM2_START_CHECK_TARGET)
+                            accepted[idx] = is_success(code)
+                        else
+                            accepted[idx] = false
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    nothing
+end
+
+function threaded_track_hom2_hom3!(X, P1, accepted2, tracker2, tracker3, progress)
+
+    l_start = length(P1)
+
+    nthr = Threads.nthreads()
+    trackers2 = [deepcopy(tracker2) for _ = 1:nthr]
+    trackers3 = [deepcopy(tracker3) for _ = 1:nthr]
+
+    progress_lock = ReentrantLock()
+
+    next_idx = Threads.Atomic{Int}(1)
+    Threads.@sync begin
+        for tid = 1:nthr
+            let local_tracker2 = trackers2[tid], local_tracker3 = trackers3[tid]
+                Threads.@spawn begin
+                    while true
+
+                        idx = Threads.atomic_add!(next_idx, 1)
+                        if idx > l_start
+                            break
+                        end
+
+                        lock(progress_lock) do
+                            update_progress_paths!(progress, idx, l_start)
+                        end
+
+                        if accepted2[idx]
+                            code2 = track!(local_tracker2, P1[idx], 1)
+                            if is_accepted(local_tracker2, code2)
+                                p2 = solution(local_tracker2)
+                                code3 = track!(local_tracker3, p2, 1)
+                                if is_accepted(local_tracker3, code3)
+                                    q = solution(local_tracker3)
+                                    lock(progress_lock) do
+                                        push!(X, q)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    nothing
 end
 
 
@@ -1862,6 +2087,7 @@ function numerical_irreducible_decomposition(
     max_iters::Int = 50,
     sorted::Bool = true,
     max_codim::Union{Int,Nothing} = nothing,
+    max_trials_u_homotopy::Int = 5,
     warning::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
     seed = nothing,
@@ -1884,6 +2110,7 @@ function numerical_irreducible_decomposition(
         tracker_options = tracker_options,
         endgame_options = endgame_options,
         monodromy_options = monodromy_options_for_regeneration,
+        max_trials_u_homotopy = max_trials_u_homotopy,
         show_monodromy_progress = show_monodromy_for_regeneration_progress,
         threading = threading,
         seed = nothing,
@@ -2066,13 +2293,15 @@ mutable struct IntersectCache{Sys<:AbstractSystem}
     h::Expression
     u::Variable
 
+    max_trials_u_homotopy::Int
+
     endgame_options::EndgameOptions
     tracker_options::TrackerOptions
 
     progress::Union{IntersectProgress,Nothing}
 end
 
-function IntersectCache(u, f, F, h, EO, TO, progress)
+function IntersectCache(u, f, F, h, EO, TO, progress; max_trials_u_homotopy::Int = 5)
     m, N = size(F)
     A = zeros(ComplexF64, N - 1, N)
     b = zeros(ComplexF64, N - 1)
@@ -2080,7 +2309,7 @@ function IntersectCache(u, f, F, h, EO, TO, progress)
     y0 = zeros(ComplexF64, m)
     y = zeros(ComplexF64, m)
 
-    IntersectCache(A, b, x0, y0, y, f, F, h, u, EO, TO, progress)
+    IntersectCache(A, b, x0, y0, y, f, F, h, u, max_trials_u_homotopy, EO, TO, progress)
 end
 
 
@@ -2096,6 +2325,7 @@ This intersects the witness sets `W` and `H`, where `H` is a hypersurface define
 * `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
 * `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
 * `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
+* `max_trials_u_homotopy = 5`: maximal number of random subspaces tried until an intermediate u-regeneration intersection step succeeds.
 * `atol = 1e-14` and `rtol = sqrt(eps())`: a point `y` is considered equal to `x` when the distance between `x`and `y` is smaller than `max(atol, norm(x, Inf) * rtol).`
 * `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
 
@@ -2144,6 +2374,7 @@ function _intersect(
     monodromy_options::MonodromyOptions = MonodromyOptions(;
         parameter_sampler = weighted_normal,
     ),
+    max_trials_u_homotopy::Int = 5,
     show_monodromy_progress::Bool = false,
     threading = Threads.nthreads() > 1,
     kwargs...,
@@ -2173,7 +2404,16 @@ function _intersect(
     W₁, W₂, Hᵤ, f, F, h, vars_u = prepare_for_u_homotopy(H, W, vars, u)
 
     # cache
-    cache = IntersectCache(u, f, F, h, endgame_options, tracker_options, progress)
+    cache = IntersectCache(
+        u,
+        f,
+        F,
+        h,
+        endgame_options,
+        tracker_options,
+        progress;
+        max_trials_u_homotopy = max_trials_u_homotopy,
+    )
 
     # intersect
     intersect_with_hypersurface!(W₁, Hᵤ, W₂, cache; threading = threading, kwargs...)
