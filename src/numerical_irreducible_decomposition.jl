@@ -708,7 +708,7 @@ function regeneration_monodromy_options(M::MonodromyOptions, W)
         certification_max_precision = M.certification_max_precision,
         certification_refine_solution = M.certification_refine_solution,
         trace_test_tol = M.trace_test_tol,
-        target_solutions_count = Int(floor(1.5 * degree(W))), # in case a singular solution slips through
+        target_solutions_count = Int(floor(1.5 * degree(W))), # in case we miss solutions
         timeout = M.timeout,
         min_solutions = M.min_solutions,
         max_loops_no_progress = M.max_loops_no_progress,
