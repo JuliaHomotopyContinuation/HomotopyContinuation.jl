@@ -1400,9 +1400,9 @@ function decompose_with_monodromy!(
                                 matching_indices(
                                     non_complete_points,
                                     P_certified;
-                                    norm = options.distance,
-                                    atol = something(options.unique_points_atol, 1e-14),
-                                    rtol = something(options.unique_points_rtol, 1e-8),
+                                    norm = options_with_trace.distance,
+                                    atol = something(options_with_trace.unique_points_atol, 1e-14),
+                                    rtol = something(options_with_trace.unique_points_rtol, 1e-8),
                                 ),
                             )
 
