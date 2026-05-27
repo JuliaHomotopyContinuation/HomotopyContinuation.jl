@@ -836,13 +836,13 @@ function track_intersection!(X, P, roots, trackers, u_data, cache, progress, thr
         trial > 1 && reset_u_homotopy_trackers!(trackers, u_data, cache)
 
         fill!(accepted, false)
-        track_hom1!(accepted1, P1, P, roots, trackers[1], progress, threading)
+        track_hom1!(accepted, P1, P, roots, trackers[1], progress, threading)
         all(accepted) || continue
 
         # Hom1 only moves the slice. We still need to verify that its endpoints
         # are usable starts for Hom2; otherwise resample L1 and try again.
         fill!(accepted, false)
-        check_hom2_starts!(accepted2, P1, trackers[2], progress, threading)
+        check_hom2_starts!(accepted, P1, trackers[2], progress, threading)
         all(accepted) && break
     end
 
