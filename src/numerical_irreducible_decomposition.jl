@@ -1293,7 +1293,7 @@ The core function for decomposing a witness set into irreducible components.
 function decompose_with_monodromy!(
     W,
     show_monodromy_progress,
-    options,
+    _options,
     max_iters,
     warning,
     progress,
@@ -1312,13 +1312,13 @@ function decompose_with_monodromy!(
     if dim(L) < n
         update_progress!(progress; is_monodromy = true)
 
-        options_with_trace, options_without_trace = options
-        MS_with_trace = MonodromySolver(G, L; compile = false, options = options_with_trace)
+        options, options_without_trace = _options
+        MS = MonodromySolver(G, L; compile = false, options = options)
         MS_without_trace =
             MonodromySolver(G, L; compile = false, options = options_without_trace)
-        initial_points = check_start_solutions(MS_with_trace, P, L)
+        initial_points = check_start_solutions(MS, P, L)
         res = monodromy_solve(
-            MS_with_trace,
+            MS,
             solution.(initial_points),
             L,
             seed;
@@ -1329,7 +1329,7 @@ function decompose_with_monodromy!(
         update_progress!(progress; is_monodromy = false)
         update_progress_npts!(progress, nindexed_solutions(res))
 
-        if warning && (trace(res) > options_with_trace.trace_test_tol)
+        if warning && (trace(res) > options.trace_test_tol)
             @warn "Trying to decompose non-complete set of witness points for codimension $(dim(L)) (trace test failed). Will try to compute the missing points. The output will contain all components, for which the trace test was successfull."
         end
 
@@ -1378,7 +1378,7 @@ function decompose_with_monodromy!(
 
                 P_orbit = non_complete_points[collect(orbit)]
                 res_orbit = monodromy_solve(
-                    MS_with_trace,
+                    MS,
                     P_orbit,
                     L,
                     seed;
@@ -1388,7 +1388,7 @@ function decompose_with_monodromy!(
                 )
                 update_progress!(progress; is_monodromy = false)
 
-                if trace(res_orbit) < options_with_trace.trace_test_tol
+                if trace(res_orbit) < options.trace_test_tol
 
                     # We do not want to add orbits of length 1 in the beginning. Even if they are on an irreducible component of degree > 1, they tend to have small trace.
                     if length(orbit) > 1 || iter ≥ 5 || iter ≥ max_iters - 1
@@ -1400,9 +1400,9 @@ function decompose_with_monodromy!(
                                 matching_indices(
                                     non_complete_points,
                                     P_certified;
-                                    norm = options_with_trace.distance,
-                                    atol = something(options_with_trace.unique_points_atol, 1e-14),
-                                    rtol = something(options_with_trace.unique_points_rtol, 1e-8),
+                                    norm = options.distance,
+                                    atol = something(options.unique_points_atol, 1e-14),
+                                    rtol = something(options.unique_points_rtol, 1e-8),
                                 ),
                             )
 
