@@ -18,7 +18,7 @@
         # sorting
         W = regeneration(F; sorted = false, show_progress = false)
         @test degree.(W) == [2, 8, 8]
-        
+
         N = NumericalIrreducibleDecomposition(decompose(W))
         @test seed(N) == s
 
