@@ -657,9 +657,11 @@ function initialize_hypersurfaces(
         if isnothing(res)
             return nothing
         end
-        S =
-            projective && qᵢ == 1 ? map(x -> [x; 0], solutions(res, only_nonsingular = true)) :
-            solutions(res, only_nonsingular = true)
+        if projective && qᵢ == 1
+            S = map(x -> [x; 0], solutions(res, only_nonsingular = false))
+        else
+            S = solutions(res, only_nonsingular = false)
+        end
         out[i] = WitnessSet(h, L, S)
     end
     out
@@ -723,7 +725,7 @@ function fill_up!(out, monodromy_options, cache, show_monodromy_progress, thread
             if nsolutions(res) == 0
                 W.R = Vector{Vector{ComplexF64}}()
             else
-                W.R = unique_points(solutions(res))
+                W.R = solutions(res; only_nonsingular = false)
             end
             update_progress!(progress, W)
         end
