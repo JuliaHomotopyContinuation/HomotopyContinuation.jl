@@ -963,7 +963,7 @@ function set_up_u_homotopy(
 
     P, Q = get_num_den(h)
     d = degree(P)
-    if projective 
+    if projective
         h0 = u^d - ℓ^d
     else
         h0 = u^d - 1
@@ -977,8 +977,14 @@ function set_up_u_homotopy(
     L1 = rand_subspace(ambient_dim(L); dim = dim(L), affine = !projective)
     L2 = linear_subspace(X)
 
-    F = fixed(System([f; h0], variables = vars, variable_groups = variable_groups); compile = false)
-    G = fixed(System([f; h], variables = vars, variable_groups = variable_groups); compile = false)
+    F = fixed(
+        System([f; h0], variables = vars, variable_groups = variable_groups);
+        compile = false,
+    )
+    G = fixed(
+        System([f; h], variables = vars, variable_groups = variable_groups);
+        compile = false,
+    )
 
     Hom1 = linear_subspace_homotopy(F, L, L1; homogeneous = projective)
     Hom2 = StraightLineHomotopy(slice(F, L1), slice(G, L1); gamma = cis(2 * pi * rand()))
@@ -1330,8 +1336,7 @@ function decompose_with_monodromy!(
                     # We do not want to add orbits of length 1 in the beginning. Even if they are on an irreducible component of degree > 1, they tend to have small trace.
                     if length(orbit) > 1 || iter ≥ 5 || iter ≥ max_iters - 1
                         P_certified = indexed_solutions(res_orbit)
-                        W_new = WitnessSet(G, L, P_certified; 
-                                                is_irreducible = true)
+                        W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
                         if length(P_certified) == length(orbit)
                             complete_orbit = orbit
                         else
@@ -1345,7 +1350,7 @@ function decompose_with_monodromy!(
                                 ),
                             )
                         end
-                        
+
                         push!(decomposition, W_new)
                         push!(complete_orbits, complete_orbit)
                         d += length(P_certified) - length(complete_orbit)
@@ -2227,7 +2232,19 @@ mutable struct IntersectCache{Sys<:AbstractSystem}
     progress::Union{IntersectProgress,Nothing}
 end
 
-function IntersectCache(u, f, F, h, projective, variable_groups, ℓ, ℓ_coeffs, EO, TO, progress)
+function IntersectCache(
+    u,
+    f,
+    F,
+    h,
+    projective,
+    variable_groups,
+    ℓ,
+    ℓ_coeffs,
+    EO,
+    TO,
+    progress,
+)
     m, N = size(F)
     A = zeros(ComplexF64, N - 1, N)
     b = zeros(ComplexF64, N - 1)
@@ -2322,7 +2339,8 @@ function _intersect(
 )
     @assert size(system(H), 1) == 1 "The second argument must be defined by a single polynomial."
     @assert size(system(W), 2) == size(system(H), 2) "Witness sets must be in the same ambient space."
-    W.projective == H.projective || throw(ArgumentError("Witness sets must both be affine or projective."))
+    W.projective == H.projective ||
+        throw(ArgumentError("Witness sets must both be affine or projective."))
 
     # progress bar
     if show_progress
@@ -2348,14 +2366,8 @@ function _intersect(
     variable_groups = projective ? [vars_u] : nothing
     ℓ_coeffs = randn(ComplexF64, n)
     ℓ = sum(ℓ_coeffs .* vars)
-    W₁, W₂, Hᵤ, f, F, h = prepare_for_u_homotopy(
-        H,
-        W,
-        vars,
-        vars_u,
-        variable_groups,
-        projective,
-    )
+    W₁, W₂, Hᵤ, f, F, h =
+        prepare_for_u_homotopy(H, W, vars, vars_u, variable_groups, projective)
 
     # cache
     cache = IntersectCache(
@@ -2421,13 +2433,12 @@ function prepare_for_u_homotopy(H, W, vars, vars_u, variable_groups, projective)
     else
         W₂ = WitnessPoints(flagW[2][1], flagW[2][2], Vector{Vector{ComplexF64}}())
     end
-    Hᵤ =
-        WitnessSet(
-            fixed(FH; compile = false),
-            flagH[1][1],
-            map(x -> [x; cH], solutions(H));
-            projective = projective,
-        )
+    Hᵤ = WitnessSet(
+        fixed(FH; compile = false),
+        flagH[1][1],
+        map(x -> [x; cH], solutions(H));
+        projective = projective,
+    )
 
     W₁, W₂, Hᵤ, f, fixed(FW; compile = false), first(h)
 end

@@ -476,11 +476,7 @@ function rand_subspace(
     T = real ? Float64 : ComplexF64
     A = zeros(T, n - k, n)
     b = zeros(T, n - k)
-    rand_subspace!(
-        A,
-        b;
-        affine = affine,
-    )
+    rand_subspace!(A, b; affine = affine)
 end
 rand_subspace(x::AbstractVector{Variable}; kwargs...) = rand_subspace(length(x); kwargs...)
 function rand_subspace(
@@ -503,18 +499,9 @@ function rand_subspace(
     end
     A = zeros(eltype(x), n - k, n)
     b = zeros(eltype(x), n - k)
-    rand_subspace!(
-        A,
-        b,
-        x;
-        affine = affine,
-    )
+    rand_subspace!(A, b, x; affine = affine)
 end
-function rand_subspace!(
-    A::AbstractMatrix,
-    b::AbstractVector;
-    affine::Bool = true,
-)
+function rand_subspace!(A::AbstractMatrix, b::AbstractVector; affine::Bool = true)
     size(A, 1) == length(b) || throw(ArgumentError("Size of A and b not compatible."))
 
     Random.randn!(A)

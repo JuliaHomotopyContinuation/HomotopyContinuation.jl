@@ -116,7 +116,7 @@
     b = x[1]^3 + x[2]^3 + 2x[3]^3 + 3x[4]^3
     c = x[1]^4 + 2x[2]^4 + 4x[3]^4 - x[4]^4
     G = System([a * c; b * c]; variables = x)
-    
+
     @testset "membership projective" begin
         W = witness_set(G; codim = 2)
 
