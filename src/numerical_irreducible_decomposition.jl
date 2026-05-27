@@ -963,8 +963,14 @@ function set_up_u_homotopy(
 
     P, Q = get_num_den(h)
     d = degree(P)
-    h0 = projective ? (u^d - ℓ^d) / Q : (u^d - 1) / Q
-
+    if projective 
+        h0 = u^d - ℓ^d
+    else
+        h0 = u^d - 1
+    end
+    if degree(Q) > 0
+        h0 = h0 / Q
+    end
     # we start with the linear space L which does not use pose conditions on u, so that u^d=1
     # we end with the linear space L2 with u=c.
     L = linear_subspace_u(W)
@@ -1324,10 +1330,12 @@ function decompose_with_monodromy!(
                     # We do not want to add orbits of length 1 in the beginning. Even if they are on an irreducible component of degree > 1, they tend to have small trace.
                     if length(orbit) > 1 || iter ≥ 5 || iter ≥ max_iters - 1
                         P_certified = indexed_solutions(res_orbit)
-                        W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
-                        complete_orbit =
-                            length(P_certified) == length(orbit) ? orbit :
-                            Set(
+                        W_new = WitnessSet(G, L, P_certified; 
+                                                is_irreducible = true)
+                        if length(P_certified) == length(orbit)
+                            complete_orbit = orbit
+                        else
+                            complete_orbit = Set(
                                 matching_indices(
                                     non_complete_points,
                                     P_certified;
@@ -1336,7 +1344,8 @@ function decompose_with_monodromy!(
                                     rtol = something(options.unique_points_rtol, 1e-8),
                                 ),
                             )
-
+                        end
+                        
                         push!(decomposition, W_new)
                         push!(complete_orbits, complete_orbit)
                         d += length(P_certified) - length(complete_orbit)
