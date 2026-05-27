@@ -814,8 +814,7 @@ end
 
 const HOM2_START_CHECK_TARGET = 0.95
 
-is_accepted(T::EndgameTracker, code) =
-    is_success(code) && !T.state.singular && !T.state.at_infinity
+is_accepted(T::EndgameTracker, code) = is_success(code) && !T.state.singular
 
 function start_solution(P, roots, idx)
     l_P = length(P)
@@ -1326,10 +1325,13 @@ function decompose_with_monodromy!(
     if dim(L) < n
         update_progress!(progress; is_monodromy = true)
 
-        MS = MonodromySolver(G, L; compile = false, options = options)
-        initial_points = check_start_solutions(MS, P, L)
+        options_with_trace, options_without_trace = options
+        MS_with_trace = MonodromySolver(G, L; compile = false, options = options_with_trace)
+        MS_without_trace =
+            MonodromySolver(G, L; compile = false, options = options_without_trace)
+        initial_points = check_start_solutions(MS_with_trace, P, L)
         res = monodromy_solve(
-            MS,
+            MS_with_trace,
             solution.(initial_points),
             L,
             seed;
@@ -1340,7 +1342,7 @@ function decompose_with_monodromy!(
         update_progress!(progress; is_monodromy = false)
         update_progress_npts!(progress, nindexed_solutions(res))
 
-        if warning && (trace(res) > options.trace_test_tol)
+        if warning && (trace(res) > options_with_trace.trace_test_tol)
             @warn "Trying to decompose non-complete set of witness points for codimension $(dim(L)) (trace test failed). Will try to compute the missing points. The output will contain all components, for which the trace test was successfull."
         end
 
@@ -1356,20 +1358,18 @@ function decompose_with_monodromy!(
                 break
             end
 
-            if iter > 1
-                # for safety an additional monodromy when iter > 1
-                update_progress!(progress; is_monodromy = true)
-                res = monodromy_solve(
-                    MS,
-                    non_complete_points,
-                    L,
-                    seed;
-                    threading = threading,
-                    show_progress = show_monodromy_progress,
-                    progress = show_monodromy_progress ? nothing : progress,
-                )
-                update_progress!(progress; is_monodromy = false)
-            end
+
+            update_progress!(progress; is_monodromy = true)
+            res = monodromy_solve(
+                MS_without_trace, # without trace to populate the permutation matrix
+                non_complete_points,
+                L,
+                seed;
+                threading = threading,
+                show_progress = show_monodromy_progress,
+                progress = show_monodromy_progress ? nothing : progress,
+            )
+            update_progress!(progress; is_monodromy = false)
 
             updated_points = indexed_solutions(res)
             d += length(updated_points) - length(non_complete_points) # update total degree in case we found new points.
@@ -1377,7 +1377,6 @@ function decompose_with_monodromy!(
             ℓ = length(non_complete_points) # once for a later check
             k = length(non_complete_points) # and once for counting progress
             update_progress_npts!(progress, k)
-
 
             # Get orbits from monodromy result            
             orbits = get_orbits_from_monodromy_permutations(
@@ -1392,7 +1391,7 @@ function decompose_with_monodromy!(
 
                 P_orbit = non_complete_points[collect(orbit)]
                 res_orbit = monodromy_solve(
-                    MS,
+                    MS_with_trace,
                     P_orbit,
                     L,
                     seed;
@@ -1402,7 +1401,7 @@ function decompose_with_monodromy!(
                 )
                 update_progress!(progress; is_monodromy = false)
 
-                if trace(res_orbit) < options.trace_test_tol
+                if trace(res_orbit) < options_with_trace.trace_test_tol
 
                     # We do not want to add orbits of length 1 in the beginning. Even if they are on an irreducible component of degree > 1, they tend to have small trace.
                     if length(orbit) > 1 || iter ≥ 5 || iter ≥ max_iters - 1
@@ -1539,8 +1538,6 @@ function decompose_with_monodromy!(
     decomposition
 end
 
-
-
 # Helper function to merge two sets
 function merge_sets_find(parent, i)
     root = i
@@ -1660,7 +1657,10 @@ end
 
 function decompose_with_monodromy_options(M::MonodromyOptions)
 
-    MonodromyOptions(;
+    # we need two copies of the options. 
+    # one with trace test
+    # one without to run monodromy populating the permutation matrix
+    options_with_trace = MonodromyOptions(;
         permutations = true,
         trace_test = true,
         single_loop_per_start_solution = true,
@@ -1682,6 +1682,30 @@ function decompose_with_monodromy_options(M::MonodromyOptions)
         unique_points_atol = M.unique_points_atol,
         unique_points_rtol = M.unique_points_rtol,
     )
+    options_without_trace = MonodromyOptions(;
+        permutations = true,
+        trace_test = false,
+        single_loop_per_start_solution = true,
+        check_startsolutions = false,
+        group_actions = M.group_actions,
+        loop_finished_callback = M.loop_finished_callback,
+        parameter_sampler = M.parameter_sampler,
+        equivalence_classes = M.equivalence_classes,
+        duplicate_check = M.duplicate_check,
+        certification_max_precision = M.certification_max_precision,
+        certification_refine_solution = M.certification_refine_solution,
+        trace_test_tol = M.trace_test_tol,
+        target_solutions_count = M.target_solutions_count,
+        timeout = M.timeout,
+        min_solutions = M.min_solutions,
+        max_loops_no_progress = M.max_loops_no_progress,
+        reuse_loops = M.reuse_loops,
+        distance = M.distance,
+        unique_points_atol = M.unique_points_atol,
+        unique_points_rtol = M.unique_points_rtol,
+    )
+
+    options_with_trace, options_without_trace
 end
 
 
