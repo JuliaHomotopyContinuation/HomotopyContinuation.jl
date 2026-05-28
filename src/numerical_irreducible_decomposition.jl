@@ -49,7 +49,7 @@ Base.@kwdef mutable struct WitnessSetsProgress
     is_membership_test::Bool = false
     is_monodromy::Bool = false
     is_finished::Bool = false
-    path_label::String = "Computing start solutions" # this is the initial stage of the u-homotopy
+    path_label::String = "Track paths"
     current_path::Int = 0
     npaths::Int = 0
     current_task::Int = 0
@@ -138,6 +138,9 @@ end
 update_progress_hypersurface!(progress::Nothing, i::Int) = nothing
 function update_progress_hypersurface!(progress::WitnessSetsProgress, i::Int)
     progress.current_hypersurface = i
+    progress.current_path = 0
+    progress.npaths = 0
+    progress.path_label = "Track paths"
     PM.update!(
         progress.progress_meter,
         progress.current_hypersurface,
@@ -167,6 +170,13 @@ end
 update_progress_path_label!(progress::Nothing, label::String) = nothing
 function update_progress_path_label!(progress::WitnessSetsProgress, label::String)
     progress.path_label = label
+    nothing
+end
+start_progress_paths!(progress::Nothing, label::String, m::Int) = nothing
+function start_progress_paths!(progress::WitnessSetsProgress, label::String, m::Int)
+    progress.path_label = label
+    progress.current_path = 0
+    progress.npaths = m
     PM.update!(
         progress.progress_meter,
         progress.current_hypersurface,
@@ -206,7 +216,7 @@ function showvalues(progress::WitnessSetsProgress)
                     "$(progress.current_hypersurface) / $(progress.nhypersurfaces)",
                 ),
             )
-            if progress.is_solving
+            if progress.is_solving && progress.npaths > 0
                 push!(
                     text,
                     (progress.path_label, "$(progress.current_path) / $(progress.npaths)"),
@@ -850,7 +860,7 @@ function track_intersection!(X, P, roots, trackers, u_data, cache, progress, thr
         # is nothing left to resample, so we finish the sweep and keep the
         # starts that did pass the check.
         fail_fast = trial < ntrials
-        update_progress_path_label!(progress, "Computing start solutions")
+        start_progress_paths!(progress, "Computing start solutions", l_start)
         track_hom1_and_check_hom2_starts!(
             accepted,
             P1,
@@ -868,7 +878,7 @@ function track_intersection!(X, P, roots, trackers, u_data, cache, progress, thr
     # `accepted` guards against undefined or rejected P1 entries. This matters
     # both after failed trials and when the final trial only validates a subset
     # of the starts.
-    update_progress_path_label!(progress, "Track paths")
+    start_progress_paths!(progress, "Track paths", l_start)
     track_hom2_hom3!(X, P1, accepted, trackers[2], trackers[3], progress, threading)
 
     nothing
@@ -1082,12 +1092,7 @@ function threaded_track_hom1_and_check_hom2_starts!(
                         code1 = track!(local_tracker1, p, 1)
                         if is_accepted(local_tracker1, code1)
                             p1 = solution(local_tracker1)
-                            code2 = track!(
-                                local_tracker2,
-                                p1,
-                                1,
-                                HOM2_START_CHECK_TARGET,
-                            )
+                            code2 = track!(local_tracker2, p1, 1, HOM2_START_CHECK_TARGET)
                             if is_success(code2)
                                 accepted[idx] = true
                                 P1[idx] = p1
