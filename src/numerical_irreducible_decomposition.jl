@@ -859,7 +859,7 @@ end
 # Hom3 moves the linear space L1 to the linear space given by the initial witness sets. 
 # We first run Hom1. Then we check if the output of Hom1 works as input for Hom2. If this fails, resample L1. Only then track Hom2 and Hom3. 
 
-const HOM2_START_CHECK_TARGET = 0.95
+const HOM2_START_CHECK_TARGET = 0.99
 
 is_accepted(T::EndgameTracker, code) = is_success(code) && !T.state.singular
 
@@ -889,7 +889,7 @@ function track_intersection!(X, P, roots, trackers, u_data, cache, progress, thr
         # is nothing left to resample, so we finish the sweep and keep the
         # starts that did pass the check.
         fail_fast = trial < ntrials
-        start_progress_paths!(progress, "Computing start solutions", l_start)
+        start_progress_paths!(progress, "Compute start solutions", l_start)
         track_hom1_and_check_hom2_starts!(
             accepted,
             P1,
