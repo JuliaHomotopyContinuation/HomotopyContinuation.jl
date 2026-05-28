@@ -1369,7 +1369,7 @@ The core function for decomposing a witness set into irreducible components.
 function decompose_with_monodromy!(
     W,
     show_monodromy_progress,
-    _options,
+    options,
     max_iters,
     warning,
     progress,
