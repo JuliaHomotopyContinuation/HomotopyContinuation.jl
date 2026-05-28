@@ -808,7 +808,7 @@ end
 # Hom1 moves the linear equation u = c to a random linear space L1 involving (x,u), where x are the variables of F.
 # Hom2 moves u^d - 1 to the new polynomial fᵢ with deg(fᵢ) = d.
 # Hom3 moves the linear space L1 to the linear space given by the initial witness sets. 
-# We first run Hom1. Then we check if the output of Hom1 works as input for Hom2. If this fails, resampel L1. Only then track Hom2 and Hom3. 
+# We first run Hom1. Then we check if the output of Hom1 works as input for Hom2. If this fails, resample L1. Only then track Hom2 and Hom3. 
 
 const HOM2_START_CHECK_TARGET = 0.95
 
@@ -834,19 +834,29 @@ function track_intersection!(X, P, roots, trackers, u_data, cache, progress, thr
         trial > 1 && reset_u_homotopy_trackers!(trackers, u_data, cache)
 
         fill!(accepted, false)
-        track_hom1!(accepted, P1, P, roots, trackers[1], progress, threading)
-        if !all(accepted)
-            fill!(accepted, false)
-            continue
-        end
-
-        # Hom1 only moves the slice. We still need to verify that its endpoints
-        # are usable starts for Hom2; otherwise resample L1 and try again.
-        fill!(accepted, false)
-        check_hom2_starts!(accepted, P1, trackers[2], progress, threading)
+        # Hom1 and the cheap Hom2 start check are paired: as soon as an
+        # intermediate slice produces a start that Hom2 cannot consume, the
+        # slice is considered bad and we resample it. On the final trial there
+        # is nothing left to resample, so we finish the sweep and keep the
+        # starts that did pass the check.
+        fail_fast = trial < ntrials
+        track_hom1_and_check_hom2_starts!(
+            accepted,
+            P1,
+            P,
+            roots,
+            trackers[1],
+            trackers[2],
+            progress,
+            threading,
+            fail_fast,
+        )
         all(accepted) && break
     end
 
+    # `accepted` guards against undefined or rejected P1 entries. This matters
+    # both after failed trials and when the final trial only validates a subset
+    # of the starts.
     track_hom2_hom3!(X, P1, accepted, trackers[2], trackers[3], progress, threading)
 
     nothing
@@ -915,19 +925,39 @@ function set_up_u_homotopy(W, f, X, h, vars, u)
 end
 
 
-function track_hom1!(accepted, P1, P, roots, tracker, progress, threading)
+function track_hom1_and_check_hom2_starts!(
+    accepted,
+    P1,
+    P,
+    roots,
+    tracker1,
+    tracker2,
+    progress,
+    threading,
+    fail_fast,
+)
     if threading
-        threaded_track_hom1!(accepted, P1, P, roots, tracker, progress)
+        threaded_track_hom1_and_check_hom2_starts!(
+            accepted,
+            P1,
+            P,
+            roots,
+            tracker1,
+            tracker2,
+            progress,
+            fail_fast,
+        )
     else
-        serial_track_hom1!(accepted, P1, P, roots, tracker, progress)
-    end
-end
-
-function check_hom2_starts!(accepted, P1, tracker, progress, threading)
-    if threading
-        threaded_check_hom2_starts!(accepted, P1, tracker, progress)
-    else
-        serial_check_hom2_starts!(accepted, P1, tracker, progress)
+        serial_track_hom1_and_check_hom2_starts!(
+            accepted,
+            P1,
+            P,
+            roots,
+            tracker1,
+            tracker2,
+            progress,
+            fail_fast,
+        )
     end
 end
 
@@ -939,33 +969,39 @@ function track_hom2_hom3!(X, P1, accepted, tracker2, tracker3, progress, threadi
     end
 end
 
-function serial_track_hom1!(accepted, P1, P, roots, tracker, progress)
+function serial_track_hom1_and_check_hom2_starts!(
+    accepted,
+    P1,
+    P,
+    roots,
+    tracker1,
+    tracker2,
+    progress,
+    fail_fast,
+)
     l_start = length(P) * length(roots)
 
     for i = 1:l_start
         update_progress_paths!(progress, i, l_start)
 
         p = start_solution(P, roots, i)
-        code = track!(tracker, p, 1)
-        if is_accepted(tracker, code)
-            accepted[i] = true
-            P1[i] = solution(tracker)
-        else
+        code1 = track!(tracker1, p, 1)
+        if !is_accepted(tracker1, code1)
             accepted[i] = false
+            fail_fast && break
+            continue
         end
-    end
 
-    nothing
-end
+        p1 = solution(tracker1)
+        code2 = track!(tracker2.tracker, p1, 1, HOM2_START_CHECK_TARGET)
+        if !is_success(code2)
+            accepted[i] = false
+            fail_fast && break
+            continue
+        end
 
-function serial_check_hom2_starts!(accepted, P1, tracker, progress)
-    l_start = length(P1)
-
-    for i = 1:l_start
-        update_progress_paths!(progress, i, l_start)
-
-        code = track!(tracker.tracker, P1[i], 1, HOM2_START_CHECK_TARGET)
-        accepted[i] = is_success(code)
+        accepted[i] = true
+        P1[i] = p1
     end
 
     nothing
@@ -991,23 +1027,35 @@ function serial_track_hom2_hom3!(X, P1, accepted, tracker2, tracker3, progress)
     nothing
 end
 
-function threaded_track_hom1!(accepted, P1, P, roots, tracker, progress)
+function threaded_track_hom1_and_check_hom2_starts!(
+    accepted,
+    P1,
+    P,
+    roots,
+    tracker1,
+    tracker2,
+    progress,
+    fail_fast,
+)
 
     l_P = length(P)
     l_roots = length(roots)
     l_start = l_P * l_roots
 
     nthr = Threads.nthreads()
-    trackers = [deepcopy(tracker) for _ = 1:nthr]
+    trackers1 = [deepcopy(tracker1) for _ = 1:nthr]
+    trackers2 = [deepcopy(tracker2.tracker) for _ = 1:nthr]
 
     progress_lock = ReentrantLock()
 
     next_idx = Threads.Atomic{Int}(1)
+    failed = Threads.Atomic{Bool}(false)
     Threads.@sync begin
         for tid = 1:nthr
-            let local_tracker = trackers[tid]
+            let local_tracker1 = trackers1[tid], local_tracker2 = trackers2[tid]
                 Threads.@spawn begin
                     while true
+                        fail_fast && failed[] && break
 
                         idx = Threads.atomic_add!(next_idx, 1)
                         if idx > l_start
@@ -1019,49 +1067,26 @@ function threaded_track_hom1!(accepted, P1, P, roots, tracker, progress)
                         end
 
                         p = start_solution(P, roots, idx)
-                        code = track!(local_tracker, p, 1)
-                        if is_accepted(local_tracker, code)
-                            accepted[idx] = true
-                            P1[idx] = solution(local_tracker)
+                        code1 = track!(local_tracker1, p, 1)
+                        if is_accepted(local_tracker1, code1)
+                            p1 = solution(local_tracker1)
+                            code2 = track!(
+                                local_tracker2,
+                                p1,
+                                1,
+                                HOM2_START_CHECK_TARGET,
+                            )
+                            if is_success(code2)
+                                accepted[idx] = true
+                                P1[idx] = p1
+                            else
+                                accepted[idx] = false
+                                fail_fast && (failed[] = true)
+                            end
                         else
                             accepted[idx] = false
+                            fail_fast && (failed[] = true)
                         end
-                    end
-                end
-            end
-        end
-    end
-
-    nothing
-end
-
-function threaded_check_hom2_starts!(accepted, P1, tracker, progress)
-
-    l_start = length(P1)
-
-    nthr = Threads.nthreads()
-    trackers = [deepcopy(tracker.tracker) for _ = 1:nthr]
-
-    progress_lock = ReentrantLock()
-
-    next_idx = Threads.Atomic{Int}(1)
-    Threads.@sync begin
-        for tid = 1:nthr
-            let local_tracker = trackers[tid]
-                Threads.@spawn begin
-                    while true
-
-                        idx = Threads.atomic_add!(next_idx, 1)
-                        if idx > l_start
-                            break
-                        end
-
-                        lock(progress_lock) do
-                            update_progress_paths!(progress, idx, l_start)
-                        end
-
-                        code = track!(local_tracker, P1[idx], 1, HOM2_START_CHECK_TARGET)
-                        accepted[idx] = is_success(code)
                     end
                 end
             end
