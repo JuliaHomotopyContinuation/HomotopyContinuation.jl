@@ -654,7 +654,7 @@ function fill_up!(out, monodromy_options, cache, show_monodromy_progress, thread
                 Fᵢ,
                 W.R,
                 linear_subspace(W);
-                options = regeneration_monodromy_options(monodromy_options, W),
+                options = regeneration_monodromy_options(monodromy_options, W; atol = atol, rtol = rtol),
                 show_progress = show_monodromy_progress,
                 progress = show_monodromy_progress ? nothing : progress,
                 threading = threading,
@@ -676,7 +676,7 @@ function fill_up!(out, monodromy_options, cache, show_monodromy_progress, thread
     end
 end
 
-function regeneration_monodromy_options(M::MonodromyOptions, W)
+function regeneration_monodromy_options(M::MonodromyOptions, W; atol = 1e-14, rtol = sqrt(eps()))
 
     MonodromyOptions(;
         permutations = false,
@@ -697,8 +697,10 @@ function regeneration_monodromy_options(M::MonodromyOptions, W)
         max_loops_no_progress = M.max_loops_no_progress,
         reuse_loops = M.reuse_loops,
         distance = M.distance,
-        unique_points_atol = M.unique_points_atol,
-        unique_points_rtol = M.unique_points_rtol,
+        # Forward the practical tolerances so monodromy's internal add! uses them
+        # rather than the tight per-solution uniqueness_rtol(res) based on ω.
+        unique_points_atol = something(M.unique_points_atol, atol),
+        unique_points_rtol = something(M.unique_points_rtol, rtol),
     )
 end
 
@@ -1723,9 +1725,9 @@ function get_orbits_from_monodromy_permutations(
     orbits
 end
 
-function decompose_with_monodromy_options(M::MonodromyOptions)
+function decompose_with_monodromy_options(M::MonodromyOptions; atol = 1e-14, rtol = sqrt(eps()))
 
-    # we need two copies of the options. 
+    # we need two copies of the options.
     # one with trace test
     # one without to run monodromy populating the permutation matrix
     options_with_trace = MonodromyOptions(;
@@ -1747,8 +1749,8 @@ function decompose_with_monodromy_options(M::MonodromyOptions)
         max_loops_no_progress = M.max_loops_no_progress,
         reuse_loops = M.reuse_loops,
         distance = M.distance,
-        unique_points_atol = M.unique_points_atol,
-        unique_points_rtol = M.unique_points_rtol,
+        unique_points_atol = something(M.unique_points_atol, atol),
+        unique_points_rtol = something(M.unique_points_rtol, rtol),
     )
     options_without_trace = MonodromyOptions(;
         permutations = true,
@@ -1769,8 +1771,8 @@ function decompose_with_monodromy_options(M::MonodromyOptions)
         max_loops_no_progress = M.max_loops_no_progress,
         reuse_loops = M.reuse_loops,
         distance = M.distance,
-        unique_points_atol = M.unique_points_atol,
-        unique_points_rtol = M.unique_points_rtol,
+        unique_points_atol = something(M.unique_points_atol, atol),
+        unique_points_rtol = something(M.unique_points_rtol, rtol),
     )
 
     options_with_trace, options_without_trace
@@ -1830,6 +1832,8 @@ function decompose(
     warning::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
     seed = nothing,
+    atol = 1e-14,
+    rtol = sqrt(eps()),
 ) where {WP<:WitnessSet}
 
     if isnothing(seed)
@@ -1838,7 +1842,7 @@ function decompose(
     Random.seed!(seed)
 
     sort!(Ws; by = dim, rev = true)
-    options = decompose_with_monodromy_options(monodromy_options)
+    options = decompose_with_monodromy_options(monodromy_options; atol = atol, rtol = rtol)
     out = Vector{WitnessSet}()
 
     if isempty(Ws)
@@ -2216,6 +2220,8 @@ function numerical_irreducible_decomposition(
         threading = threading,
         warning = warning,
         seed = seed,
+        atol = atol,
+        rtol = rtol,
         kwargs...,
     )
 
