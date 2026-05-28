@@ -637,7 +637,15 @@ function intersect_all!(out, H, cache; kwargs...)
     end
 end
 
-function fill_up!(out, monodromy_options, cache, show_monodromy_progress, threading; atol = 1e-14, rtol = sqrt(eps()))
+function fill_up!(
+    out,
+    monodromy_options,
+    cache,
+    show_monodromy_progress,
+    threading;
+    atol = 1e-14,
+    rtol = sqrt(eps()),
+)
     progress = cache.progress
     Fᵢ = cache.Fᵢ
 
@@ -654,7 +662,12 @@ function fill_up!(out, monodromy_options, cache, show_monodromy_progress, thread
                 Fᵢ,
                 W.R,
                 linear_subspace(W);
-                options = regeneration_monodromy_options(monodromy_options, W; atol = atol, rtol = rtol),
+                options = regeneration_monodromy_options(
+                    monodromy_options,
+                    W;
+                    atol = atol,
+                    rtol = rtol,
+                ),
                 show_progress = show_monodromy_progress,
                 progress = show_monodromy_progress ? nothing : progress,
                 threading = threading,
@@ -669,14 +682,20 @@ function fill_up!(out, monodromy_options, cache, show_monodromy_progress, thread
                 # poor accuracy (~1e-10 error). If they evade monodromy's 
                 # internal deduplication tolerance, 
                 # remove near-duplicates here before continuing
-                W.R = length(sols) > 1 ? unique_points(sols; atol = atol, rtol = rtol) : sols
+                W.R =
+                    length(sols) > 1 ? unique_points(sols; atol = atol, rtol = rtol) : sols
             end
             update_progress!(progress, W)
         end
     end
 end
 
-function regeneration_monodromy_options(M::MonodromyOptions, W; atol = 1e-14, rtol = sqrt(eps()))
+function regeneration_monodromy_options(
+    M::MonodromyOptions,
+    W;
+    atol = 1e-14,
+    rtol = sqrt(eps()),
+)
 
     MonodromyOptions(;
         permutations = false,
@@ -1725,7 +1744,11 @@ function get_orbits_from_monodromy_permutations(
     orbits
 end
 
-function decompose_with_monodromy_options(M::MonodromyOptions; atol = 1e-14, rtol = sqrt(eps()))
+function decompose_with_monodromy_options(
+    M::MonodromyOptions;
+    atol = 1e-14,
+    rtol = sqrt(eps()),
+)
 
     # we need two copies of the options.
     # one with trace test
@@ -2518,9 +2541,26 @@ function _intersect(
     )
 
     # intersect
-    intersect_with_hypersurface!(W₁, Hᵤ, W₂, cache; threading = threading, atol = atol, rtol = rtol, kwargs...)
+    intersect_with_hypersurface!(
+        W₁,
+        Hᵤ,
+        W₂,
+        cache;
+        threading = threading,
+        atol = atol,
+        rtol = rtol,
+        kwargs...,
+    )
     update_Fᵢ!(cache, [f; h], vars_u)
-    fill_up!([W₁; W₂], monodromy_options, cache, show_monodromy_progress, threading; atol = atol, rtol = rtol)
+    fill_up!(
+        [W₁; W₂],
+        monodromy_options,
+        cache,
+        show_monodromy_progress,
+        threading;
+        atol = atol,
+        rtol = rtol,
+    )
 
     # return data 
     G = fixed(System([f; h], variables = vars); compile = false)
