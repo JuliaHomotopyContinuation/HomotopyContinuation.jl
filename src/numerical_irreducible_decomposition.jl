@@ -49,6 +49,7 @@ Base.@kwdef mutable struct WitnessSetsProgress
     is_membership_test::Bool = false
     is_monodromy::Bool = false
     is_finished::Bool = false
+    path_label::String = "Computing start solutions" # this is the initial stage of the u-homotopy
     current_path::Int = 0
     npaths::Int = 0
     current_task::Int = 0
@@ -163,6 +164,15 @@ function update_progress_paths!(progress::WitnessSetsProgress, i::Int, m::Int)
         showvalues = showvalues(progress),
     )
 end
+update_progress_path_label!(progress::Nothing, label::String) = nothing
+function update_progress_path_label!(progress::WitnessSetsProgress, label::String)
+    progress.path_label = label
+    PM.update!(
+        progress.progress_meter,
+        progress.current_hypersurface,
+        showvalues = showvalues(progress),
+    )
+end
 update_progress!(progress::Nothing, W::Union{WitnessPoints,WitnessSet}) = nothing
 function update_progress!(progress::WitnessSetsProgress, W::Union{WitnessPoints,WitnessSet})
     progress.degrees[codim(W)] = degree(W)
@@ -199,7 +209,7 @@ function showvalues(progress::WitnessSetsProgress)
             if progress.is_solving
                 push!(
                     text,
-                    ("Track paths", "$(progress.current_path) / $(progress.npaths)"),
+                    (progress.path_label, "$(progress.current_path) / $(progress.npaths)"),
                 )
             elseif progress.is_monodromy
                 push!(
@@ -840,6 +850,7 @@ function track_intersection!(X, P, roots, trackers, u_data, cache, progress, thr
         # is nothing left to resample, so we finish the sweep and keep the
         # starts that did pass the check.
         fail_fast = trial < ntrials
+        update_progress_path_label!(progress, "Computing start solutions")
         track_hom1_and_check_hom2_starts!(
             accepted,
             P1,
@@ -857,6 +868,7 @@ function track_intersection!(X, P, roots, trackers, u_data, cache, progress, thr
     # `accepted` guards against undefined or rejected P1 entries. This matters
     # both after failed trials and when the final trial only validates a subset
     # of the starts.
+    update_progress_path_label!(progress, "Track paths")
     track_hom2_hom3!(X, P1, accepted, trackers[2], trackers[3], progress, threading)
 
     nothing
