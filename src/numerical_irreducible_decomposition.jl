@@ -287,7 +287,20 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
     progress::Union{WitnessSetsProgress,Nothing}
 end
 
-function RegenerationCache(u, f, F, h, codim, projective, ℓ, ℓ_coeffs, max_trials_u_homotopy, EO, TO, progress)
+function RegenerationCache(
+    u,
+    f,
+    F,
+    h,
+    codim,
+    projective,
+    ℓ,
+    ℓ_coeffs,
+    max_trials_u_homotopy,
+    EO,
+    TO,
+    progress,
+)
     m, N = size(F)
     A = zeros(ComplexF64, N - 1, N)
     b = zeros(ComplexF64, N - 1)
@@ -808,7 +821,8 @@ function intersect_with_hypersurface!(
     # Step 2:
     # the points in P_next are used as starting points for a homotopy.
     # where u^d-1 (u is the extra variable in u-regeneration) is deformed into g 
-    u_data, d = set_up_u_homotopy(W, f, X, h, vars, u; projective = cache.projective, ℓ = cache.ℓ)
+    u_data, d =
+        set_up_u_homotopy(W, f, X, h, vars, u; projective = cache.projective, ℓ = cache.ℓ)
     trackers = initialize_u_homotopy_trackers(u_data, cache)
 
 
@@ -911,7 +925,8 @@ const HOM2_START_CHECK_TARGET = 0.95
 is_accepted(T::EndgameTracker, code) = is_success(code) && !T.state.singular
 
 function scaling(p, ℓ_coeffs)
-    isnothing(ℓ_coeffs) ? one(ComplexF64) : sum(ℓ_coeffs[j] * p[j] for j = 1:length(ℓ_coeffs))
+    isnothing(ℓ_coeffs) ? one(ComplexF64) :
+    sum(ℓ_coeffs[j] * p[j] for j = 1:length(ℓ_coeffs))
 end
 
 function start_solution(P, roots, idx, ℓ_coeffs = nothing)
@@ -1430,7 +1445,7 @@ The core function for decomposing a witness set into irreducible components.
 function decompose_with_monodromy!(
     W,
     show_monodromy_progress,
-    _options,
+    options,
     max_iters,
     warning,
     progress,
@@ -1449,10 +1464,7 @@ function decompose_with_monodromy!(
     if dim(L) < n
         update_progress!(progress; is_monodromy = true)
 
-        options, options_without_trace = _options
         MS = MonodromySolver(G, L; compile = false, options = options)
-        MS_without_trace =
-            MonodromySolver(G, L; compile = false, options = options_without_trace)
         initial_points = check_start_solutions(MS, P, L)
         res = monodromy_solve(
             MS,
@@ -1463,6 +1475,7 @@ function decompose_with_monodromy!(
             show_progress = show_monodromy_progress,
             progress = show_monodromy_progress ? nothing : progress,
         )
+
         update_progress!(progress; is_monodromy = false)
         update_progress_npts!(progress, nindexed_solutions(res))
 
@@ -1485,7 +1498,7 @@ function decompose_with_monodromy!(
 
             update_progress!(progress; is_monodromy = true)
             res = monodromy_solve(
-                MS_without_trace, # without trace to populate the permutation matrix
+                MS,
                 non_complete_points,
                 L,
                 seed;
@@ -1803,7 +1816,7 @@ function decompose_with_monodromy_options(
     # we need two copies of the options.
     # one with trace test
     # one without to run monodromy populating the permutation matrix
-    options_with_trace = MonodromyOptions(;
+    options = MonodromyOptions(;
         permutations = true,
         trace_test = true,
         single_loop_per_start_solution = true,
@@ -1825,30 +1838,8 @@ function decompose_with_monodromy_options(
         unique_points_atol = something(M.unique_points_atol, atol),
         unique_points_rtol = something(M.unique_points_rtol, rtol),
     )
-    options_without_trace = MonodromyOptions(;
-        permutations = true,
-        trace_test = false,
-        single_loop_per_start_solution = true,
-        check_startsolutions = false,
-        group_actions = M.group_actions,
-        loop_finished_callback = M.loop_finished_callback,
-        parameter_sampler = M.parameter_sampler,
-        equivalence_classes = M.equivalence_classes,
-        duplicate_check = M.duplicate_check,
-        certification_max_precision = M.certification_max_precision,
-        certification_refine_solution = M.certification_refine_solution,
-        trace_test_tol = M.trace_test_tol,
-        target_solutions_count = M.target_solutions_count,
-        timeout = M.timeout,
-        min_solutions = M.min_solutions,
-        max_loops_no_progress = M.max_loops_no_progress,
-        reuse_loops = M.reuse_loops,
-        distance = M.distance,
-        unique_points_atol = something(M.unique_points_atol, atol),
-        unique_points_rtol = something(M.unique_points_rtol, rtol),
-    )
 
-    options_with_trace, options_without_trace
+    options
 end
 
 
@@ -2479,7 +2470,19 @@ mutable struct IntersectCache{Sys<:AbstractSystem}
     progress::Union{IntersectProgress,Nothing}
 end
 
-function IntersectCache(u, f, F, h, projective, ℓ, ℓ_coeffs, max_trials_u_homotopy, EO, TO, progress)
+function IntersectCache(
+    u,
+    f,
+    F,
+    h,
+    projective,
+    ℓ,
+    ℓ_coeffs,
+    max_trials_u_homotopy,
+    EO,
+    TO,
+    progress,
+)
     m, N = size(F)
     A = zeros(ComplexF64, N - 1, N)
     b = zeros(ComplexF64, N - 1)
@@ -2487,7 +2490,24 @@ function IntersectCache(u, f, F, h, projective, ℓ, ℓ_coeffs, max_trials_u_ho
     y0 = zeros(ComplexF64, m)
     y = zeros(ComplexF64, m)
 
-    IntersectCache(A, b, x0, y0, y, f, F, h, u, projective, ℓ, ℓ_coeffs, max_trials_u_homotopy, EO, TO, progress)
+    IntersectCache(
+        A,
+        b,
+        x0,
+        y0,
+        y,
+        f,
+        F,
+        h,
+        u,
+        projective,
+        ℓ,
+        ℓ_coeffs,
+        max_trials_u_homotopy,
+        EO,
+        TO,
+        progress,
+    )
 end
 
 
