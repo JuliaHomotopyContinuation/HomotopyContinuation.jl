@@ -1449,14 +1449,13 @@ function decompose_with_monodromy!(
                     if length(orbit) > 1 || iter ≥ 10 || iter ≥ max_iters - 1
                         P_certified = indexed_solutions(res_orbit)
                         W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
-                        complete_orbit =
-                            # matching_indices is only needed when P_certified found more
-                            # witness points than orbit contained. When P_certified has
-                            # fewer points (inner monodromy deduplicated some starts), the
-                            # full orbit is still complete — collapsed elements were just
-                            # numerical duplicates on the same component.
-                            length(P_certified) > length(orbit) ?
-                            Set(
+                        # matching_indices is only needed when P_certified found more
+                        # witness points than orbit contained. When P_certified has
+                        # fewer points (inner monodromy deduplicated some starts), the
+                        # full orbit is still complete — collapsed elements were just
+                        # numerical duplicates on the same component.
+                        if length(P_certified) > length(orbit)
+                            complete_orbit = Set(
                                 matching_indices(
                                     non_complete_points,
                                     P_certified;
@@ -1464,8 +1463,10 @@ function decompose_with_monodromy!(
                                     atol = something(options.unique_points_atol, 1e-14),
                                     rtol = something(options.unique_points_rtol, 1e-8),
                                 ),
-                            ) :
-                            orbit
+                            )
+                        else
+                            complete_orbit = orbit
+                        end
 
                         push!(decomposition, W_new)
                         push!(complete_orbits, complete_orbit)
