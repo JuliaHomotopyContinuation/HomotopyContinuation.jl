@@ -665,10 +665,10 @@ function fill_up!(out, monodromy_options, cache, show_monodromy_progress, thread
                 W.R = Vector{Vector{ComplexF64}}()
             else
                 sols = solution.(results(res))
-                # Near-singular solutions tracked in monodromy loops can have poor
-                # accuracy (~1e-10 error), which is too large for monodromy's internal
-                # add! tolerance (1e-14 * norm). Deduplicate here with the wider
-                # regeneration tolerances to catch such near-duplicates.
+                # Near-singular solutions tracked in monodromy loops can have
+                # poor accuracy (~1e-10 error). If they evade monodromy's 
+                # internal deduplication tolerance, 
+                # remove near-duplicates here before continuing
                 W.R = length(sols) > 1 ? unique_points(sols; atol = atol, rtol = rtol) : sols
             end
             update_progress!(progress, W)
@@ -1455,6 +1455,18 @@ function decompose_with_monodromy!(
                     # We do not want to add orbits of length 1 in the beginning. Even if they are on an irreducible component of degree > 1, they tend to have small trace.
                     if length(orbit) > 1 || iter ≥ 10 || iter ≥ max_iters - 1
                         P_certified = indexed_solutions(res_orbit)
+                        # Near-singular solutions tracked in monodromy loops can have
+                        # poor accuracy (~1e-10 error). If they evade monodromy's 
+                        # internal deduplication tolerance, 
+                        # remove near-duplicates here before
+                        # computing the degree of the certified component.
+                        if length(P_certified) > 1
+                            P_certified = unique_points(
+                                P_certified;
+                                atol = something(options.unique_points_atol, 1e-14),
+                                rtol = something(options.unique_points_rtol, sqrt(eps())),
+                            )
+                        end
                         W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
                         # matching_indices is only needed when P_certified found more
                         # witness points than orbit contained. When P_certified has
