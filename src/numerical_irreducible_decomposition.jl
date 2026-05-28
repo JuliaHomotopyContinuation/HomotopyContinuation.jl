@@ -835,7 +835,10 @@ function track_intersection!(X, P, roots, trackers, u_data, cache, progress, thr
 
         fill!(accepted, false)
         track_hom1!(accepted, P1, P, roots, trackers[1], progress, threading)
-        all(accepted) || continue
+        if !all(accepted)
+            fill!(accepted, false)
+            continue
+        end
 
         # Hom1 only moves the slice. We still need to verify that its endpoints
         # are usable starts for Hom2; otherwise resample L1 and try again.
@@ -844,7 +847,7 @@ function track_intersection!(X, P, roots, trackers, u_data, cache, progress, thr
         all(accepted) && break
     end
 
-    track_hom2_hom3!(X, P1, trackers[2], trackers[3], progress, threading)
+    track_hom2_hom3!(X, P1, accepted, trackers[2], trackers[3], progress, threading)
 
     nothing
 end
@@ -928,11 +931,11 @@ function check_hom2_starts!(accepted, P1, tracker, progress, threading)
     end
 end
 
-function track_hom2_hom3!(X, P1, tracker2, tracker3, progress, threading)
+function track_hom2_hom3!(X, P1, accepted, tracker2, tracker3, progress, threading)
     if threading
-        threaded_track_hom2_hom3!(X, P1, tracker2, tracker3, progress)
+        threaded_track_hom2_hom3!(X, P1, accepted, tracker2, tracker3, progress)
     else
-        serial_track_hom2_hom3!(X, P1, tracker2, tracker3, progress)
+        serial_track_hom2_hom3!(X, P1, accepted, tracker2, tracker3, progress)
     end
 end
 
@@ -968,11 +971,12 @@ function serial_check_hom2_starts!(accepted, P1, tracker, progress)
     nothing
 end
 
-function serial_track_hom2_hom3!(X, P1, tracker2, tracker3, progress)
+function serial_track_hom2_hom3!(X, P1, accepted, tracker2, tracker3, progress)
     l_start = length(P1)
 
     for i = 1:l_start
         update_progress_paths!(progress, i, l_start)
+        accepted[i] || continue
 
         code2 = track!(tracker2, P1[i], 1)
         if is_accepted(tracker2, code2)
@@ -1067,7 +1071,7 @@ function threaded_check_hom2_starts!(accepted, P1, tracker, progress)
     nothing
 end
 
-function threaded_track_hom2_hom3!(X, P1, tracker2, tracker3, progress)
+function threaded_track_hom2_hom3!(X, P1, accepted, tracker2, tracker3, progress)
 
     l_start = length(P1)
 
@@ -1092,6 +1096,7 @@ function threaded_track_hom2_hom3!(X, P1, tracker2, tracker3, progress)
                         lock(progress_lock) do
                             update_progress_paths!(progress, idx, l_start)
                         end
+                        accepted[idx] || continue
 
                         code2 = track!(local_tracker2, P1[idx], 1)
                         if is_accepted(local_tracker2, code2)
