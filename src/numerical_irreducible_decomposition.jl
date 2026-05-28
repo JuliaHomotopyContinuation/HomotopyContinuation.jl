@@ -1477,7 +1477,7 @@ function decompose_with_monodromy!(
                     if length(orbit) > 1 || iter ≥ 10 || iter ≥ max_iters - 1
                         P_certified = indexed_solutions(res_orbit)
                         W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
-                        
+
                         # matching_indices is only needed when P_certified found more
                         # witness points than orbit contained. When P_certified has
                         # fewer points (inner monodromy deduplicated some starts), the
