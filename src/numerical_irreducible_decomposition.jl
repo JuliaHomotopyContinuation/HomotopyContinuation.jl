@@ -2227,6 +2227,7 @@ Base.@kwdef mutable struct IntersectProgress
     is_membership_test::Bool = false
     is_monodromy::Bool = false
     is_finished::Bool = false
+    path_label::String = "Track paths"
     current_task::Int = 0
     ntasks::Int = 0
     current_path::Int = 0
@@ -2294,6 +2295,12 @@ function update_progress_paths!(progress::IntersectProgress, i::Int, m::Int)
     progress.npaths = m
     PM.update!(progress.progress_meter, showvalues = showvalues(progress))
 end
+function start_progress_paths!(progress::IntersectProgress, label::String, m::Int)
+    progress.path_label = label
+    progress.current_path = 0
+    progress.npaths = m
+    PM.update!(progress.progress_meter, showvalues = showvalues(progress))
+end
 function finish_progress!(progress::IntersectProgress)
     progress.is_solving = false
     progress.is_membership_test = false
@@ -2305,8 +2312,11 @@ function showvalues(progress::IntersectProgress)
 
     if !progress.is_finished
         text = [("Status", "")]
-        if progress.is_solving
-            push!(text, ("Track paths", "$(progress.current_task)/$(progress.ntasks)"))
+        if progress.is_solving && progress.npaths > 0
+            push!(
+                text,
+                (progress.path_label, "$(progress.current_path) / $(progress.npaths)"),
+            )
         elseif progress.is_monodromy
             push!(
                 text,
