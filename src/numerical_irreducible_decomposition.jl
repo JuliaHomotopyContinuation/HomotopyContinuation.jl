@@ -1476,19 +1476,8 @@ function decompose_with_monodromy!(
                     # We do not want to add orbits of length 1 in the beginning. Even if they are on an irreducible component of degree > 1, they tend to have small trace.
                     if length(orbit) > 1 || iter ≥ 10 || iter ≥ max_iters - 1
                         P_certified = indexed_solutions(res_orbit)
-                        # Near-singular solutions tracked in monodromy loops can have
-                        # poor accuracy (~1e-10 error). If they evade monodromy's 
-                        # internal deduplication tolerance, 
-                        # remove near-duplicates here before
-                        # computing the degree of the certified component.
-                        if length(P_certified) > 1
-                            P_certified = unique_points(
-                                P_certified;
-                                atol = something(options.unique_points_atol, 1e-14),
-                                rtol = something(options.unique_points_rtol, sqrt(eps())),
-                            )
-                        end
                         W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
+                        
                         # matching_indices is only needed when P_certified found more
                         # witness points than orbit contained. When P_certified has
                         # fewer points (inner monodromy deduplicated some starts), the
