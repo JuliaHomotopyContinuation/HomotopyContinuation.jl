@@ -1388,10 +1388,7 @@ function decompose_with_monodromy!(
     if dim(L) < n
         update_progress!(progress; is_monodromy = true)
 
-        options, options_without_trace = _options
         MS = MonodromySolver(G, L; compile = false, options = options)
-        MS_without_trace =
-            MonodromySolver(G, L; compile = false, options = options_without_trace)
         initial_points = check_start_solutions(MS, P, L)
         res = monodromy_solve(
             MS,
@@ -1424,7 +1421,7 @@ function decompose_with_monodromy!(
 
             update_progress!(progress; is_monodromy = true)
             res = monodromy_solve(
-                MS_without_trace, # without trace to populate the permutation matrix
+                MS,
                 non_complete_points,
                 L,
                 seed;
@@ -1742,7 +1739,7 @@ function decompose_with_monodromy_options(
     # we need two copies of the options.
     # one with trace test
     # one without to run monodromy populating the permutation matrix
-    options_with_trace = MonodromyOptions(;
+    options = MonodromyOptions(;
         permutations = true,
         trace_test = true,
         single_loop_per_start_solution = true,
@@ -1764,30 +1761,8 @@ function decompose_with_monodromy_options(
         unique_points_atol = something(M.unique_points_atol, atol),
         unique_points_rtol = something(M.unique_points_rtol, rtol),
     )
-    options_without_trace = MonodromyOptions(;
-        permutations = true,
-        trace_test = false,
-        single_loop_per_start_solution = true,
-        check_startsolutions = false,
-        group_actions = M.group_actions,
-        loop_finished_callback = M.loop_finished_callback,
-        parameter_sampler = M.parameter_sampler,
-        equivalence_classes = M.equivalence_classes,
-        duplicate_check = M.duplicate_check,
-        certification_max_precision = M.certification_max_precision,
-        certification_refine_solution = M.certification_refine_solution,
-        trace_test_tol = M.trace_test_tol,
-        target_solutions_count = M.target_solutions_count,
-        timeout = M.timeout,
-        min_solutions = M.min_solutions,
-        max_loops_no_progress = M.max_loops_no_progress,
-        reuse_loops = M.reuse_loops,
-        distance = M.distance,
-        unique_points_atol = something(M.unique_points_atol, atol),
-        unique_points_rtol = something(M.unique_points_rtol, rtol),
-    )
 
-    options_with_trace, options_without_trace
+    options
 end
 
 
