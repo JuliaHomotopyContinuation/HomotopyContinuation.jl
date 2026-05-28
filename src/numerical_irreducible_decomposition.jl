@@ -493,7 +493,9 @@ function _regeneration(
                         monodromy_options,
                         cache,
                         show_monodromy_progress,
-                        threading,
+                        threading;
+                        atol = atol,
+                        rtol = rtol,
                     )
 
                     update_progress!(progress)
@@ -635,7 +637,7 @@ function intersect_all!(out, H, cache; kwargs...)
     end
 end
 
-function fill_up!(out, monodromy_options, cache, show_monodromy_progress, threading)
+function fill_up!(out, monodromy_options, cache, show_monodromy_progress, threading; atol = 1e-14, rtol = sqrt(eps()))
     progress = cache.progress
     Fᵢ = cache.Fᵢ
 
@@ -662,7 +664,12 @@ function fill_up!(out, monodromy_options, cache, show_monodromy_progress, thread
             if nsolutions(res) == 0
                 W.R = Vector{Vector{ComplexF64}}()
             else
-                W.R = solution.(results(res))
+                sols = solution.(results(res))
+                # Near-singular solutions tracked in monodromy loops can have poor
+                # accuracy (~1e-10 error), which is too large for monodromy's internal
+                # add! tolerance (1e-14 * norm). Deduplicate here with the wider
+                # regeneration tolerances to catch such near-duplicates.
+                W.R = length(sols) > 1 ? unique_points(sols; atol = atol, rtol = rtol) : sols
             end
             update_progress!(progress, W)
         end
