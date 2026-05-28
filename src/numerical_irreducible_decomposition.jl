@@ -752,6 +752,7 @@ function intersect_with_hypersurface!(
     else
         serial_intersection!(X, P_next, roots, trackers, u_data, cache, progress)
     end
+
     nothing
 end
 
@@ -1405,6 +1406,7 @@ function decompose_with_monodromy!(
             )
             update_progress!(progress; is_monodromy = false)
 
+            prev_count = length(non_complete_points)
             updated_points = indexed_solutions(res)
             d += length(updated_points) - length(non_complete_points) # update total degree in case we found new points.
             non_complete_points = updated_points
@@ -1412,7 +1414,13 @@ function decompose_with_monodromy!(
             k = length(non_complete_points) # and once for counting progress
             update_progress_npts!(progress, k)
 
-            # Get orbits from monodromy result            
+            # If monodromy deduplicated starting solutions, the cached orbit indices are
+            # stale (they reference the old count). Reset to avoid a BoundsError.
+            if length(non_complete_points) < prev_count
+                non_complete_orbits = Vector{Set{Int}}()
+            end
+
+            # Get orbits from monodromy result
             orbits = get_orbits_from_monodromy_permutations(
                 res;
                 initial_orbits = non_complete_orbits,
@@ -1442,7 +1450,12 @@ function decompose_with_monodromy!(
                         P_certified = indexed_solutions(res_orbit)
                         W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
                         complete_orbit =
-                            length(P_certified) == length(orbit) ? orbit :
+                            # matching_indices is only needed when P_certified found more
+                            # witness points than orbit contained. When P_certified has
+                            # fewer points (inner monodromy deduplicated some starts), the
+                            # full orbit is still complete — collapsed elements were just
+                            # numerical duplicates on the same component.
+                            length(P_certified) > length(orbit) ?
                             Set(
                                 matching_indices(
                                     non_complete_points,
@@ -1451,7 +1464,8 @@ function decompose_with_monodromy!(
                                     atol = something(options.unique_points_atol, 1e-14),
                                     rtol = something(options.unique_points_rtol, 1e-8),
                                 ),
-                            )
+                            ) :
+                            orbit
 
                         push!(decomposition, W_new)
                         push!(complete_orbits, complete_orbit)
