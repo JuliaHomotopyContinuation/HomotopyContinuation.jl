@@ -2477,6 +2477,8 @@ function _intersect(
     max_trials_u_homotopy::Int = 5,
     show_monodromy_progress::Bool = false,
     threading = Threads.nthreads() > 1,
+    atol = 1e-14,
+    rtol = sqrt(eps()),
     kwargs...,
 )
     @assert size(system(H), 1) == 1 "The second argument must be defined by a single polynomial."
@@ -2516,9 +2518,9 @@ function _intersect(
     )
 
     # intersect
-    intersect_with_hypersurface!(W₁, Hᵤ, W₂, cache; threading = threading, kwargs...)
+    intersect_with_hypersurface!(W₁, Hᵤ, W₂, cache; threading = threading, atol = atol, rtol = rtol, kwargs...)
     update_Fᵢ!(cache, [f; h], vars_u)
-    fill_up!([W₁; W₂], monodromy_options, cache, show_monodromy_progress, threading)
+    fill_up!([W₁; W₂], monodromy_options, cache, show_monodromy_progress, threading; atol = atol, rtol = rtol)
 
     # return data 
     G = fixed(System([f; h], variables = vars); compile = false)
