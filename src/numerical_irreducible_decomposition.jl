@@ -1457,6 +1457,9 @@ function decompose_with_monodromy!(
             # Only check when new points were found and certified_up is non-empty.
             phantom_indices = Set{Int}()
             if length(updated_points) > prev_count && !isempty(certified_up)
+                # reset degree1 check if we found new points 
+                allow_degree1_iter = 0
+                # now compute phantom points
                 for (i, p) in pairs(updated_points)
                     if !isnothing(search_in_radius(certified_up, p, atol))
                         push!(phantom_indices, i)
@@ -1491,6 +1494,8 @@ function decompose_with_monodromy!(
             complete_orbits = Vector{Set{Int}}()
 
             for orbit in orbits
+                success = true # this checks if this run was successful
+
                 update_progress!(progress; is_monodromy = true)
 
                 # Strip phantom indices from the orbit before running inner monodromy.
@@ -1544,32 +1549,28 @@ function decompose_with_monodromy!(
                             )
                             # Only check certified_up when matching_indices left points unaccounted for.
                             # Unmatched points are either genuine new discoveries or path-jumping phantoms.
-                            diff = length(P_certified) - length(matched)
-                            if diff > 0 && any(
-                                p -> !isnothing(search_in_radius(certified_up, p, atol)),
-                                P_certified,
-                            )
-                                continue
-                            end
-                            complete_orbit = matched
-                            if diff == 1
-                                allow_degree1_iter = 0
+                            if length(matched) < length(P_certified)
+                                success = false
+                            else
+                                complete_orbit = matched
                             end
                         else
                             complete_orbit = clean_orbit
                         end
 
                         # postprocessing
-                        push!(complete_orbits, complete_orbit)
-                        k -= length(complete_orbit)
-                        update_progress_npts!(progress, k)
+                        if success
+                            push!(complete_orbits, complete_orbit)
+                            k -= length(complete_orbit)
+                            update_progress_npts!(progress, k)
 
-                        push!(decomposition, W_new)
-                        for p in solutions(W_new)
-                            add!(certified_up, p, 1, atol)
+                            push!(decomposition, W_new)
+                            for p in solutions(W_new)
+                                add!(certified_up, p, 1, atol)
+                            end
+                            d += length(P_certified) - length(complete_orbit)
+                            update_progress!(progress, W_new)
                         end
-                        d += length(P_certified) - length(complete_orbit)
-                        update_progress!(progress, W_new)
                     end
                 end
             end
