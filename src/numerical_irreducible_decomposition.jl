@@ -1407,6 +1407,7 @@ function decompose_with_monodromy!(
         end
 
         iter = 0
+        allow_degree1_iter = 0
         non_complete_points = indexed_solutions(res)
         d = length(non_complete_points) # the total degree (i.e., number of points on all irreducible components)
         non_complete_orbits = Vector{Set{Int}}()
@@ -1414,6 +1415,7 @@ function decompose_with_monodromy!(
 
         while !isempty(non_complete_points)
             iter += 1
+            allow_degree1_iter += 1
             if iter > max_iters
                 break
             end
@@ -1470,8 +1472,10 @@ function decompose_with_monodromy!(
 
                 if trace(res_orbit) < options.trace_test_tol
 
-                    # We do not want to add orbits of length 1 in the beginning. Even if they are on an irreducible component of degree > 1, they tend to have small trace.
-                    if length(orbit) > 1 || iter ≥ 10 || iter ≥ max_iters - 1
+                    # We do not want to add orbits of degree 1 as long as allow_degree1_iter < 10. 
+                    # Single orobits tend to have small trace, even if their points are on a irreducible component of degree > 1.
+                    # allow_degree1_iter is reset once we we find new points 
+                    if length(orbit) > 1 || allow_degree1_iter ≥ 10 || iter ≥ max_iters - 1
                         P_certified = indexed_solutions(res_orbit)
                         W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
 
@@ -1485,11 +1489,11 @@ function decompose_with_monodromy!(
                                 matching_indices(
                                     non_complete_points,
                                     P_certified;
-                                    norm = options.distance,
                                     atol = something(options.unique_points_atol, 1e-14),
                                     rtol = something(options.unique_points_rtol, 1e-8),
                                 ),
                             )
+                            allow_degree1_iter = 0
                         else
                             complete_orbit = orbit
                         end
@@ -1671,14 +1675,14 @@ function merge_sets(sets)
 end
 
 # find indices of newly detected points
-function matching_indices(points, certified_points; norm, atol, rtol)
+function matching_indices(points, certified_points; atol, rtol)
     indices = Int[]
     matched = falses(length(certified_points))
     for (i, p) in pairs(points)
-        tol = max(atol, rtol * distance(p, zero(p), norm))
+        rad = max(atol, norm(p, Inf) * rtol)
         for (j, q) in pairs(certified_points)
             matched[j] && continue
-            if distance(p, q, norm) ≤ tol
+            if distance(p, q, InfNorm()) ≤ rad
                 push!(indices, i)
                 matched[j] = true
                 break
