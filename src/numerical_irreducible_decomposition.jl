@@ -1378,10 +1378,27 @@ function decompose_with_monodromy!(
 )
     update_progress_dim!(progress, dim(W))
 
-    P = unique_points(points(W))
+    P₀ = points(W)
     L = linear_subspace(W)
     G = system(W)
     n = ambient_dim(L)
+
+    # tolerances for comparing points
+    atol = something(options.unique_points_atol, 1e-14)
+    rtol = something(options.unique_points_rtol, 1e-8)
+
+    # first check that all points in P are unique
+    id = 1
+    certified_up =
+        UniquePoints(first(P₀), 1; distance = InfNorm())
+    P = Vector{eltype(P₀)}()
+    for (i, pᵢ) in enumerate(P₀)
+        _, new_point = add!(certified_up, pᵢ, i; atol = atol, rtol = rtol)
+        if new_point
+            push!(P, pᵢ)
+        end
+    end
+    empty!(certified_up) # we reuse this later
 
     decomposition = Vector{WitnessSet}()
 
@@ -1436,6 +1453,18 @@ function decompose_with_monodromy!(
             updated_points = indexed_solutions(res)
             d += length(updated_points) - length(non_complete_points) # update total degree in case we found new points.
             non_complete_points = updated_points
+
+            # Identify phantom points: new points that jumped into an already-certified component.
+            # Only check when new points were found and certified_up is non-empty.
+            phantom_indices = Set{Int}()
+            if length(updated_points) > prev_count && !isempty(certified_up)
+                for (i, p) in pairs(updated_points)
+                    if !isnothing(search_in_radius(certified_up, p, atol))
+                        push!(phantom_indices, i)
+                    end
+                end
+                d -= length(phantom_indices)
+            end
             ℓ = length(non_complete_points) # once for a later check
             k = length(non_complete_points) # and once for counting progress
             update_progress_npts!(progress, k)
@@ -1465,7 +1494,18 @@ function decompose_with_monodromy!(
             for orbit in orbits
                 update_progress!(progress; is_monodromy = true)
 
-                P_orbit = non_complete_points[collect(orbit)]
+                # Strip phantom indices from the orbit before running inner monodromy.
+                clean_orbit =
+                    isempty(phantom_indices) ? orbit : setdiff(orbit, phantom_indices)
+                if isempty(clean_orbit)
+                    push!(complete_orbits, orbit)
+                    k -= length(orbit)
+                    update_progress_npts!(progress, k)
+                    update_progress!(progress; is_monodromy = false)
+                    continue
+                end
+
+                P_orbit = non_complete_points[sort!(collect(clean_orbit))]
                 res_orbit = monodromy_solve(
                     MS,
                     P_orbit,
@@ -1477,63 +1517,58 @@ function decompose_with_monodromy!(
                 )
                 update_progress!(progress; is_monodromy = false)
 
+                # only continue when trace test succeeds
                 if trace(res_orbit) < options.trace_test_tol
 
-                    # We do not want to add orbits of degree 1 as long as allow_degree1_iter < 10. 
-                    # Single orobits tend to have small trace, even if their points are on a irreducible component of degree > 1.
-                    # allow_degree1_iter is reset once we we find new points 
-                    if length(orbit) > 1 || allow_degree1_iter ≥ 5 || iter ≥ max_iters - 1
+                    # We do not want to add orbits of degree 1 as long as allow_degree1_iter < 5.
+                    # Single orbits tend to have small trace, even if their points are on an irreducible component of degree > 1.
+                    # allow_degree1_iter is reset once we find new points.
+                    if length(clean_orbit) > 1 ||
+                       allow_degree1_iter ≥ 5 ||
+                       iter ≥ max_iters - 1
                         P_certified = indexed_solutions(res_orbit)
+
+                        # Check whether inner monodromy jumped into an already-certified component.
+                        # If so, the trace test result is unreliable — skip this orbit.
+                        if any(
+                            p -> !isnothing(search_in_radius(certified_up, p, atol)),
+                            P_certified,
+                        )
+                            continue
+                        end
+
                         W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
 
-                        # when P_certified found more witness points than orbit contained,
-                        # there can be two reasons
-                        # (1) path jumping
-                        # (2) we found genuine new points 
-                        # we first check path jumping using has_point_in_decomposition
-                        # if this returns false, run matching_indices to find the correct indices
-                        # of the points in P_certified
-                        # if P_certified has fewer points (inner monodromy deduplicated some starts), the full orbit is still complete — collapsed elements were just
-                        # numerical duplicates on the same component.
-                        if length(P_certified) > length(orbit)
-                            # check if the extra points in P_certified came from path 
-                            # jumping by comparing them to the points in the completed decompositions
-                            has_duplicate = has_point_in_decomposition(
-                                P_certified,
-                                decomposition;
-                                atol = something(options.unique_points_atol, 1e-14),
-                                rtol = something(options.unique_points_rtol, 1e-8),
-                            )
-
-                            if !has_duplicate
-                                # if we have genuine new points find their indices
-                                complete_orbit = Set(
+                        if length(P_certified) > length(clean_orbit)
+                            # Genuine new points found — compute their indices in non_complete_points,
+                            # excluding any phantom indices that might have matched numerically.
+                            complete_orbit = setdiff(
+                                Set(
                                     matching_indices(
                                         non_complete_points,
                                         P_certified;
-                                        atol = something(options.unique_points_atol, 1e-14),
-                                        rtol = something(options.unique_points_rtol, 1e-8),
+                                        atol = atol,
+                                        rtol = rtol,
                                     ),
-                                )
-                                # if we have genuine new points restart the degree 1 check 
-                                allow_degree1_iter = 0
-                            end
+                                ),
+                                phantom_indices,
+                            )
+                            allow_degree1_iter = 0
                         else
-                            has_duplicate = false
-                            complete_orbit = orbit
+                            complete_orbit = clean_orbit
                         end
 
+                        # postprocessing
                         push!(complete_orbits, complete_orbit)
-                        k = k - length(complete_orbit)
+                        k -= length(complete_orbit)
                         update_progress_npts!(progress, k)
 
-                        # put a new witness set into decomposition
-                        # only if has_duplicate == false
-                        if !has_duplicate
-                            push!(decomposition, W_new)
-                            d += length(P_certified) - length(complete_orbit)
-                            update_progress!(progress, W_new)
+                        push!(decomposition, W_new)
+                        for p in solutions(W_new)
+                            add!(certified_up, p, 1, atol)
                         end
+                        d += length(P_certified) - length(complete_orbit)
+                        update_progress!(progress, W_new)
                     end
                 end
             end
@@ -1564,7 +1599,9 @@ function decompose_with_monodromy!(
             for orbit in complete_orbits
                 append!(complete_orbit_indices, orbit)
             end
+            append!(complete_orbit_indices, phantom_indices)
             sort!(complete_orbit_indices)
+            unique!(complete_orbit_indices)
 
             deleteat!(non_complete_points, complete_orbit_indices)
 
@@ -1587,15 +1624,18 @@ function decompose_with_monodromy!(
                 i += 1
             end
 
-            shift_orbit(orbit) = Set(orbit_indices_mapping[i] for i in orbit)
+            # Skip phantom indices when shifting — they have been removed from non_complete_points.
+            shift_orbit(orbit) =
+                Set(orbit_indices_mapping[i] for i in orbit if i ∉ phantom_indices)
             # 1. shift existing non complete orbits to new mapping
             non_complete_orbits =
                 shift_orbit.(
                     merge_sets(
                         [
-                            # Remove all orbits that are contained in a complete orbit
+                            # Remove all orbits that overlap with a complete orbit or phantom indices
                             filter(non_complete_orbits) do o
-                                all(co -> isdisjoint(co, o), complete_orbits)
+                                all(co -> isdisjoint(co, o), complete_orbits) &&
+                                    isdisjoint(o, phantom_indices)
                             end
                             setdiff(orbits, complete_orbits)
                         ],
@@ -1704,15 +1744,6 @@ function merge_sets(sets)
 end
 
 # check if we have found points that are already classifiedxw
-function has_point_in_decomposition(P, decomposition; atol, rtol)
-    any(P) do p
-        rad = max(atol, norm(p, Inf) * rtol)
-        any(decomposition) do W
-            any(q -> distance(p, q, InfNorm()) ≤ rad, points(W))
-        end
-    end
-end
-
 # find indices of newly detected points
 function matching_indices(points, certified_points; atol, rtol)
     indices = Int[]
