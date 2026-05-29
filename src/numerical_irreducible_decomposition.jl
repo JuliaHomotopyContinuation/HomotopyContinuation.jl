@@ -1526,33 +1526,35 @@ function decompose_with_monodromy!(
                        allow_degree1_iter ≥ 5 ||
                        iter ≥ max_iters - 1
                         P_certified = indexed_solutions(res_orbit)
-
-                        # Check whether inner monodromy jumped into an already-certified component.
-                        # If so, the trace test result is unreliable — skip this orbit.
-                        if any(
-                            p -> !isnothing(search_in_radius(certified_up, p, atol)),
-                            P_certified,
-                        )
-                            continue
-                        end
-
                         W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
 
                         if length(P_certified) > length(clean_orbit)
-                            # Genuine new points found — compute their indices in non_complete_points,
-                            # excluding any phantom indices that might have matched numerically.
-                            complete_orbit = setdiff(
+                            # Inner monodromy found new points beyond the starting orbit.
+                            # First match them against non_complete_points.
+                            matched = setdiff(
                                 Set(
                                     matching_indices(
                                         non_complete_points,
                                         P_certified;
                                         atol = atol,
-                                        rtol = rtol,
+                                        rtol = something(options.unique_points_rtol, 1e-8),
                                     ),
                                 ),
                                 phantom_indices,
                             )
-                            allow_degree1_iter = 0
+                            # Only check certified_up when matching_indices left points unaccounted for.
+                            # Unmatched points are either genuine new discoveries or path-jumping phantoms.
+                            diff = length(P_certified) - length(matched)
+                            if diff > 0 && any(
+                                p -> !isnothing(search_in_radius(certified_up, p, atol)),
+                                P_certified,
+                            )
+                                continue
+                            end
+                            complete_orbit = matched
+                            if diff == 1
+                                allow_degree1_iter = 0
+                            end
                         else
                             complete_orbit = clean_orbit
                         end
