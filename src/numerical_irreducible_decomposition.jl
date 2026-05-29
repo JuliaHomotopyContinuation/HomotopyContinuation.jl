@@ -1378,7 +1378,7 @@ function decompose_with_monodromy!(
 )
     update_progress_dim!(progress, dim(W))
 
-    P = points(W)
+    P = unique_points(points(W))
     L = linear_subspace(W)
     G = system(W)
     n = ambient_dim(L)
