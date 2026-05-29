@@ -1415,7 +1415,6 @@ function decompose_with_monodromy!(
 
         while !isempty(non_complete_points)
             iter += 1
-            allow_degree1_iter += 1
             if iter > max_iters
                 break
             end
@@ -1455,6 +1454,10 @@ function decompose_with_monodromy!(
                 initial_orbits = non_complete_orbits,
             )
 
+            # increase the degree1 check only if there are other orbits
+            if all(o -> length(o) == 1, orbits)
+                allow_degree1_iter += 1
+            end
             complete_orbits = Vector{Set{Int}}()
 
             for orbit in orbits
@@ -1477,7 +1480,7 @@ function decompose_with_monodromy!(
                     # We do not want to add orbits of degree 1 as long as allow_degree1_iter < 10. 
                     # Single orobits tend to have small trace, even if their points are on a irreducible component of degree > 1.
                     # allow_degree1_iter is reset once we we find new points 
-                    if length(orbit) > 1 || allow_degree1_iter ≥ 10 || iter ≥ max_iters - 1
+                    if length(orbit) > 1 || allow_degree1_iter ≥ 5 || iter ≥ max_iters - 1
                         P_certified = indexed_solutions(res_orbit)
                         W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
 
