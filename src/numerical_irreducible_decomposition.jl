@@ -1389,8 +1389,7 @@ function decompose_with_monodromy!(
 
     # first check that all points in P are unique
     id = 1
-    certified_up =
-        UniquePoints(first(P₀), 1; distance = InfNorm())
+    certified_up = UniquePoints(first(P₀), 1; distance = InfNorm())
     P = Vector{eltype(P₀)}()
     for (i, pᵢ) in enumerate(P₀)
         _, new_point = add!(certified_up, pᵢ, i; atol = atol, rtol = rtol)
