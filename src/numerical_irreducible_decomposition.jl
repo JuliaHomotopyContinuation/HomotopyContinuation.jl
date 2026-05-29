@@ -1566,7 +1566,7 @@ function decompose_with_monodromy!(
 
                             push!(decomposition, W_new)
                             for p in solutions(W_new)
-                                add!(certified_up, p, 1, atol)
+                                add!(certified_up, p, 1; atol = atol, rtol = rtol)
                             end
                             d += length(P_certified) - length(complete_orbit)
                             update_progress!(progress, W_new)
