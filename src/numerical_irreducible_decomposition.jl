@@ -1454,7 +1454,9 @@ function decompose_with_monodromy!(
                 initial_orbits = non_complete_orbits,
             )
 
-            # increase the degree1 check only if there are other orbits
+            # update the degree1 check only if there are no orbits of degree > 1
+            # we want to check degree 1 component 
+            # only if there is nothing else to classify
             if all(o -> length(o) == 1, orbits)
                 allow_degree1_iter += 1
             end
