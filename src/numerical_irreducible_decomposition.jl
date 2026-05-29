@@ -1479,32 +1479,54 @@ function decompose_with_monodromy!(
                         P_certified = indexed_solutions(res_orbit)
                         W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
 
-                        # matching_indices is only needed when P_certified found more
-                        # witness points than orbit contained. When P_certified has
-                        # fewer points (inner monodromy deduplicated some starts), the
-                        # full orbit is still complete — collapsed elements were just
+                        # when P_certified found more witness points than orbit contained,
+                        # there can be two reasons
+                        # (1) path jumping
+                        # (2) we found genuine new points 
+                        # we first check path jumping using has_point_in_decomposition
+                        # if this returns false, run matching_indices to find the correct indices
+                        # of the points in P_certified
+                        # if P_certified has fewer points (inner monodromy deduplicated some starts), the full orbit is still complete — collapsed elements were just
                         # numerical duplicates on the same component.
                         if length(P_certified) > length(orbit)
-                            complete_orbit = Set(
-                                matching_indices(
-                                    non_complete_points,
-                                    P_certified;
-                                    atol = something(options.unique_points_atol, 1e-14),
-                                    rtol = something(options.unique_points_rtol, 1e-8),
-                                ),
+                            # check if the extra points in P_certified came from path 
+                            # jumping by comparing them to the points in the completed decompositions
+                            has_duplicate = has_point_in_decomposition(
+                                P_certified,
+                                decomposition;
+                                atol = something(options.unique_points_atol, 1e-14),
+                                rtol = something(options.unique_points_rtol, 1e-8),
                             )
-                            allow_degree1_iter = 0
+
+                            if !has_duplicate
+                                # if we have genuine new points find their indices
+                                complete_orbit = Set(
+                                    matching_indices(
+                                        non_complete_points,
+                                        P_certified;
+                                        atol = something(options.unique_points_atol, 1e-14),
+                                        rtol = something(options.unique_points_rtol, 1e-8),
+                                    ),
+                                )
+                                # if we have genuine new points restart the degree 1 check 
+                                allow_degree1_iter = 0
+                            end
                         else
+                            has_duplicate = false
                             complete_orbit = orbit
                         end
 
-                        push!(decomposition, W_new)
                         push!(complete_orbits, complete_orbit)
-                        d += length(P_certified) - length(complete_orbit)
                         k = k - length(complete_orbit)
-
-                        update_progress!(progress, W_new)
                         update_progress_npts!(progress, k)
+
+                        # put a new witness set into decomposition
+                        # only if has_duplicate == false
+                        if !has_duplicate
+                            push!(decomposition, W_new)
+                            d += length(P_certified) - length(complete_orbit)
+                            update_progress!(progress, W_new)
+                        end
                     end
                 end
             end
@@ -1672,6 +1694,16 @@ function merge_sets(sets)
         end
     end
     return collect(values(result))
+end
+
+# check if we have found points that are already classifiedxw
+function has_point_in_decomposition(P, decomposition; atol, rtol)
+    any(P) do p
+        rad = max(atol, norm(p, Inf) * rtol)
+        any(decomposition) do W
+            any(q -> distance(p, q, InfNorm()) ≤ rad, points(W))
+        end
+    end
 end
 
 # find indices of newly detected points
