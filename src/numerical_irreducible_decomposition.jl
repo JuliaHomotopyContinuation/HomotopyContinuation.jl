@@ -1456,7 +1456,7 @@ function decompose_with_monodromy!(
             # Identify phantom points: new points that jumped into an already-certified component.
             # Only check when new points were found and certified_up is non-empty.
             phantom_indices = Set{Int}()
-            if length(updated_points) > prev_count && !isempty(certified_up)
+            if length(updated_points) > prev_count && length(certified_up) > 0
                 # reset degree1 check if we found new points 
                 allow_degree1_iter = 0
                 # now compute phantom points
