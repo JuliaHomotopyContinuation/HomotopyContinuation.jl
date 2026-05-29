@@ -1454,10 +1454,26 @@ function decompose_with_monodromy!(
 )
     update_progress_dim!(progress, dim(W))
 
-    P = points(W)
+    P₀ = points(W)
     L = linear_subspace(W)
     G = system(W)
     n = ambient_dim(L)
+
+    # tolerances for comparing points
+    atol = something(options.unique_points_atol, 1e-14)
+    rtol = something(options.unique_points_rtol, 1e-8)
+
+    # first check that all points in P are unique
+    id = 1
+    certified_up = UniquePoints(first(P₀), 1; distance = InfNorm())
+    P = Vector{eltype(P₀)}()
+    for (i, pᵢ) in enumerate(P₀)
+        _, new_point = add!(certified_up, pᵢ, i; atol = atol, rtol = rtol)
+        if new_point
+            push!(P, pᵢ)
+        end
+    end
+    empty!(certified_up) # we reuse this later
 
     decomposition = Vector{WitnessSet}()
 
@@ -1484,6 +1500,7 @@ function decompose_with_monodromy!(
         end
 
         iter = 0
+        allow_degree1_iter = 0
         non_complete_points = indexed_solutions(res)
         d = length(non_complete_points) # the total degree (i.e., number of points on all irreducible components)
         non_complete_orbits = Vector{Set{Int}}()
@@ -1512,14 +1529,31 @@ function decompose_with_monodromy!(
             updated_points = indexed_solutions(res)
             d += length(updated_points) - length(non_complete_points) # update total degree in case we found new points.
             non_complete_points = updated_points
+
+            # Identify phantom points: new points that jumped into an already-certified component.
+            # Only check when new points were found and certified_up is non-empty.
+            phantom_indices = Set{Int}()
+            if length(updated_points) > prev_count && length(certified_up) > 0
+                # reset degree1 check if we found new points 
+                allow_degree1_iter = 0
+                # now compute phantom points
+                for (i, p) in pairs(updated_points)
+                    if !isnothing(search_in_radius(certified_up, p, atol))
+                        push!(phantom_indices, i)
+                    end
+                end
+                d -= length(phantom_indices)
+            end
             ℓ = length(non_complete_points) # once for a later check
             k = length(non_complete_points) # and once for counting progress
             update_progress_npts!(progress, k)
 
             # If monodromy deduplicated starting solutions, the cached orbit indices are
-            # stale (they reference the old count). Reset to avoid a BoundsError.
+            # stale (they reference the old count). Reset to avoid a BoundsError
+            # also reset the degree 1 counter in this case
             if length(non_complete_points) < prev_count
                 non_complete_orbits = Vector{Set{Int}}()
+                allow_degree1_iter = 0
             end
 
             # Get orbits from monodromy result
@@ -1528,12 +1562,29 @@ function decompose_with_monodromy!(
                 initial_orbits = non_complete_orbits,
             )
 
+            # update the degree1 check only if there are no orbits of degree > 1
+            # we want to check degree 1 component 
+            # only if there is nothing else to classify
+            if all(o -> length(o) == 1, orbits)
+                allow_degree1_iter += 1
+            end
             complete_orbits = Vector{Set{Int}}()
 
             for orbit in orbits
                 update_progress!(progress; is_monodromy = true)
 
-                P_orbit = non_complete_points[collect(orbit)]
+                # Strip phantom indices from the orbit before running inner monodromy.
+                clean_orbit =
+                    isempty(phantom_indices) ? orbit : setdiff(orbit, phantom_indices)
+                if isempty(clean_orbit)
+                    push!(complete_orbits, orbit)
+                    k -= length(orbit)
+                    update_progress_npts!(progress, k)
+                    update_progress!(progress; is_monodromy = false)
+                    continue
+                end
+
+                P_orbit = non_complete_points[sort!(collect(clean_orbit))]
                 res_orbit = monodromy_solve(
                     MS,
                     P_orbit,
@@ -1545,39 +1596,53 @@ function decompose_with_monodromy!(
                 )
                 update_progress!(progress; is_monodromy = false)
 
+                # only continue when trace test succeeds
                 if trace(res_orbit) < options.trace_test_tol
 
-                    # We do not want to add orbits of length 1 in the beginning. Even if they are on an irreducible component of degree > 1, they tend to have small trace.
-                    if length(orbit) > 1 || iter ≥ 10 || iter ≥ max_iters - 1
+                    # We do not want to add orbits of degree 1 as long as allow_degree1_iter < 5.
+                    # Single orbits tend to have small trace, even if their points are on an irreducible component of degree > 1.
+                    # allow_degree1_iter is reset once we find new points.
+                    if length(clean_orbit) > 1 ||
+                       allow_degree1_iter ≥ 10 ||
+                       iter ≥ max_iters - 1
                         P_certified = indexed_solutions(res_orbit)
                         W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
 
-                        # matching_indices is only needed when P_certified found more
-                        # witness points than orbit contained. When P_certified has
-                        # fewer points (inner monodromy deduplicated some starts), the
-                        # full orbit is still complete — collapsed elements were just
-                        # numerical duplicates on the same component.
-                        if length(P_certified) > length(orbit)
-                            complete_orbit = Set(
-                                matching_indices(
-                                    non_complete_points,
-                                    P_certified;
-                                    norm = options.distance,
-                                    atol = something(options.unique_points_atol, 1e-14),
-                                    rtol = something(options.unique_points_rtol, 1e-8),
+                        if length(P_certified) > length(clean_orbit)
+                            # Inner monodromy found new points beyond the starting orbit.
+                            # Match them against non_complete_points to detect orbit merging
+                            # and path-jumping phantoms.
+                            matched = setdiff(
+                                Set(
+                                    matching_indices(
+                                        non_complete_points,
+                                        P_certified;
+                                        atol = atol,
+                                        rtol = rtol,
+                                    ),
                                 ),
+                                phantom_indices,
                             )
+                            # If not all P_certified points are accounted for in non_complete_points,
+                            # the result is unreliable (phantom or genuine new point) — skip.
+                            if length(matched) < length(P_certified)
+                                continue
+                            end
+                            complete_orbit = matched
                         else
-                            complete_orbit = orbit
+                            complete_orbit = clean_orbit
                         end
 
-                        push!(decomposition, W_new)
                         push!(complete_orbits, complete_orbit)
-                        d += length(P_certified) - length(complete_orbit)
-                        k = k - length(complete_orbit)
-
-                        update_progress!(progress, W_new)
+                        k -= length(complete_orbit)
                         update_progress_npts!(progress, k)
+
+                        push!(decomposition, W_new)
+                        for p in solutions(W_new)
+                            add!(certified_up, p, 1; atol = atol, rtol = rtol)
+                        end
+                        d += length(P_certified) - length(complete_orbit)
+                        update_progress!(progress, W_new)
                     end
                 end
             end
@@ -1608,7 +1673,9 @@ function decompose_with_monodromy!(
             for orbit in complete_orbits
                 append!(complete_orbit_indices, orbit)
             end
+            append!(complete_orbit_indices, phantom_indices)
             sort!(complete_orbit_indices)
+            unique!(complete_orbit_indices)
 
             deleteat!(non_complete_points, complete_orbit_indices)
 
@@ -1631,15 +1698,18 @@ function decompose_with_monodromy!(
                 i += 1
             end
 
-            shift_orbit(orbit) = Set(orbit_indices_mapping[i] for i in orbit)
+            # Skip phantom indices when shifting — they have been removed from non_complete_points.
+            shift_orbit(orbit) =
+                Set(orbit_indices_mapping[i] for i in orbit if i ∉ phantom_indices)
             # 1. shift existing non complete orbits to new mapping
             non_complete_orbits =
                 shift_orbit.(
                     merge_sets(
                         [
-                            # Remove all orbits that are contained in a complete orbit
+                            # Remove all orbits that overlap with a complete orbit or phantom indices
                             filter(non_complete_orbits) do o
-                                all(co -> isdisjoint(co, o), complete_orbits)
+                                all(co -> isdisjoint(co, o), complete_orbits) &&
+                                    isdisjoint(o, phantom_indices)
                             end
                             setdiff(orbits, complete_orbits)
                         ],
@@ -1747,15 +1817,16 @@ function merge_sets(sets)
     return collect(values(result))
 end
 
+# check if we have found points that are already classifiedxw
 # find indices of newly detected points
-function matching_indices(points, certified_points; norm, atol, rtol)
+function matching_indices(points, certified_points; atol, rtol)
     indices = Int[]
     matched = falses(length(certified_points))
     for (i, p) in pairs(points)
-        tol = max(atol, rtol * distance(p, zero(p), norm))
+        rad = max(atol, norm(p, Inf) * rtol)
         for (j, q) in pairs(certified_points)
             matched[j] && continue
-            if distance(p, q, norm) ≤ tol
+            if distance(p, q, InfNorm()) ≤ rad
                 push!(indices, i)
                 matched[j] = true
                 break
@@ -1804,6 +1875,8 @@ function get_orbits_from_monodromy_permutations(
             end
         end
     end
+    sort!(orbits; by = length, rev = true)
+
     orbits
 end
 
@@ -1852,7 +1925,7 @@ This function decomposes a [`WitnessSet`](@ref) or a vector of [`WitnessSet`](@r
 * `show_progress = true`: indicate whether a progress bar should be displayed.
 * `show_monodromy_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) should be displayed. If `false`, minimal info about the monodromy computations are still displayed in the progress bar of `decompose`.
 * `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
-* `max_iters = 200`: maximal number of iterations for the decomposition step.
+* `max_iters = 500`: maximal number of iterations for the decomposition step.
 * `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
 * `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
 * `seed`: choose the random seed.
@@ -1892,7 +1965,7 @@ function decompose(
     show_progress::Bool = true,
     show_monodromy_progress::Bool = false,
     monodromy_options::MonodromyOptions = MonodromyOptions(),
-    max_iters::Int = 200,
+    max_iters::Int = 500,
     warning::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
     seed = nothing,
@@ -2174,7 +2247,7 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 * `show_monodromy_progress = false`: if `true`, sets `show_monodromy_for_regeneration_progress` and `show_monodromy_for_decompose_progress` to `true`. If `false`, minimal info about the monodromy computations are still displayed in the progress bar of each substep.
 * `show_monodromy_for_regeneration_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) in [`regeneration`](@ref) should be displayed. 
 * `show_monodromy_for_decompose_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) in [`decompose`](@ref) should be displayed.
-* `max_iters = 200`: maximal number of iterations for the decomposition step.
+* `max_iters = 500`: maximal number of iterations for the decomposition step.
 * `atol = 1e-14` and `rtol = sqrt(eps())`: a point `y` is considered equal to `x` when the distance between `x`and `y` is smaller than `max(atol, norm(x, Inf) * rtol).` This option is used for [`regeneration`](@ref).
 * `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
 * `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
@@ -2238,7 +2311,7 @@ function numerical_irreducible_decomposition(
     show_monodromy_progress::Bool = false,
     show_monodromy_for_regeneration_progress::Bool = false,
     show_monodromy_for_decompose_progress::Bool = false,
-    max_iters::Int = 200,
+    max_iters::Int = 500,
     sorted::Bool = true,
     max_codim::Union{Int,Nothing} = nothing,
     max_trials_u_homotopy::Int = 5,
