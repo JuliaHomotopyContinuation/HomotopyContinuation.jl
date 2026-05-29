@@ -1442,9 +1442,11 @@ function decompose_with_monodromy!(
             update_progress_npts!(progress, k)
 
             # If monodromy deduplicated starting solutions, the cached orbit indices are
-            # stale (they reference the old count). Reset to avoid a BoundsError.
+            # stale (they reference the old count). Reset to avoid a BoundsError
+            # also reset the degree 1 counter in this case
             if length(non_complete_points) < prev_count
                 non_complete_orbits = Vector{Set{Int}}()
+                allow_degree1_iter = 0
             end
 
             # Get orbits from monodromy result
