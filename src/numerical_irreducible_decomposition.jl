@@ -1526,7 +1526,7 @@ function decompose_with_monodromy!(
                     # Single orbits tend to have small trace, even if their points are on an irreducible component of degree > 1.
                     # allow_degree1_iter is reset once we find new points.
                     if length(clean_orbit) > 1 ||
-                       allow_degree1_iter ≥ 5 ||
+                       allow_degree1_iter ≥ 10 ||
                        iter ≥ max_iters - 1
                         P_certified = indexed_solutions(res_orbit)
                         W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
