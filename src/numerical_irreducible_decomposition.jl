@@ -1765,6 +1765,8 @@ function get_orbits_from_monodromy_permutations(
             end
         end
     end
+    sort!(orbits; by = length, rev = true)
+
     orbits
 end
 
