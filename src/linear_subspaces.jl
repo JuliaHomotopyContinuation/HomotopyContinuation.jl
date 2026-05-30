@@ -11,6 +11,7 @@ export LinearSubspace,
     codim,
     ambient_dim,
     rand_subspace,
+    rand_subspace!,
     coord_change,
     geodesic_distance,
     geodesic,
@@ -473,13 +474,9 @@ function rand_subspace(
         k = n - codim
     end
     T = real ? Float64 : ComplexF64
-    A = randn(T, n - k, n)
-    if affine
-        LinearSubspace(A, randn(T, n - k))
-    else
-        LinearSubspace(A)
-    end
-
+    A = zeros(T, n - k, n)
+    b = zeros(T, n - k)
+    rand_subspace!(A, b; affine = affine)
 end
 rand_subspace(x::AbstractVector{Variable}; kwargs...) = rand_subspace(length(x); kwargs...)
 function rand_subspace(
@@ -500,16 +497,51 @@ function rand_subspace(
         0 < codim < n || throw(ArgumentError("`codim` has to be between 0 and `n`."))
         k = n - codim
     end
+    A = zeros(eltype(x), n - k, n)
+    b = zeros(eltype(x), n - k)
+    rand_subspace!(A, b, x; affine = affine)
+end
+function rand_subspace!(A::AbstractMatrix, b::AbstractVector; affine::Bool = true)
+    size(A, 1) == length(b) || throw(ArgumentError("Size of A and b not compatible."))
+
+    Random.randn!(A)
+    if affine
+        Random.randn!(b)
+    else
+        fill!(b, zero(eltype(b)))
+    end
+
+    LinearSubspace(Matrix(A), Vector(b))
+end
+function rand_subspace!(
+    A::AbstractMatrix,
+    b::AbstractVector,
+    x::AbstractVector;
+    affine::Bool = true,
+)
+    size(A, 2) == length(x) || throw(ArgumentError("Size of A and x not compatible."))
+    size(A, 1) == length(b) || throw(ArgumentError("Size of A and b not compatible."))
 
     if affine
-        A = randn(eltype(x), n - k, n)
-        b = A * x
-        LinearSubspace(A, b)
+        Random.randn!(A)
+        LA.mul!(b, A, x)
     else
-        N = LA.nullspace(Matrix(x'))'
-        A = randn(eltype(N), n - k, size(N, 1)) * N
-        LinearSubspace(A)
+        fill!(b, zero(eltype(b)))
+        Random.randn!(A)
+        nrmsq = sum(abs2, x)
+        for i = 1:size(A, 1)
+            α = zero(eltype(A))
+            for j = 1:size(A, 2)
+                α += A[i, j] * x[j]
+            end
+            α /= nrmsq
+            for j = 1:size(A, 2)
+                A[i, j] -= α * conj(x[j])
+            end
+        end
     end
+
+    LinearSubspace(Matrix(A), Vector(b))
 end
 
 # Coordinate changes

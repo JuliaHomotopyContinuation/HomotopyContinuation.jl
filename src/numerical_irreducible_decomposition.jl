@@ -276,6 +276,9 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
     u::Variable
     i::Int
     codim::Int
+    projective::Bool
+    ℓ::Union{Nothing,Expression}
+    ℓ_coeffs::Union{Nothing,Vector{ComplexF64}}
     max_trials_u_homotopy::Int
 
     endgame_options::EndgameOptions
@@ -284,7 +287,20 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
     progress::Union{WitnessSetsProgress,Nothing}
 end
 
-function RegenerationCache(u, f, F, h, codim, max_trials_u_homotopy, EO, TO, progress)
+function RegenerationCache(
+    u,
+    f,
+    F,
+    h,
+    codim,
+    projective,
+    ℓ,
+    ℓ_coeffs,
+    max_trials_u_homotopy,
+    EO,
+    TO,
+    progress,
+)
     m, N = size(F)
     A = zeros(ComplexF64, N - 1, N)
     b = zeros(ComplexF64, N - 1)
@@ -304,6 +320,9 @@ function RegenerationCache(u, f, F, h, codim, max_trials_u_homotopy, EO, TO, pro
         u,
         0,
         codim,
+        projective,
+        ℓ,
+        ℓ_coeffs,
         max_trials_u_homotopy,
         EO,
         TO,
@@ -324,6 +343,7 @@ function update_Fᵢ!(cache, fᵢ, vars)
 end
 update_hᵢ!(cache, h) = cache.h = h
 update_i!(cache, i) = cache.i = i
+
 
 """
     regeneration(F::System; options...) 
@@ -385,10 +405,12 @@ function _regeneration(
     # the algorithm is u-regeneration as proposed 
     # by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869
 
-    vars = variables(F)
+    xvars = variables(F)
+    projective = is_homogeneous(F)
+    vars = copy(xvars)
     n = size(F, 2) # ambient dimension
     c = size(F, 1) # we can have witness sets of codimesion at most min(c,n)
-    expected_max_codim = min(c, n)
+    expected_max_codim = min(c, n - projective)
     if !isnothing(max_codim) && max_codim < expected_max_codim
         # if max_codim is smaller than the expected codimension we must compute witness points for one more codimension, so that we can remove spurious points
         codim = max_codim + 1
@@ -418,13 +440,19 @@ function _regeneration(
     # prepare codim witness sets for the output
     # internally we represent a witness superset by WitnessPoints
     # the i-th witness superset out[i] is for codimension i
-    out = initialize_witness_sets(codim, n)
+    out = initialize_witness_sets(codim, n; affine = !projective)
 
     # we compute witness (super)sets for the hypersurfaces f[1]=0,...,f[c]=0.
     # it is covenient to use the WitnessSet wrapper here, because this also keeps track of the equation
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
     update_progress!(progress; is_computing_hypersurfaces = true)
-    H = initialize_hypersurfaces(F, vars, linear_subspace(out[1]); threading = threading)
+    H = initialize_hypersurfaces(
+        F,
+        vars,
+        linear_subspace(out[1]),
+        projective;
+        threading = threading,
+    )
     if any(isnothing, H)
         return nothing
     end
@@ -440,12 +468,17 @@ function _regeneration(
 
     # Initialize a cache
     Fᵢ = fixed(System(f[1:1], variables = vars), compile = false)
+    ℓ_coeffs = projective ? randn(ComplexF64, length(xvars)) : nothing
+    ℓ = projective ? sum(ℓ_coeffs .* xvars) : nothing
     cache = RegenerationCache(
         u,
         f[1:1],
         Fᵢ,
         f[1],
         codim,
+        projective,
+        ℓ,
+        ℓ_coeffs,
         max_trials_u_homotopy,
         endgame_options,
         tracker_options,
@@ -516,7 +549,7 @@ function _regeneration(
         ws = map(out) do W
             update_progress!(progress)
             P, L = u_transform(W)
-            WitnessSet(fixed(F, compile = false), L, P)
+            WitnessSet(fixed(F, compile = false), L, P; projective = projective)
         end
     else
         return ws = Vector{WitnessSet}()
@@ -540,25 +573,31 @@ function get_flag(iter, L₀)
     # type 1 does not use u, so we set the last column to zero
     Aᵤ = [A₀ zeros(n - 1)]
     bᵤ = b₀
-    # type 2 sets the linear equation u=c. We add this as the first equation
-    c = randn(ComplexF64)
+    # type 2 sets the linear equation u=c. If L₀ is linear, keep the augmented
+    # subspaces linear as well.
+    c = is_linear(L₀) ? zero(ComplexF64) : randn(ComplexF64)
     A = [zeros(1, m) 1.0; A₀ zeros(n - 1)]
     b = [c; b₀]
 
     map(iter) do i
-        j = i + 1
         # type 1 linear equation for out[i] takes the last i rows of Aᵤ
-        Eᵤ = ExtrinsicDescription(Aᵤ[i:end, :], bᵤ[i:end]; orthonormal = true)
+        idx = i <= n - 1 ? (i:n-1) : (n:n-1)
+        Eᵤ = ExtrinsicDescription(Aᵤ[idx, :], bᵤ[idx]; orthonormal = true)
         Lᵤ = LinearSubspace(Eᵤ)
         # type 2 linear equation for out[i] takes the last i-1 rows and the first row of A
-        E = ExtrinsicDescription(A[[1; j:n], :], b[[1; j:n]]; orthonormal = true)
+        rows = [1; idx .+ 1]
+        E = ExtrinsicDescription(A[rows, :], b[rows]; orthonormal = true)
         L = LinearSubspace(E)
         L, Lᵤ
     end
 end
-function initialize_witness_sets(codim, n)
-    # we need a flag containing a linear space of dimension 1
-    L₀ = rand_subspace(n; dim = 1)
+
+function initialize_witness_sets(codim, n; affine::Bool = true)
+    # we need an initial slice from which the u-regeneration flag is derived
+    dim = affine ? 1 : 2
+    L₀ =
+        dim == n ? LinearSubspace(zeros(ComplexF64, 0, n)) :
+        rand_subspace(n; dim = dim, affine = affine)
     flag = get_flag(1:codim, L₀)
 
     map(flag) do F
@@ -569,7 +608,8 @@ end
 function initialize_hypersurfaces(
     F::System,
     vars,
-    L;
+    L,
+    projective;
     threading::Bool = Threads.nthreads() > 1,
 )
     f = expressions(F)
@@ -579,18 +619,34 @@ function initialize_hypersurfaces(
         fᵢ = f[i]
         h = fixed(System([fᵢ], variables = vars), compile = false)
         pᵢ, qᵢ = get_num_den(fᵢ) # fᵢ = pᵢ / qᵢ
-        res = solve(
-            System([pᵢ], variables = vars),
-            target_subspace = L;
-            start_system = :total_degree,
-            show_progress = false,
-            threading = threading,
-        )
+        xvars = vars[1:(end-1)]
+        if projective
+            E = extrinsic(L)
+            A = E.A[2:end, 1:(end-1)]
+            b = E.b[2:end]
+            L_eqs = map(1:size(A, 1)) do i
+                sum(A[i, j] * xvars[j] for j = 1:length(xvars)) - b[i]
+            end
+            res = solve(
+                System([pᵢ; L_eqs], variables = xvars);
+                start_system = :total_degree,
+                show_progress = false,
+                threading = threading,
+            )
+        else
+            res = solve(
+                System([pᵢ], variables = vars),
+                target_subspace = L;
+                start_system = :total_degree,
+                show_progress = false,
+                threading = threading,
+            )
+        end
         # if fᵢ is rational we check which zeros of pᵢ are also zeros of fᵢ
         if qᵢ != 1
             res = solve(
                 h,
-                solution.(results(res));
+                projective ? map(x -> [x; 0], solutions(res)) : solutions(res);
                 start_subspace = L,
                 target_subspace = L,
                 show_progress = false,
@@ -600,7 +656,11 @@ function initialize_hypersurfaces(
         if isnothing(res)
             return nothing
         end
-        S = solution.(results(res))
+        if projective && qᵢ == 1
+            S = map(x -> [x; 0], solution.(results(res)))
+        else
+            S = solution.(results(res))
+        end
         out[i] = WitnessSet(h, L, S)
     end
     out
@@ -673,14 +733,14 @@ function fill_up!(
                 threading = threading,
                 warning = false,
             )
-            # check if solutions remain, and if yes, take unique_points
+            # check if solutions remain
             if nsolutions(res) == 0
                 W.R = Vector{Vector{ComplexF64}}()
             else
                 sols = solution.(results(res))
                 # Near-singular solutions tracked in monodromy loops can have
-                # poor accuracy (~1e-10 error). If they evade monodromy's 
-                # internal deduplication tolerance, 
+                # poor accuracy (~1e-10 error). If they evade monodromy's
+                # internal deduplication tolerance,
                 # remove near-duplicates here before continuing
                 W.R =
                     length(sols) > 1 ? unique_points(sols; atol = atol, rtol = rtol) : sols
@@ -710,7 +770,7 @@ function regeneration_monodromy_options(
         certification_max_precision = M.certification_max_precision,
         certification_refine_solution = M.certification_refine_solution,
         trace_test_tol = M.trace_test_tol,
-        target_solutions_count = Int(floor(1.5 * degree(W))), # in case a singular solution slips through
+        target_solutions_count = Int(floor(1.5 * degree(W))), # in case we miss solutions
         timeout = M.timeout,
         min_solutions = M.min_solutions,
         max_loops_no_progress = M.max_loops_no_progress,
@@ -761,7 +821,8 @@ function intersect_with_hypersurface!(
     # Step 2:
     # the points in P_next are used as starting points for a homotopy.
     # where u^d-1 (u is the extra variable in u-regeneration) is deformed into g 
-    u_data, d = set_up_u_homotopy(W, f, X, h, vars, u)
+    u_data, d =
+        set_up_u_homotopy(W, f, X, h, vars, u; projective = cache.projective, ℓ = cache.ℓ)
     trackers = initialize_u_homotopy_trackers(u_data, cache)
 
 
@@ -855,21 +916,25 @@ end
 # The following piece of the code implements the core part of u-regeneration
 # It consists of three subhomotopies: Hom1, Hom2, Hom3.
 # Hom1 moves the linear equation u = c to a random linear space L1 involving (x,u), where x are the variables of F.
-# Hom2 moves u^d - 1 to the new polynomial fᵢ with deg(fᵢ) = d.
-# Hom3 moves the linear space L1 to the linear space given by the initial witness sets. 
-# We first run Hom1. Then we check if the output of Hom1 works as input for Hom2. If this fails, resample L1. Only then track Hom2 and Hom3. 
+# Hom2 moves u^d - 1 (or u^d - ℓ^d in the projective case) to the new polynomial fᵢ.
+# Hom3 moves the linear space L1 to the linear space given by the initial witness sets.
+# We first run Hom1. Then we check if the output of Hom1 works as input for Hom2. If this fails, resample L1. Only then track Hom2 and Hom3.
 
 const HOM2_START_CHECK_TARGET = 0.99
 
 is_accepted(T::EndgameTracker, code) = is_success(code) && !T.state.singular
 
-function start_solution(P, roots, idx)
+function scaling(p, ℓ_coeffs)
+    isnothing(ℓ_coeffs) ? one(ComplexF64) :
+    sum(ℓ_coeffs[j] * p[j] for j = 1:length(ℓ_coeffs))
+end
+
+function start_solution(P, roots, idx, ℓ_coeffs = nothing)
     l_P = length(P)
     p_idx = rem(idx - 1, l_P) + 1
     r_idx = div(idx - 1, l_P) + 1
     p = copy(P[p_idx])
-    p[end] = roots[r_idx]
-
+    p[end] = scaling(p, ℓ_coeffs) * roots[r_idx]
     p
 end
 
@@ -900,6 +965,7 @@ function track_intersection!(X, P, roots, trackers, u_data, cache, progress, thr
             progress,
             threading,
             fail_fast,
+            cache.ℓ_coeffs,
         )
         all(accepted) && break
     end
@@ -931,11 +997,13 @@ end
 
 function initialize_u_homotopy_trackers(u_data, cache)
     F, G, L, L2 = u_data
-    L1 = rand_subspace(ambient_dim(L); dim = dim(L))
+    projective = cache.projective
+    L1 = rand_subspace(ambient_dim(L); dim = dim(L), affine = !projective)
 
-    Hom1 = linear_subspace_homotopy(F, L, L1)
+    Hom1 = linear_subspace_homotopy(F, L, L1; homogeneous = projective)
     Hom2 = StraightLineHomotopy(slice(F, L1), slice(G, L1); gamma = cis(2 * pi * rand()))
-    Hom3 = linear_subspace_homotopy(G, L1, L2)
+    projective && (Hom2 = on_affine_chart(Hom2))
+    Hom3 = linear_subspace_homotopy(G, L1, L2; homogeneous = projective)
 
     [
         u_homotopy_tracker(Hom1, cache),
@@ -946,24 +1014,30 @@ end
 
 function reset_u_homotopy_trackers!(trackers, u_data, cache)
     F, G, L, L2 = u_data
-    L1 = rand_subspace(ambient_dim(L); dim = dim(L))
+    projective = cache.projective
+    L1 = rand_subspace(ambient_dim(L); dim = dim(L), affine = !projective)
 
     target_parameters!(trackers[1], L1)
-    trackers[2] = u_homotopy_tracker(
-        StraightLineHomotopy(slice(F, L1), slice(G, L1); gamma = cis(2 * pi * rand())),
-        cache,
-    )
+    Hom2 = StraightLineHomotopy(slice(F, L1), slice(G, L1); gamma = cis(2 * pi * rand()))
+    projective && (Hom2 = on_affine_chart(Hom2))
+    trackers[2] = u_homotopy_tracker(Hom2, cache)
     start_parameters!(trackers[3], L1)
 
     trackers
 end
 
-function set_up_u_homotopy(W, f, X, h, vars, u)
+function set_up_u_homotopy(W, f, X, h, vars, u; projective::Bool = false, ℓ = 1)
 
     P, Q = get_num_den(h)
     d = degree(P)
-    h0 = (u^d - 1) / Q
-
+    if projective
+        h0 = u^d - ℓ^d
+    else
+        h0 = u^d - 1
+    end
+    if degree(Q) > 0
+        h0 = h0 / Q
+    end
     # we start with the linear space L which does not use pose conditions on u, so that u^d=1
     # we end with the linear space L2 with u=c.
     L = linear_subspace_u(W)
@@ -986,6 +1060,7 @@ function track_hom1_and_check_hom2_starts!(
     progress,
     threading,
     fail_fast,
+    ℓ_coeffs = nothing,
 )
     if threading
         threaded_track_hom1_and_check_hom2_starts!(
@@ -997,6 +1072,7 @@ function track_hom1_and_check_hom2_starts!(
             tracker2,
             progress,
             fail_fast,
+            ℓ_coeffs,
         )
     else
         serial_track_hom1_and_check_hom2_starts!(
@@ -1008,6 +1084,7 @@ function track_hom1_and_check_hom2_starts!(
             tracker2,
             progress,
             fail_fast,
+            ℓ_coeffs,
         )
     end
 end
@@ -1029,13 +1106,14 @@ function serial_track_hom1_and_check_hom2_starts!(
     tracker2,
     progress,
     fail_fast,
+    ℓ_coeffs = nothing,
 )
     l_start = length(P) * length(roots)
 
     for i = 1:l_start
         update_progress_paths!(progress, i, l_start)
 
-        p = start_solution(P, roots, i)
+        p = start_solution(P, roots, i, ℓ_coeffs)
         code1 = track!(tracker1, p, 1)
         if !is_accepted(tracker1, code1)
             accepted[i] = false
@@ -1087,12 +1165,10 @@ function threaded_track_hom1_and_check_hom2_starts!(
     tracker2,
     progress,
     fail_fast,
+    ℓ_coeffs = nothing,
 )
 
-    l_P = length(P)
-    l_roots = length(roots)
-    l_start = l_P * l_roots
-
+    l_start = length(P) * length(roots)
     nthr = Threads.nthreads()
     trackers1 = [deepcopy(tracker1) for _ = 1:nthr]
     trackers2 = [deepcopy(tracker2.tracker) for _ = 1:nthr]
@@ -1117,7 +1193,7 @@ function threaded_track_hom1_and_check_hom2_starts!(
                             update_progress_paths!(progress, idx, l_start)
                         end
 
-                        p = start_solution(P, roots, idx)
+                        p = start_solution(P, roots, idx, ℓ_coeffs)
                         code1 = track!(local_tracker1, p, 1)
                         if is_accepted(local_tracker1, code1)
                             p1 = solution(local_tracker1)
@@ -1415,6 +1491,7 @@ function decompose_with_monodromy!(
             show_progress = show_monodromy_progress,
             progress = show_monodromy_progress ? nothing : progress,
         )
+
         update_progress!(progress; is_monodromy = false)
         update_progress_npts!(progress, nindexed_solutions(res))
 
@@ -2454,6 +2531,9 @@ mutable struct IntersectCache{Sys<:AbstractSystem}
     Fᵢ::Sys
     h::Expression
     u::Variable
+    projective::Bool
+    ℓ::Union{Nothing,Expression}
+    ℓ_coeffs::Union{Nothing,Vector{ComplexF64}}
 
     max_trials_u_homotopy::Int
 
@@ -2463,7 +2543,19 @@ mutable struct IntersectCache{Sys<:AbstractSystem}
     progress::Union{IntersectProgress,Nothing}
 end
 
-function IntersectCache(u, f, F, h, EO, TO, progress; max_trials_u_homotopy::Int = 5)
+function IntersectCache(
+    u,
+    f,
+    F,
+    h,
+    projective,
+    ℓ,
+    ℓ_coeffs,
+    max_trials_u_homotopy,
+    EO,
+    TO,
+    progress,
+)
     m, N = size(F)
     A = zeros(ComplexF64, N - 1, N)
     b = zeros(ComplexF64, N - 1)
@@ -2471,7 +2563,24 @@ function IntersectCache(u, f, F, h, EO, TO, progress; max_trials_u_homotopy::Int
     y0 = zeros(ComplexF64, m)
     y = zeros(ComplexF64, m)
 
-    IntersectCache(A, b, x0, y0, y, f, F, h, u, max_trials_u_homotopy, EO, TO, progress)
+    IntersectCache(
+        A,
+        b,
+        x0,
+        y0,
+        y,
+        f,
+        F,
+        h,
+        u,
+        projective,
+        ℓ,
+        ℓ_coeffs,
+        max_trials_u_homotopy,
+        EO,
+        TO,
+        progress,
+    )
 end
 
 
@@ -2543,6 +2652,8 @@ function _intersect(
 )
     @assert size(system(H), 1) == 1 "The second argument must be defined by a single polynomial."
     @assert size(system(W), 2) == size(system(H), 2) "Witness sets must be in the same ambient space."
+    W.projective == H.projective ||
+        throw(ArgumentError("Witness sets must both be affine or projective."))
 
     # progress bar
     if show_progress
@@ -2563,18 +2674,26 @@ function _intersect(
     n = ambient_dim(W.L)
     @unique_var u
     @unique_var vars[1:n]
-    W₁, W₂, Hᵤ, f, F, h, vars_u = prepare_for_u_homotopy(H, W, vars, u)
+    vars_u = [vars; u]
+    projective = W.projective
+    W₁, W₂, Hᵤ, f, F, h = prepare_for_u_homotopy(H, W, vars, vars_u, projective)
+
 
     # cache
+    ℓ_coeffs = projective ? randn(ComplexF64, n) : nothing
+    ℓ = projective ? sum(ℓ_coeffs .* vars) : nothing
     cache = IntersectCache(
         u,
         f,
         F,
         h,
+        projective,
+        ℓ,
+        ℓ_coeffs,
+        max_trials_u_homotopy,
         endgame_options,
         tracker_options,
-        progress;
-        max_trials_u_homotopy = max_trials_u_homotopy,
+        progress,
     )
 
     # intersect
@@ -2602,10 +2721,10 @@ function _intersect(
     # return data 
     G = fixed(System([f; h], variables = vars); compile = false)
     P1, L1 = u_transform(W₁)
-    out = [WitnessSet(G, L1, P1)]
+    out = [WitnessSet(G, L1, P1; projective = projective)]
     if !isnothing(W₂)
         P2, L2 = u_transform(W₂)
-        push!(out, WitnessSet(G, L2, P2))
+        push!(out, WitnessSet(G, L2, P2; projective = projective))
 
     end
     filter!(X -> degree(X) > 0, out)
@@ -2616,13 +2735,12 @@ end
 
 
 
-function prepare_for_u_homotopy(H, W, vars, u)
+function prepare_for_u_homotopy(H, W, vars, vars_u, projective)
     # prepare polynomials 
     FH0 = deepcopy(System(system(H)))
     FW0 = deepcopy(System(system(W)))
     h = subs(expressions(FH0), variables(FH0) => vars)
     f = subs(expressions(FW0), variables(FW0) => vars)
-    vars_u = [vars; u]
     FH = System(h, variables = vars_u)
     FW = System(f, variables = vars_u)
 
@@ -2641,9 +2759,13 @@ function prepare_for_u_homotopy(H, W, vars, u)
     else
         W₂ = WitnessPoints(flagW[2][1], flagW[2][2], Vector{Vector{ComplexF64}}())
     end
-    Hᵤ =
-        WitnessSet(fixed(FH; compile = false), flagH[1][1], map(x -> [x; cH], solutions(H)))
+    Hᵤ = WitnessSet(
+        fixed(FH; compile = false),
+        flagH[1][1],
+        map(x -> [x; cH], solutions(H));
+        projective = projective,
+    )
 
-    W₁, W₂, Hᵤ, f, fixed(FW; compile = false), first(h), vars_u
+    W₁, W₂, Hᵤ, f, fixed(FW; compile = false), first(h)
 end
 get_c(flag) = extrinsic((flag[1][1])).b[1] # the first entry of b is the right-hand side of "u=c"
