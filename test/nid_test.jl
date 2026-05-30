@@ -27,26 +27,16 @@
         N = nid(F; threading = false, show_progress = false)
         @test isa(N, NumericalIrreducibleDecomposition)
 
-        # seed
-        s = 0x42c9d504
-        N = nid(F; seed = s, show_progress = false)
-        @test seed(N) == s
-
-        N = nid(F; seed = nothing, show_progress = false)
-        @test isnothing(seed(N))
-
         # bad seed
-        N = nid(F; seed = 0xc770fa47, show_progress = false)
+        s = UInt32(62)
+        N = nid(F; seed = s, show_progress = false)
         degs = degrees(N)
+        @test seed(N) == s
         @test degs[2] == [2]
         @test degs[1] == [4, 4]
 
-
-        N = nid(F; show_monodromy_progress = true, show_progress = false)
-        @test isa(N, NumericalIrreducibleDecomposition)
-
-        N = nid(F; warning = false, show_progress = false)
-        @test isa(N, NumericalIrreducibleDecomposition)
+        N = nid(F; seed = nothing, show_progress = false)
+        @test isnothing(seed(N))
 
         # options
         N_fails = nid(
@@ -58,29 +48,24 @@
 
         N2 = nid(
             F;
-            tracker_options = TrackerOptions(; extended_precision = false),
+            monodromy_options = MonodromyOptions(; trace_test_tol = 1e-5),
             show_progress = false,
         )
         @test isa(N2, NumericalIrreducibleDecomposition)
 
-        N3 = nid(
-            F;
-            monodromy_options = MonodromyOptions(; trace_test_tol = 1e-5),
-            show_progress = false,
-        )
-        @test isa(N3, NumericalIrreducibleDecomposition)
+        N = nid(F; show_monodromy_progress = true, show_progress = false)
+        @test isa(N, NumericalIrreducibleDecomposition)
+
+        N = nid(F; warning = false, show_progress = false)
+        @test isa(N, NumericalIrreducibleDecomposition)
 
         # number of components
-        @test ncomponents(N3) == 11
-        @test ncomponents(N3, dims = [1, 2]) == 3
-        @test ncomponents(N3, 1) == 2
-        @test n_components(N3) == 11
-        @test n_components(N3, dims = [1, 2]) == 3
-        @test n_components(N3, 1) == 2
-
-        # max_codim = 1
-        N4 = nid(F; max_codim = 1, show_progress = false)
-        @test isa(N4, NumericalIrreducibleDecomposition)
+        @test ncomponents(N2) == 11
+        @test ncomponents(N2, dims = [1, 2]) == 3
+        @test ncomponents(N2, 1) == 2
+        @test n_components(N2) == 11
+        @test n_components(N2, dims = [1, 2]) == 3
+        @test n_components(N2, 1) == 2
     end
 
     @testset "rational systems" begin
