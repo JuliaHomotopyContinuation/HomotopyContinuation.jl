@@ -381,7 +381,50 @@ function Base.cos(b::Basic)
     ccall((:basic_cos, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)
     return a
 end
+function Base.tan(b::Basic)
+    a = Expression()
+    ccall((:basic_tan, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)
+    return a
+end
 Base.sincos(x::Basic) = (sin(x), cos(x))
+
+function Base.asin(b::Basic)
+    a = Expression()
+    ccall((:basic_asin, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)
+    return a
+end
+function Base.acos(b::Basic)
+    a = Expression()
+    ccall((:basic_acos, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)
+    return a
+end
+function Base.atan(b::Basic)
+    a = Expression()
+    ccall((:basic_atan, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)
+    return a
+end
+
+function Base.sinh(b::Basic)
+    a = Expression()
+    ccall((:basic_sinh, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)
+    return a
+end
+function Base.cosh(b::Basic)
+    a = Expression()
+    ccall((:basic_cosh, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)
+    return a
+end
+function Base.tanh(b::Basic)
+    a = Expression()
+    ccall((:basic_tanh, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)
+    return a
+end
+
+function Base.exp(b::Basic)
+    a = Expression()
+    ccall((:basic_exp, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)
+    return a
+end
 
 function Base.log(b::ModelKit.Basic)
     a = Expression()

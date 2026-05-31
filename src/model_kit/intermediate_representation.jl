@@ -470,6 +470,16 @@ function expr_to_ir_statements!(
         end
     elseif t == :Pow
         x, k = args(ex)
+
+        base_str = to_string(x)
+        # Intercept: If the base is Euler's constant 'e', it is actually an exp() call
+        if base_str == "E" || base_str == "e" || base_str == "exp(1)" || class(x) == :Euler
+            # Route the exponent directly through the exp handler
+            k_ref = expr_to_ir_statements!(ir, k, cse, pse)
+            return add_op!(ir, OP_EXP, k_ref)
+        end
+
+        # Normal power processing fallback for integers/constants
         x_ref = expr_to_ir_statements!(ir, x, cse, pse)
         k_ref = expr_to_ir_statements!(ir, k, cse, pse)
         pow!(ir, x_ref, k_ref)
@@ -490,6 +500,33 @@ function expr_to_ir_statements!(
     elseif t == :Cos
         x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
         return add_op!(ir, OP_COS, x)
+    elseif t == :Tan
+        x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
+        return add_op!(ir, OP_TAN, x)
+    elseif t == :Sinh
+        x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
+        return add_op!(ir, OP_SINH, x)
+    elseif t == :Cosh
+        x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
+        return add_op!(ir, OP_COSH, x)
+    elseif t == :Tanh
+        x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
+        return add_op!(ir, OP_TANH, x)
+    elseif t == :ASin
+        x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
+        return add_op!(ir, OP_ASIN, x)
+    elseif t == :ACos
+        x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
+        return add_op!(ir, OP_ACOS, x)
+    elseif t == :ATan
+        x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
+        return add_op!(ir, OP_ATAN, x)
+    elseif t == :Exp || t == :exp
+        x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
+        return add_op!(ir, OP_EXP, x)
+    elseif t == :Sqrt || t == :SquareRott
+        x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
+        return add_op!(ir, OP_SQRT, x)
     else
         n = to_number(ex)
         if (n === ex)
