@@ -38,9 +38,9 @@ export certify,
     nresults,
     nfinite,
     nparts,
-    max_bucket_size,
-    oversized_buckets,
-    unsplittable_buckets,
+    max_leaf_size,
+    oversized_leaves,
+    unsplittable_leaves,
     refinement_steps,
     solutions,
     certificates,
@@ -2079,9 +2079,9 @@ Base.@kwdef struct IteratorCertificationResult
     distinct_real::Int = 0
     distinct_complex::Int = 0
     nparts::Int = 0
-    max_bucket_size::Int = 0
-    oversized_buckets::Int = 0
-    unsplittable_buckets::Int = 0
+    max_leaf_size::Int = 0
+    oversized_leaves::Int = 0
+    unsplittable_leaves::Int = 0
     refinement_steps::Int = 0
 end
 
@@ -2163,25 +2163,25 @@ Return the number of BSP leaves in the final partition.
 nparts(R::IteratorCertificationResult) = R.nparts
 
 """
-    max_bucket_size(R::IteratorCertificationResult)
+    max_leaf_size(R::IteratorCertificationResult)
 
-Return the size of the largest terminal BSP bucket.
+Return the size of the largest BSP leaf.
 """
-max_bucket_size(R::IteratorCertificationResult) = R.max_bucket_size
-
-"""
-    oversized_buckets(R::IteratorCertificationResult)
-
-Return the number of terminal BSP buckets whose size exceeds the requested `bucket_size_bound`.
-"""
-oversized_buckets(R::IteratorCertificationResult) = R.oversized_buckets
+max_leaf_size(R::IteratorCertificationResult) = R.max_leaf_size
 
 """
-    unsplittable_buckets(R::IteratorCertificationResult)
+    oversized_leaves(R::IteratorCertificationResult)
+
+Return the number of terminal BSP buckets whose size exceeds the requested `leaf_size_bound`.
+"""
+oversized_leaves(R::IteratorCertificationResult) = R.oversized_leaves
+
+"""
+    unsplittable_leaves(R::IteratorCertificationResult)
 
 Return the number of BSP leaves that could not be refined further in the chosen projection.
 """
-unsplittable_buckets(R::IteratorCertificationResult) = R.unsplittable_buckets
+unsplittable_leaves(R::IteratorCertificationResult) = R.unsplittable_leaves
 
 """
     refinement_steps(R::IteratorCertificationResult)
@@ -2205,13 +2205,13 @@ function Base.show(io::IO, summary::IteratorCertificationResult)
         "• $(summary.distinct_certified) distinct certified intervals " *
         "($(summary.distinct_real) real, $(summary.distinct_complex) complex)",
     )
-    println(io, "• max bucket size: $(summary.max_bucket_size)")
+    println(io, "• max leaf size: $(summary.max_leaf_size)")
     println(io, "• BSP leaves: $(summary.nparts) ")
-    if summary.oversized_buckets > 0
+    if summary.oversized_leaves > 0
         println(
             io,
-            "• $(summary.oversized_buckets) oversized buckets remain " *
-            "($(summary.unsplittable_buckets) unsplittable by the first coordinate)",
+            "• $(summary.oversized_leaves) oversized buckets remain " *
+            "($(summary.unsplittable_leaves) unsplittable by the first coordinate)",
         )
     end
 end
@@ -2260,12 +2260,12 @@ function check_iterator_certify_options(
     F::AbstractSystem;
     ε::Float64,
     coordinate::Int,
-    bucket_size_bound::Integer,
+    leaf_size_bound::Integer,
     boundaries,
     max_refinement_steps::Int,
 )
     ε > 0 && isfinite(ε) || throw(ArgumentError("`ε` must be positive and finite."))
-    bucket_size_bound > 0 || throw(ArgumentError("`bucket_size_bound` must be positive."))
+    leaf_size_bound > 0 || throw(ArgumentError("`leaf_size_bound` must be positive."))
     max_refinement_steps >= 0 ||
         throw(ArgumentError("`max_refinement_steps` must be non-negative."))
     1 <= coordinate <= size(F, 2) || throw(
@@ -2293,8 +2293,8 @@ Base.@kwdef struct IteratorCertificationCache{S<:AbstractSystem,P,C<:Certificati
     certification_cache::C
     distinct_solutions::D
     progress::Union{Nothing,IteratorCertificationProgress}
-    bucket_size_bound::Int
-    certify_oversized_buckets::Bool
+    leaf_size_bound::Int
+    certify_oversized_leaves::Bool
     ε::Float64
     coordinate::Int
     max_refinement_steps::Int
@@ -3159,17 +3159,17 @@ function _set_leaf_count!(bsp::BSPPartition, leaf, count::Int)
     count
 end
 
-function _leaf_stats(bsp::BSPPartition, bucket_size_bound::Integer)
+function _leaf_stats(bsp::BSPPartition, leaf_size_bound::Integer)
     # Summarize the final BSP leaves for reporting after the full iterator pass and all
     # local refinements have finished.
-    max_bucket_size = 0
-    oversized_buckets = 0
+    max_leaf_size = 0
+    oversized_leaves = 0
     for leaf in bsp.leaves
         count = _bucket_count(bsp, leaf)
-        max_bucket_size = max(max_bucket_size, count)
-        oversized_buckets += Int(count > bucket_size_bound)
+        max_leaf_size = max(max_leaf_size, count)
+        oversized_leaves += Int(count > leaf_size_bound)
     end
-    return max_bucket_size, oversized_buckets
+    return max_leaf_size, oversized_leaves
 end
 
 function certify_terminal_bucket!(
@@ -3390,7 +3390,7 @@ function process_leaf!(
         current_leaf = leaf
     end
 
-    if bucket_size > cache.bucket_size_bound && depth < cache.max_refinement_steps
+    if bucket_size > cache.leaf_size_bound && depth < cache.max_refinement_steps
         # Step 2: this leaf is oversized, so recollect the full local bucket and work
         # only with the corresponding bucket iterator from here on.
         if isnothing(initial_entries)
@@ -3489,7 +3489,7 @@ function process_leaf!(
                 end
             end
 
-            bucket_size ≤ cache.bucket_size_bound && break
+            bucket_size ≤ cache.leaf_size_bound && break
             if !isempty(deterministic_points)
                 # Only after both deterministic tries fail do we spend one extra pass on
                 # a random admissible cut.
@@ -3532,7 +3532,7 @@ function process_leaf!(
         # No safe gap exists in the chosen projection, so this leaf becomes terminal.
         # We remember that explicitly so the final result can distinguish "oversized
         # because unsplittable in this projection" from "oversized because unchecked".
-        bucket_size > cache.bucket_size_bound &&
+        bucket_size > cache.leaf_size_bound &&
             push!(bsp.unsplittable, _bucket_id(current_leaf))
     end
 
@@ -3549,7 +3549,7 @@ function process_leaf!(
 
     # Optionally leave oversized terminal buckets uncertified while still recording
     # their size in the final BSP summary.
-    if bucket_size > cache.bucket_size_bound && !cache.certify_oversized_buckets
+    if bucket_size > cache.leaf_size_bound && !cache.certify_oversized_leaves
         return (
             distinct_certified = 0,
             distinct_real = 0,
@@ -3662,9 +3662,9 @@ Certify a `ResultIterator` without materializing all solutions at once by using 
 The algorithm works in two phases:
 1. stream through the iterator, certify each finite result, and place the certified
    interval into a BSP leaf using the real part of the chosen coordinate;
-2. iteratively refine heavy leaves until every splittable bucket contains at most `bucket_size_bound`
-   entries, then revisit the iterator bucket-by-bucket and certify only the solutions
-   belonging to that bucket jointly.
+2. iteratively refine heavy leaves until every splittable leaf contains at most `leaf_size_bound`
+   entries, then revisit the iterator leaf-by-leaf and certify only the solutions
+   belonging to that leaf jointly.
 For more details of the implementation see [^BBK26].
 ## Options
 
@@ -3672,12 +3672,12 @@ For more details of the implementation see [^BBK26].
 * `threading = true`: If `true`, independent iterator certification passes are threaded. Bucketwise distinct-solution checks are always performed serially.
 * `max_precision = 256`: The maximal accuracy (in bits) that is used in the certification process.
 * `compile = false`: See the [`solve`](@ref) documentation.
-* `bucket_size_bound = 1000`: the algorithm tries to split the real lines into buckets each containing at most `bucket_size_bound` many solutions.
-* `certify_oversized_buckets = false`: if a bucket contains more than `bucket_size_bound` solutions, only certify them when `certify_oversized_buckets` is true.
+* `leaf_size_bound = 1000`: the algorithm tries to split the real lines into buckets each containing at most `leaf_size_bound` many solutions.
+* `certify_oversized_leaves = false`: if a bucket contains more than `leaf_size_bound` solutions, only certify them when `certify_oversized_leaves` is true.
 * `ε = 1e-4`: when proposing a split from one sampled certified interval, place the split at distance `ε` from that interval.
 * `coordinate = 1`: the coordinate of the solutions we project to to compute the binary spatial partition tree.
 * `boundaries = -10:10`: the initial boundaries of the spatial partition.
-* `max_refinement_steps = 50`: the maximal number of times we split buckets to get all buckets containing at most `bucket_size_bound` solutions
+* `max_refinement_steps = 50`: the maximal number of times we split buckets to get all buckets containing at most `leaf_size_bound` solutions
 
 [^BBK26]: Breiding, P., Brysiewicz, T. and Johnson, D. K. "Low-Memory Numerical Certification." arXiv:2604.16623.
 """
@@ -3688,14 +3688,14 @@ function _certify_iterator_bsp(
     cert_params,
     certification_cache::CertificationCache;
     show_progress::Bool = true,
-    bucket_size_bound::Integer = 1000,
-    certify_oversized_buckets::Bool = false,
+    leaf_size_bound::Integer = 1000,
+    certify_oversized_leaves::Bool = false,
     threading::Bool = Threads.nthreads() > 1,
     ε::Float64 = 1e-4,
     coordinate::Int = 1,
     boundaries = -10:10,
     max_refinement_steps::Int = 50,
-    check_oversized_buckets::Bool = true,
+    check_oversized_leaves::Bool = true,
     max_precision::Int = 256,
     refine_solution::Bool = true,
     extended_certificate::Bool = false,
@@ -3706,7 +3706,7 @@ function _certify_iterator_bsp(
         F;
         ε = ε,
         coordinate = coordinate,
-        bucket_size_bound = bucket_size_bound,
+        leaf_size_bound = leaf_size_bound,
         boundaries = boundaries,
         max_refinement_steps = max_refinement_steps,
     )
@@ -3742,8 +3742,8 @@ function _certify_iterator_bsp(
         certification_cache = certification_cache,
         distinct_solutions = d,
         progress = progress,
-        bucket_size_bound = Int(bucket_size_bound),
-        certify_oversized_buckets = certify_oversized_buckets,
+        leaf_size_bound = Int(leaf_size_bound),
+        certify_oversized_leaves = certify_oversized_leaves,
         ε = ε,
         coordinate = coordinate,
         max_refinement_steps = max_refinement_steps,
@@ -3805,9 +3805,9 @@ function _certify_iterator_bsp(
         i = rightmost_index + 1
     end
 
-    max_bucket_size, oversized_buckets = _leaf_stats(bsp, bucket_size_bound)
-    if oversized_buckets > 0 && !check_oversized_buckets
-        oversized_buckets = 0
+    max_leaf_size, oversized_leaves = _leaf_stats(bsp, leaf_size_bound)
+    if oversized_leaves > 0 && !check_oversized_leaves
+        oversized_leaves = 0
     end
 
     res = IteratorCertificationResult(;
@@ -3822,9 +3822,9 @@ function _certify_iterator_bsp(
         distinct_real = distinct_real,
         distinct_complex = distinct_complex,
         nparts = length(bsp.leaves),
-        max_bucket_size = max_bucket_size,
-        oversized_buckets = oversized_buckets,
-        unsplittable_buckets = length(bsp.unsplittable),
+        max_leaf_size = max_leaf_size,
+        oversized_leaves = oversized_leaves,
+        unsplittable_leaves = length(bsp.unsplittable),
         refinement_steps = refinement_steps,
     )
 
