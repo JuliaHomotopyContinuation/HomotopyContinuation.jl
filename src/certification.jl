@@ -3672,7 +3672,7 @@ For more details of the implementation see [^BBK26].
 * `threading = true`: If `true`, independent iterator certification passes are threaded. Bucketwise distinct-solution checks are always performed serially.
 * `max_precision = 256`: The maximal accuracy (in bits) that is used in the certification process.
 * `compile = false`: See the [`solve`](@ref) documentation.
-* `leaf_size_bound = 1000`: the algorithm tries to split the real lines into buckets each containing at most `leaf_size_bound` many solutions.
+* `leaf_size_bound = 10.000`: the algorithm tries to split the real lines into buckets each containing at most `leaf_size_bound` many solutions.
 * `certify_oversized_leaves = false`: if a bucket contains more than `leaf_size_bound` solutions, only certify them when `certify_oversized_leaves` is true.
 * `ε = 1e-4`: when proposing a split from one sampled certified interval, place the split at distance `ε` from that interval.
 * `coordinate = 1`: the coordinate of the solutions we project to to compute the binary spatial partition tree.
@@ -3688,7 +3688,7 @@ function _certify_iterator_bsp(
     cert_params,
     certification_cache::CertificationCache;
     show_progress::Bool = true,
-    leaf_size_bound::Integer = 1000,
+    leaf_size_bound::Integer = 10000,
     certify_oversized_leaves::Bool = false,
     threading::Bool = Threads.nthreads() > 1,
     ε::Float64 = 1e-4,
