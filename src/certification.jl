@@ -1935,7 +1935,7 @@ end
 
 function _phase_label(progress::IteratorCertificationProgress)
     if progress.phase == :assignment
-        "Assign initial leafs and individual certification"
+        "Assign initial leafs/individual certification"
     elseif progress.phase == :refinement
         "Refine leafs for distinct certification"
     else
