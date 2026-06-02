@@ -1928,6 +1928,7 @@ function make_iterator_certification_progress(; dt::Float64 = 0.4)
         desc = "Certifying iterator:",
         color = :green,
         output = stdout,
+        spinner=true
     )
     progress_meter.tlast += 0.3
     IteratorCertificationProgress(progress_meter = progress_meter)
@@ -1966,6 +1967,7 @@ end
 )
     (
         ("Phase", _phase_label(progress)),
+        ("Total # paths tracked", "$(progress.streamed_work)"),
         ("Start iterator length", progress.iterator_length),
         ("Target iterator length", progress.nfinite),
         (
@@ -1977,7 +1979,7 @@ end
             "Total distinct (real/complex)",
             "$(progress.distinct_certified) ($(progress.distinct_real)/$(progress.distinct_complex))",
         ),
-        ("Total number of leaves", "$(progress.total_leaves)"),
+        ("Total # leaves", "$(progress.total_leaves)"),
         ("Current leaf", "$(progress.processed_leaves)"),
         ("Pass status", progress.current_pass),
         ("Pass progress", _format_local_pass_bar(progress)),
@@ -2024,15 +2026,14 @@ function update_iterator_progress!(
 
     progress_meter = progress.progress_meter
     if finish
-        PM.update!(progress_meter, progress.streamed_work)
+        PM.update!(progress_meter)
         PM.finish!(
             progress_meter;
             showvalues = _iterator_certification_showvalues(progress),
         )
     elseif force || time() > progress_meter.tlast + progress_meter.dt
         PM.update!(
-            progress_meter,
-            progress.streamed_work;
+            progress_meter;
             showvalues = _iterator_certification_showvalues(progress),
         )
     end
