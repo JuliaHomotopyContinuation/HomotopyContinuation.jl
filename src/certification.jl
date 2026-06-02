@@ -41,7 +41,7 @@ export certify,
     max_bucket_size,
     oversized_buckets,
     unsplittable_buckets,
-    refinement_rounds,
+    refinement_steps,
     solutions,
     certificates,
     distinct_certified_solutions,
@@ -1919,7 +1919,7 @@ Base.@kwdef mutable struct IteratorCertificationProgress
     distinct_certified::Int = 0
     distinct_real::Int = 0
     distinct_complex::Int = 0
-    refinement_rounds::Int = 0
+    refinement_steps::Int = 0
 end
 
 function make_iterator_certification_progress(; dt::Float64 = 0.4)
@@ -1960,6 +1960,20 @@ function _format_local_pass_bar(progress::IteratorCertificationProgress; barlen:
     )
 end
 
+# Certifying iterator
+#       Total # paths tracked:   7901050          Time: 12:56:33
+#       
+#       Start Iterator Length         : 4923250
+#       Target Iterator Length        : 605653
+#       Certified Solutions at 
+#          first level (real/complex) : 605653 (352/605301) 
+#       Total Distinct (real/complex) : 34878 (59/34819)
+#       Not certified at first level  : 0
+#       Total # Leaves                : 101
+#       
+#       Current Leaf                  : 90
+#             Pass progress                 : 31.4%|██████              | 117/373
+
 @noinline function _iterator_certification_showvalues(
     progress::IteratorCertificationProgress,
 )
@@ -1979,7 +1993,7 @@ end
             "Distinct (real/complex)",
             "$(progress.distinct_certified) ($(progress.distinct_real)/$(progress.distinct_complex))",
         ),
-        ("Refinement rounds", progress.refinement_rounds),
+        ("Refinement rounds", progress.refinement_steps),
     )
 end
 
@@ -2002,7 +2016,7 @@ function update_iterator_progress!(
     distinct_certified::Union{Nothing,Int} = nothing,
     distinct_real::Union{Nothing,Int} = nothing,
     distinct_complex::Union{Nothing,Int} = nothing,
-    refinement_rounds::Union{Nothing,Int} = nothing,
+    refinement_steps::Union{Nothing,Int} = nothing,
     force::Bool = false,
     finish::Bool = false,
 )
@@ -2019,7 +2033,7 @@ function update_iterator_progress!(
     isnothing(distinct_certified) || (progress.distinct_certified = distinct_certified)
     isnothing(distinct_real) || (progress.distinct_real = distinct_real)
     isnothing(distinct_complex) || (progress.distinct_complex = distinct_complex)
-    isnothing(refinement_rounds) || (progress.refinement_rounds = refinement_rounds)
+    isnothing(refinement_steps) || (progress.refinement_steps = refinement_steps)
 
     progress_meter = progress.progress_meter
     if finish
@@ -2081,7 +2095,7 @@ Base.@kwdef struct IteratorCertificationResult
     max_bucket_size::Int = 0
     oversized_buckets::Int = 0
     unsplittable_buckets::Int = 0
-    refinement_rounds::Int = 0
+    refinement_steps::Int = 0
 end
 
 """
@@ -2183,11 +2197,11 @@ Return the number of BSP leaves that could not be refined further in the chosen 
 unsplittable_buckets(R::IteratorCertificationResult) = R.unsplittable_buckets
 
 """
-    refinement_rounds(R::IteratorCertificationResult)
+    refinement_steps(R::IteratorCertificationResult)
 
 Return the number of local BSP refinement steps performed during certification.
 """
-refinement_rounds(R::IteratorCertificationResult) = R.refinement_rounds
+refinement_steps(R::IteratorCertificationResult) = R.refinement_steps
 
 
 function Base.show(io::IO, summary::IteratorCertificationResult)
@@ -2261,12 +2275,12 @@ function check_iterator_certify_options(
     coordinate::Int,
     bucket_size_bound::Integer,
     boundaries,
-    max_refinement_rounds::Int,
+    max_refinement_steps::Int,
 )
     ε > 0 && isfinite(ε) || throw(ArgumentError("`ε` must be positive and finite."))
     bucket_size_bound > 0 || throw(ArgumentError("`bucket_size_bound` must be positive."))
-    max_refinement_rounds >= 0 ||
-        throw(ArgumentError("`max_refinement_rounds` must be non-negative."))
+    max_refinement_steps >= 0 ||
+        throw(ArgumentError("`max_refinement_steps` must be non-negative."))
     1 <= coordinate <= size(F, 2) || throw(
         ArgumentError(
             "`coordinate` must be between 1 and the number of variables ($(size(F, 2))).",
@@ -2296,7 +2310,7 @@ Base.@kwdef struct IteratorCertificationCache{S<:AbstractSystem,P,C<:Certificati
     certify_oversized_buckets::Bool
     ε::Float64
     coordinate::Int
-    max_refinement_rounds::Int
+    max_refinement_steps::Int
     max_precision::Int
     refine_solution::Bool
     extended_certificate::Bool
@@ -3389,7 +3403,7 @@ function process_leaf!(
         current_leaf = leaf
     end
 
-    if bucket_size > cache.bucket_size_bound && depth < cache.max_refinement_rounds
+    if bucket_size > cache.bucket_size_bound && depth < cache.max_refinement_steps
         # Step 2: this leaf is oversized, so recollect the full local bucket and work
         # only with the corresponding bucket iterator from here on.
         if isnothing(initial_entries)
@@ -3676,7 +3690,7 @@ For more details of the implementation see [^BBK26].
 * `ε = 1e-4`: when proposing a split from one sampled certified interval, place the split at distance `ε` from that interval.
 * `coordinate = 1`: the coordinate of the solutions we project to to compute the binary spatial partition tree.
 * `boundaries = -10:10`: the initial boundaries of the spatial partition.
-* `max_refinement_rounds = 50`: the maximal number of times we split buckets to get all buckets containing at most `bucket_size_bound` solutions
+* `max_refinement_steps = 50`: the maximal number of times we split buckets to get all buckets containing at most `bucket_size_bound` solutions
 
 [^BBK26]: Breiding, P., Brysiewicz, T. and Johnson, D. K. "Low-Memory Numerical Certification." arXiv:2604.16623.
 """
@@ -3693,7 +3707,7 @@ function _certify_iterator_bsp(
     ε::Float64 = 1e-4,
     coordinate::Int = 1,
     boundaries = -10:10,
-    max_refinement_rounds::Int = 50,
+    max_refinement_steps::Int = 50,
     check_oversized_buckets::Bool = true,
     max_precision::Int = 256,
     refine_solution::Bool = true,
@@ -3707,7 +3721,7 @@ function _certify_iterator_bsp(
         coordinate = coordinate,
         bucket_size_bound = bucket_size_bound,
         boundaries = boundaries,
-        max_refinement_rounds = max_refinement_rounds,
+        max_refinement_steps = max_refinement_steps,
     )
     bsp = _build_partition(boundaries)
     iter_length = length(iter)
@@ -3745,7 +3759,7 @@ function _certify_iterator_bsp(
         certify_oversized_buckets = certify_oversized_buckets,
         ε = ε,
         coordinate = coordinate,
-        max_refinement_rounds = max_refinement_rounds,
+        max_refinement_steps = max_refinement_steps,
         max_precision = max_precision,
         refine_solution = refine_solution,
         extended_certificate = extended_certificate,
@@ -3769,7 +3783,7 @@ function _certify_iterator_bsp(
             distinct_certified = distinct_certified,
             distinct_real = distinct_real,
             distinct_complex = distinct_complex,
-            refinement_rounds = refinement_steps,
+            refinement_steps = refinement_steps,
         )
         # Walk the current leaf partition from left to right. Processing one leaf may
         # split it into a whole local subtree, so we resume after the rightmost child.
@@ -3824,7 +3838,7 @@ function _certify_iterator_bsp(
         max_bucket_size = max_bucket_size,
         oversized_buckets = oversized_buckets,
         unsplittable_buckets = length(bsp.unsplittable),
-        refinement_rounds = refinement_steps,
+        refinement_steps = refinement_steps,
     )
 
     update_iterator_progress!(
@@ -3841,7 +3855,7 @@ function _certify_iterator_bsp(
         distinct_certified = distinct_certified,
         distinct_real = distinct_real,
         distinct_complex = distinct_complex,
-        refinement_rounds = refinement_steps,
+        refinement_steps = refinement_steps,
         finish = true,
     )
 
