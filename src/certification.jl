@@ -1928,7 +1928,7 @@ function make_iterator_certification_progress(; dt::Float64 = 0.4)
         desc = "Certifying iterator:",
         color = :green,
         output = stdout,
-        spinner=true
+        spinner = true,
     )
     progress_meter.tlast += 0.3
     IteratorCertificationProgress(progress_meter = progress_meter)
@@ -3181,11 +3181,7 @@ function certify_terminal_leaf!(
 )
     d = cache.distinct_solutions
     empty!(d)
-    register_iterator_pass!(
-        cache.progress,
-        "Certify terminal leaf",
-        length(leaf_iter),
-    )
+    register_iterator_pass!(cache.progress, "Certify terminal leaf", length(leaf_iter))
 
     if threading && Threads.nthreads() > 1 && length(leaf_iter) > 1
         worker_count = min(Threads.nthreads(), length(leaf_iter))
@@ -3533,8 +3529,7 @@ function process_leaf!(
         # No safe gap exists in the chosen projection, so this leaf becomes terminal.
         # We remember that explicitly so the final result can distinguish "oversized
         # because unsplittable in this projection" from "oversized because unchecked".
-        leaf_size > cache.leaf_size_bound &&
-            push!(bsp.unsplittable, _leaf_id(current_leaf))
+        leaf_size > cache.leaf_size_bound && push!(bsp.unsplittable, _leaf_id(current_leaf))
     end
 
     # From here on we treat the leaf as terminal, either because it is small enough or
