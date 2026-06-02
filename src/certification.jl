@@ -1935,9 +1935,9 @@ end
 
 function _phase_label(progress::IteratorCertificationProgress)
     if progress.phase == :assignment
-        "Assign initial BSP buckets"
+        "Assign initial leafs and individual certification"
     elseif progress.phase == :refinement
-        "Refine BSP buckets"
+        "Refine leafs for distinct certification"
     else
         "Finished"
     end
@@ -1960,40 +1960,27 @@ function _format_local_pass_bar(progress::IteratorCertificationProgress; barlen:
     )
 end
 
-# Certifying iterator
-#       Total # paths tracked:   7901050          Time: 12:56:33
-#       
-#       Start Iterator Length         : 4923250
-#       Target Iterator Length        : 605653
-#       Certified Solutions at 
-#          first level (real/complex) : 605653 (352/605301) 
-#       Total Distinct (real/complex) : 34878 (59/34819)
-#       Not certified at first level  : 0
-#       Total # Leaves                : 101
-#       
-#       Current Leaf                  : 90
-#             Pass progress                 : 31.4%|██████              | 117/373
 
 @noinline function _iterator_certification_showvalues(
     progress::IteratorCertificationProgress,
 )
     (
         ("Phase", _phase_label(progress)),
-        ("Current pass", progress.current_pass),
-        ("Pass progress", _format_local_pass_bar(progress)),
-        ("Iterator length", progress.iterator_length),
-        ("Finite solutions", progress.nfinite),
+        ("Start iterator length", progress.iterator_length),
+        ("Target iterator length", progress.nfinite),
         (
-            "Certified solutions (real/complex)",
+            "Individual certified (real/complex)",
             "$(progress.certified) ($(progress.certified_real)/$(progress.certified_complex))",
         ),
         ("Not certified", progress.not_certified),
-        ("Leaves", "$(progress.processed_leaves) / $(progress.total_leaves)"),
         (
-            "Distinct (real/complex)",
+            "Total distinct (real/complex)",
             "$(progress.distinct_certified) ($(progress.distinct_real)/$(progress.distinct_complex))",
         ),
-        ("Refinement rounds", progress.refinement_steps),
+        ("Total number of leaves", "$(progress.total_leaves)"),
+        ("Current leaf", "$(progress.processed_leaves)"),
+        ("Pass status", progress.current_pass),
+        ("Pass progress", _format_local_pass_bar(progress)),
     )
 end
 
@@ -2542,7 +2529,7 @@ function assign_initial_buckets!(
     #    a certified interval crosses an existing coarse cut.
     stats = BSPAssignmentStats()
     bucket_entries = _bucket_entries_dict()
-    register_iterator_pass!(progress, "Assign initial BSP buckets", length(iter))
+    register_iterator_pass!(progress, "Intial pass", length(iter))
 
     if threading && Threads.nthreads() > 1 && length(iter) > 1
         worker_count = min(Threads.nthreads(), length(iter))
@@ -2729,7 +2716,7 @@ function collect_leaf_entries!(
     bucket_size = 0
     register_iterator_pass!(
         cache.progress,
-        isnothing(max_entries) ? "Recollect BSP bucket" : "Sample BSP bucket",
+        isnothing(max_entries) ? "Recollect leaf" : "Sample leaf",
         length(iter),
     )
 
@@ -2921,7 +2908,7 @@ function verify_split!(
     left_count = 0
     right_count = 0
     idx = 0
-    register_iterator_pass!(cache.progress, "Verify BSP split", length(iter))
+    register_iterator_pass!(cache.progress, "Leaf split", length(iter))
 
     if threading && Threads.nthreads() > 1 && length(iter) > 1
         worker_count = min(Threads.nthreads(), length(iter))
@@ -3195,7 +3182,7 @@ function certify_terminal_bucket!(
     empty!(d)
     register_iterator_pass!(
         cache.progress,
-        "Certify terminal BSP bucket",
+        "Certify terminal leaf",
         length(bucket_iter),
     )
 
