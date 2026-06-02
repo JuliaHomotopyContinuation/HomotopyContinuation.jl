@@ -481,7 +481,7 @@
             F,
             iter,
             nothing;
-            bucket_size_bound = 2,
+            leaf_size_bound = 2,
             boundaries = -3:3,
             show_progress = false,
         )
@@ -507,7 +507,7 @@
             solve(F; iterator_only = true, target_parameters = params),
         )
 
-        res = certify(F, iter, params; coordinate = 2, certify_oversized_buckets = true)
+        res = certify(F, iter, params; coordinate = 2, certify_oversized_leaves = true)
 
         @test nresults(res) == 3
         @test nfinite(res) == 3
@@ -536,7 +536,7 @@
             target_parameters = [-2],
         )
 
-        res = certify(F, second_iter, [-2]; max_refinement_rounds = 0)
+        res = certify(F, second_iter, [-2]; max_refinement_steps = 0)
         results = collect(second_iter)
         nfinite_results = count(isfinite, results)
 
