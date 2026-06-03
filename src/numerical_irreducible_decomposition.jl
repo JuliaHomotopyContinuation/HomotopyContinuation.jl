@@ -363,6 +363,7 @@ The implementation is based on the algorithm [u-regeneration](https://arxiv.org/
 * `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
 * `max_trials_u_homotopy = 5`: maximal number of random subspaces tried until an intermediate u-regeneration intersection step succeeds.
 * `atol = 1e-14` and `rtol = sqrt(eps())`: a point `y` is considered equal to `x` when the distance between `x`and `y` is smaller than `max(atol, norm(x, Inf) * rtol).`
+* `warning = true`: if `true`, prints a warning when an intermediate u-regeneration intersection step fails after all trials.
 * `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
 * `seed`: choose the random seed.
 
@@ -398,6 +399,7 @@ function _regeneration(
     seed = nothing,
     atol = 1e-14,
     rtol = sqrt(eps()),
+    warning::Bool = true,
 )
 
     !isnothing(seed) && Random.seed!(seed)
@@ -515,6 +517,7 @@ function _regeneration(
                         threading = threading,
                         atol = atol,
                         rtol = rtol,
+                        warning = warning,
                     )
 
                     # update Fᵢ
@@ -794,6 +797,7 @@ function intersect_with_hypersurface!(
     X,
     cache;
     threading::Bool = Threads.nthreads() > 1,
+    warning::Bool = true,
     kwargs...,
 )
     progress = cache.progress
@@ -837,9 +841,9 @@ function intersect_with_hypersurface!(
         is_monodromy = false,
     )
     if threading
-        threaded_intersection!(X, P_next, roots, trackers, u_data, cache, progress)
+        threaded_intersection!(X, P_next, roots, trackers, u_data, cache, progress, warning)
     else
-        serial_intersection!(X, P_next, roots, trackers, u_data, cache, progress)
+        serial_intersection!(X, P_next, roots, trackers, u_data, cache, progress, warning)
     end
 
     nothing
@@ -938,7 +942,17 @@ function start_solution(P, roots, idx, ℓ_coeffs = nothing)
     p
 end
 
-function track_intersection!(X, P, roots, trackers, u_data, cache, progress, threading)
+function track_intersection!(
+    X,
+    P,
+    roots,
+    trackers,
+    u_data,
+    cache,
+    progress,
+    threading,
+    warning,
+)
     l_start = length(P) * length(roots)
     P1 = Vector{Vector{ComplexF64}}(undef, l_start)
     accepted = falses(l_start)
@@ -970,6 +984,9 @@ function track_intersection!(X, P, roots, trackers, u_data, cache, progress, thr
         all(accepted) && break
     end
 
+    if warning && any(.!accepted)
+        @warn "Some u-regeneration start paths failed after resampling the intermediate slice. The returned witness set may be incomplete."
+    end
     # `accepted` guards against undefined or rejected P1 entries. This matters
     # both after failed trials and when the final trial only validates a subset
     # of the starts.
@@ -979,12 +996,12 @@ function track_intersection!(X, P, roots, trackers, u_data, cache, progress, thr
     nothing
 end
 
-function serial_intersection!(X, P, roots, trackers, u_data, cache, progress)
-    track_intersection!(X, P, roots, trackers, u_data, cache, progress, false)
+function serial_intersection!(X, P, roots, trackers, u_data, cache, progress, warning)
+    track_intersection!(X, P, roots, trackers, u_data, cache, progress, false, warning)
 end
 
-function threaded_intersection!(X, P, roots, trackers, u_data, cache, progress)
-    track_intersection!(X, P, roots, trackers, u_data, cache, progress, true)
+function threaded_intersection!(X, P, roots, trackers, u_data, cache, progress, warning)
+    track_intersection!(X, P, roots, trackers, u_data, cache, progress, true, warning)
 end
 
 function u_homotopy_tracker(H, cache)
@@ -1926,7 +1943,7 @@ This function decomposes a [`WitnessSet`](@ref) or a vector of [`WitnessSet`](@r
 * `show_monodromy_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) should be displayed. If `false`, minimal info about the monodromy computations are still displayed in the progress bar of `decompose`.
 * `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
 * `max_iters = 500`: maximal number of iterations for the decomposition step.
-* `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
+* `warning = true`: if `true`, prints a warning when the [`trace_test`](@ref) fails.
 * `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
 * `seed`: choose the random seed.
 
@@ -2249,7 +2266,7 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 * `show_monodromy_for_decompose_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) in [`decompose`](@ref) should be displayed.
 * `max_iters = 500`: maximal number of iterations for the decomposition step.
 * `atol = 1e-14` and `rtol = sqrt(eps())`: a point `y` is considered equal to `x` when the distance between `x`and `y` is smaller than `max(atol, norm(x, Inf) * rtol).` This option is used for [`regeneration`](@ref).
-* `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
+* `warning = true`: if `true`, prints warnings when the [`trace_test`](@ref) or an intermediate u-regeneration intersection step fails.
 * `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
 * `seed`: choose the random seed.
 
@@ -2343,6 +2360,7 @@ function numerical_irreducible_decomposition(
         seed = nothing,
         atol = atol,
         rtol = rtol,
+        warning = warning,
         kwargs...,
     )
     if isnothing(Ws)
@@ -2598,6 +2616,7 @@ This intersects the witness sets `W` and `H`, where `H` is a hypersurface define
 * `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
 * `max_trials_u_homotopy = 5`: maximal number of random subspaces tried until an intermediate u-regeneration intersection step succeeds.
 * `atol = 1e-14` and `rtol = sqrt(eps())`: a point `y` is considered equal to `x` when the distance between `x`and `y` is smaller than `max(atol, norm(x, Inf) * rtol).`
+* `warning = true`: if `true`, prints a warning when an intermediate u-regeneration intersection step fails after all trials.
 * `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
 
 ### Example
@@ -2648,6 +2667,7 @@ function _intersect(
     threading = Threads.nthreads() > 1,
     atol = 1e-14,
     rtol = sqrt(eps()),
+    warning::Bool = true,
     kwargs...,
 )
     @assert size(system(H), 1) == 1 "The second argument must be defined by a single polynomial."
@@ -2705,6 +2725,7 @@ function _intersect(
         threading = threading,
         atol = atol,
         rtol = rtol,
+        warning = warning,
         kwargs...,
     )
     update_Fᵢ!(cache, [f; h], vars_u)
