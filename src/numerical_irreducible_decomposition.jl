@@ -985,7 +985,7 @@ function track_intersection!(
     end
 
     if warning && any(.!accepted)
-        @warn "Some u-regeneration start paths failed after resampling the intermediate slice. The returned witness set may be incomplete."
+        @warn "Some homotopy paths in the u-regeneration intersection step failed. The returned witness set may be incomplete."
     end
     # `accepted` guards against undefined or rejected P1 entries. This matters
     # both after failed trials and when the final trial only validates a subset
