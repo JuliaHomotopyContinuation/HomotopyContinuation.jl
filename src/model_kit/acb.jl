@@ -13,10 +13,6 @@ end
 Base.@propagate_inbounds function acb_op_asin!(t, x, m)
     Arblib.asin!(t, x)
 end
-# OP_ATAN # tan^-1 (a)
-Base.@propagate_inbounds function acb_op_atan!(t, x, m)
-    Arblib.atan!(t, x)
-end
 # OP_CB # a ^ 3
 Base.@propagate_inbounds function acb_op_cb!(t, x, m)
     Arblib.sqr!(m[1], x)

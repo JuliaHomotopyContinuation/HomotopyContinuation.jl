@@ -347,24 +347,32 @@ function taylor_sinh_helper!(list, D, k)
     k == 0 && return :sh₀
     sh_k = nothing
     for j = 1:k
-        sh_k = muladd!(list, mul!(list, j, D[:x, j]), taylor_cosh_helper!(list, D, k - j), sh_k)
+        sh_k = muladd!(
+            list,
+            mul!(list, j, D[:x, j]),
+            taylor_cosh_helper!(list, D, k - j),
+            sh_k,
+        )
     end
     div!(list, sh_k, k)
 end
-
 function taylor_cosh_helper!(list, D, k)
     k == 0 && return :ch₀
     ch_k = nothing
     for j = 1:k
-        ch_k = muladd!(list, mul!(list, j, D[:x, j]), taylor_sinh_helper!(list, D, k - j), ch_k)
+        ch_k = muladd!(
+            list,
+            mul!(list, j, D[:x, j]),
+            taylor_sinh_helper!(list, D, k - j),
+            ch_k,
+        )
     end
     div!(list, ch_k, k)
 end
-
 function taylor_sinh_impl(K, M)
     D = DiffMap()
     list = IntermediateRepresentation()
-    for k = 0:M-1
+    for k = 0:(M-1)
         D[:x, k] = Symbol(:x, k)
     end
     ids = Any[:sh₀]
@@ -374,16 +382,16 @@ function taylor_sinh_impl(K, M)
     quote
         Base.@_inline_meta
         $(untuple(:x, M - 1))
-        sh₀ = sinh(x0); ch₀ = cosh(x0)
+        sh₀ = sinh(x0);
+        ch₀ = cosh(x0)
         $(to_julia_expr(list))
         $(taylor_tuple(ids))
     end
 end
-
 function taylor_cosh_impl(K, M)
     D = DiffMap()
     list = IntermediateRepresentation()
-    for k = 0:M-1
+    for k = 0:(M-1)
         D[:x, k] = Symbol(:x, k)
     end
     ids = Any[:ch₀]
@@ -393,12 +401,12 @@ function taylor_cosh_impl(K, M)
     quote
         Base.@_inline_meta
         $(untuple(:x, M - 1))
-        sh₀ = sinh(x0); ch₀ = cosh(x0)
+        sh₀ = sinh(x0);
+        ch₀ = cosh(x0)
         $(to_julia_expr(list))
         $(taylor_tuple(ids))
     end
 end
-
 @generated function taylor_op_sinh(::Val{K}, x::TruncatedTaylorSeries{M}) where {K,M}
     taylor_sinh_impl(K, M)
 end
@@ -407,43 +415,48 @@ end
 end
 
 # OP_TAN and OP_TANH
-function taylor_tan_helper!(list, D, k)
+function taylor_tan_helper!(list, D, ids, k)
     k == 0 && return :t₀
     t_k = mul!(list, k, D[:x, k])
-    for j = 1:k-1
-        inner_sum = nothing
-        for m = 0:k-j
-            term = mul!(list, taylor_tan_helper!(list, D, m), taylor_tan_helper!(list, D, k - j - m))
-            inner_sum = inner_sum === nothing ? term : add!(list, inner_sum, term)
+    for j = 1:(k-1)
+        sq_sum = nothing
+        for m = 0:(k-j)
+            term = mul!(list, ids[m+1], ids[k-j-m+1])
+            sq_sum = sq_sum === nothing ? term : add!(list, sq_sum, term)
         end
-        t_k = muladd!(list, mul!(list, j, D[:x, j]), inner_sum, t_k)
+        t_k = muladd!(list, mul!(list, j, D[:x, j]), sq_sum, t_k)
     end
+    boundary_sq = mul!(list, ids[1], ids[1])
+    t_k = muladd!(list, mul!(list, k, D[:x, k]), boundary_sq, t_k)
+
     div!(list, t_k, k)
 end
-function taylor_tanh_helper!(list, D, k)
+function taylor_tanh_helper!(list, D, ids, k)
     k == 0 && return :th₀
     th_k = mul!(list, k, D[:x, k])
-    for j = 1:k-1
-        inner_sum = nothing
-        for m = 0:k-j
-            term = mul!(list, taylor_tanh_helper!(list, D, m), taylor_tanh_helper!(list, D, k - j - m))
-            inner_sum = inner_sum === nothing ? term : add!(list, inner_sum, term)
+    for j = 1:(k-1)
+        sq_sum = nothing
+        for m = 0:(k-j)
+            term = mul!(list, ids[m+1], ids[k-j-m+1])
+            sq_sum = sq_sum === nothing ? term : add!(list, sq_sum, term)
         end
-        product = mul!(list, mul!(list, j, D[:x, j]), inner_sum)
+        product = mul!(list, mul!(list, j, D[:x, j]), sq_sum)
         th_k = sub!(list, th_k, product)
     end
+    boundary_sq = mul!(list, ids[1], ids[1])
+    product_boundary = mul!(list, mul!(list, k, D[:x, k]), boundary_sq)
+    th_k = sub!(list, th_k, product_boundary)
     div!(list, th_k, k)
 end
-
 function taylor_tan_impl(K, M)
     D = DiffMap()
     list = IntermediateRepresentation()
-    for k = 0:M-1
+    for k = 0:(M-1)
         D[:x, k] = Symbol(:x, k)
     end
     ids = Any[:t₀]
     for k = 1:K
-        push!(ids, taylor_tan_helper!(list, D, k))
+        push!(ids, taylor_tan_helper!(list, D, ids, k))
     end
     quote
         Base.@_inline_meta
@@ -453,16 +466,15 @@ function taylor_tan_impl(K, M)
         $(taylor_tuple(ids))
     end
 end
-
 function taylor_tanh_impl(K, M)
     D = DiffMap()
     list = IntermediateRepresentation()
-    for k = 0:M-1
+    for k = 0:(M-1)
         D[:x, k] = Symbol(:x, k)
     end
     ids = Any[:th₀]
     for k = 1:K
-        push!(ids, taylor_tanh_helper!(list, D, k))
+        push!(ids, taylor_tanh_helper!(list, D, ids, k))
     end
     quote
         Base.@_inline_meta
@@ -472,7 +484,6 @@ function taylor_tanh_impl(K, M)
         $(taylor_tuple(ids))
     end
 end
-
 @generated function taylor_op_tan(::Val{K}, x::TruncatedTaylorSeries{M}) where {K,M}
     taylor_tan_impl(K, M)
 end
@@ -480,73 +491,42 @@ end
     taylor_tanh_impl(K, M)
 end
 
-# OP_ATAN, OP_ASIN, OP_ACOS
-function taylor_atan_helper!(list, D, k)
-    k == 0 && return :at₀
-    sum_terms = nothing
-    for j = 1:k-1
-        x_sq_j = nothing
-        for m = 0:j
-            x_sq_j = muladd!(list, D[:x, m], D[:x, j - m], x_sq_j)
+# OP_ASIN, OP_ACOS
+function taylor_asin_helper!(list, D, k)
+    k == 0 && return :as₀
+    u_coeffs = Vector{Any}(undef, k + 1)
+    u_coeffs[1] = sub!(list, 1, mul!(list, D[:x, 0], D[:x, 0]))
+    for n = 1:k
+        x_sq_n = nothing
+        for m = 0:n
+            x_sq_n = muladd!(list, D[:x, m], D[:x, n-m], x_sq_n)
         end
-        sum_terms = muladd!(list, mul!(list, k - j, taylor_atan_helper!(list, D, k - j)), x_sq_j, sum_terms)
+        u_coeffs[n+1] = sub!(list, 0, x_sq_n)
     end
-    
-    x_sq_0 = mul!(list, D[:x, 0], D[:x, 0])
-    denom = add_op!(list, OP_ADD, x_sq_0, 1)
-    
+    g_ids = []
+    for n = 0:k
+        taylor_sqrt_helper!(list, u_coeffs, g_ids, n)
+    end
+    sum_terms = nothing
+    for j = 1:(k-1)
+        y_kj = taylor_asin_helper!(list, D, k - j)
+        sum_terms = muladd!(list, mul!(list, k - j, y_kj), g_ids[j+1], sum_terms)
+    end
     val = mul!(list, k, D[:x, k])
     if sum_terms !== nothing
         val = sub!(list, val, sum_terms)
     end
-    div!(list, div!(list, val, denom), k)
-end
-function taylor_asin_helper!(list, D, k)
-    k == 0 && return :as₀
-    sum_terms = nothing
-    for j = 1:k-1
-        x_sq_j = nothing
-        for m = 0:j
-            x_sq_j = muladd!(list, D[:x, m], D[:x, j - m], x_sq_j)
-        end
-        sum_terms = muladd!(list, mul!(list, k - j, taylor_asin_helper!(list, D, k - j)), x_sq_j, sum_terms)
-    end
-    
-    denom = sub!(list, 1, mul!(list, D[:x, 0], D[:x, 0])) # (1 - x₀²)
-    val = mul!(list, k, D[:x, k])
-    if sum_terms !== nothing
-        val = add!(list, val, sum_terms)
-    end
-    div!(list, div!(list, val, denom), k)
+    g₀ = g_ids[1]
+    return div!(list, div!(list, val, g₀), k)
 end
 function taylor_acos_helper!(list, D, k)
     k == 0 && return :ac₀
     mul!(list, -1, taylor_asin_helper!(list, D, k))
 end
-
-function taylor_atan_impl(K, M)
-    D = DiffMap()
-    list = IntermediateRepresentation()
-    for k = 0:M-1
-        D[:x, k] = Symbol(:x, k)
-    end
-    ids = Any[:at₀]
-    for k = 1:K
-        push!(ids, taylor_atan_helper!(list, D, k))
-    end
-    quote
-        Base.@_inline_meta
-        $(untuple(:x, M - 1))
-        at₀ = atan(x0)
-        $(to_julia_expr(list))
-        $(taylor_tuple(ids))
-    end
-end
-
 function taylor_asin_impl(K, M)
     D = DiffMap()
     list = IntermediateRepresentation()
-    for k = 0:M-1
+    for k = 0:(M-1)
         D[:x, k] = Symbol(:x, k)
     end
     ids = Any[:as₀]
@@ -561,11 +541,10 @@ function taylor_asin_impl(K, M)
         $(taylor_tuple(ids))
     end
 end
-
 function taylor_acos_impl(K, M)
     D = DiffMap()
     list = IntermediateRepresentation()
-    for k = 0:M-1
+    for k = 0:(M-1)
         D[:x, k] = Symbol(:x, k)
     end
     ids = Any[:ac₀]
@@ -580,10 +559,6 @@ function taylor_acos_impl(K, M)
         $(taylor_tuple(ids))
     end
 end
-
-@generated function taylor_op_atan(::Val{K}, x::TruncatedTaylorSeries{M}) where {K,M}
-    taylor_atan_impl(K, M)
-end
 @generated function taylor_op_asin(::Val{K}, x::TruncatedTaylorSeries{M}) where {K,M}
     taylor_asin_impl(K, M)
 end
@@ -596,14 +571,15 @@ function taylor_exp_helper!(list, D, k)
     k == 0 && return :e₀
     e_k = nothing
     for j = 1:k
-        e_k = muladd!(list, mul!(list, j, D[:x, j]), taylor_exp_helper!(list, D, k - j), e_k)
+        e_k =
+            muladd!(list, mul!(list, j, D[:x, j]), taylor_exp_helper!(list, D, k - j), e_k)
     end
     div!(list, e_k, k)
 end
 function taylor_exp_impl(K, M)
     D = DiffMap()
     list = IntermediateRepresentation()
-    for k = 0:M-1
+    for k = 0:(M-1)
         D[:x, k] = Symbol(:x, k)
     end
 
@@ -676,23 +652,33 @@ end
     taylor_op_sqr_impl(K, M)
 end
 # OP_SQRT # √(a)
-# TODO VERIFY CORRECTNESS
+function taylor_sqrt_helper!(list, u_coeffs, ids, k)
+    if k == 0
+        v₀ = add_op!(list, OP_SQRT, u_coeffs[1])
+        push!(ids, v₀)
+        return v₀
+    elseif k == 1
+        d = mul!(list, 2, ids[1])
+        v₁ = div!(list, u_coeffs[2], d)
+        push!(ids, v₁)
+        return v₁
+    else
+        d = mul!(list, 2, ids[1])
+        s = nothing
+        for j = 1:(k-1)
+            s = muladd!(list, ids[j+1], ids[k-j+1], s)
+        end
+        v_k = div!(list, sub!(list, u_coeffs[k+1], s), d)
+        push!(ids, v_k)
+        return v_k
+    end
+end
 @generated function taylor_op_sqrt(::Val{K}, x::TruncatedTaylorSeries{M}) where {K,M}
     taylor_impl(K, M - 1) do list, D
-        v₀ = add_op!(list, OP_SQRT, D[:x, 0])
-        d = mul!(list, 2, v₀)
+        u_coeffs = [D[:x, n] for n = 0:K]
         ids = []
-        push!(ids, v₀)
-        if K >= 1
-            v₁ = div!(list, D[:x, 1], d)
-            push!(ids, v₁)
-        end
-        for k = 2:K
-            s = nothing
-            for j = 1:(k-1)
-                s = muladd!(list, ids[j+1], ids[k-j+1], s)
-            end
-            push!(ids, div!(list, sub!(list, D[:x, k], s), d))
+        for n = 0:K
+            taylor_sqrt_helper!(list, u_coeffs, ids, n)
         end
         ids
     end

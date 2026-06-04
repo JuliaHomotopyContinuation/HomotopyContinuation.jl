@@ -10,7 +10,6 @@
     OP_CB # a ^ 3 TODO
     OP_ACOS # cos^-1(a)
     OP_ASIN # sin^-1(a)
-    OP_ATAN # tan^-1(a)
     OP_COS # cos(a)
     OP_COSH # cosh(a)
     OP_EXP # e^a
@@ -54,7 +53,6 @@ function arity(op_type::OpType)
         0
     elseif op_type == OP_ACOS ||
            op_type == OP_ASIN ||
-           op_type == OP_ATAN ||
            op_type == OP_CB ||
            op_type == OP_COS ||
            op_type == OP_COSH ||
@@ -104,8 +102,6 @@ function op_call(op_type::OpType)
         :op_acos
     elseif op_type == OP_ASIN
         :op_asin
-    elseif op_type == OP_ATAN
-        :op_atan
     elseif op_type == OP_CB
         :op_cb
     elseif op_type == OP_COS
@@ -189,7 +185,6 @@ op_stop() = nothing
 # arity 1
 op_acos(x) = acos(x)
 op_asin(x) = asin(x)
-op_atan(x) = atan(x)
 
 # Generic fallback: 2 complex multiplications (8 real muls)
 op_cb(x) = x * x * x

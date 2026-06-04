@@ -556,7 +556,9 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
                         break
                     end
                 end
-            elseif arg_cls == :Exp || arg_cls == :exp || (arg_cls == :Pow && class(args(arg)[1]) == :Euler)
+            elseif arg_cls == :Exp ||
+                   arg_cls == :exp ||
+                   (arg_cls == :Pow && class(args(arg)[1]) == :Euler)
                 is_coeff = true
             elseif arg_cls == :Pow
                 vec = args!(pow_args, arg)
