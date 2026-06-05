@@ -66,13 +66,14 @@ ndistinct_complex_certified
 nprocessed
 nduplicates
 nnotcertified
-nresults
-nfinite
-nparts
-max_bucket_size
-oversized_buckets
-unsplittable_buckets
-refinement_rounds
+npaths
+start_iterator_length
+target_iterator_length
+nleaves
+max_leaf_size
+oversized_leaves
+unsplittable_leaves
+refinement_steps
 save(filename, R::CertificationResult)
 show_straight_line_program
 ```
