@@ -38,7 +38,7 @@ export certify,
     npaths,
     start_iterator_length,
     target_iterator_length,
-    nparts,
+    nleaves,
     max_leaf_size,
     oversized_leaves,
     unsplittable_leaves,
@@ -2076,7 +2076,7 @@ Base.@kwdef struct IteratorCertificationResult
     distinct_certified::Int = 0
     distinct_real::Int = 0
     distinct_complex::Int = 0
-    nparts::Int = 0
+    nleaves::Int = 0
     max_leaf_size::Int = 0
     oversized_leaves::Int = 0
     unsplittable_leaves::Int = 0
@@ -2161,11 +2161,11 @@ Return the number of distinct certified solutions that were certified non-real c
 ndistinct_complex_certified(R::IteratorCertificationResult) = R.distinct_complex
 
 """
-    nparts(R::IteratorCertificationResult)
+    nleaves(R::IteratorCertificationResult)
 
 Return the number of BSP leaves in the final partition.
 """
-nparts(R::IteratorCertificationResult) = R.nparts
+nleaves(R::IteratorCertificationResult) = R.nleaves
 
 """
     max_leaf_size(R::IteratorCertificationResult)
@@ -2211,7 +2211,7 @@ function Base.show(io::IO, summary::IteratorCertificationResult)
         "($(summary.distinct_real) real, $(summary.distinct_complex) complex)",
     )
     println(io, "• max leaf size: $(summary.max_leaf_size)")
-    println(io, "• BSP leaves: $(summary.nparts) ")
+    println(io, "• BSP leaves: $(summary.nleaves) ")
     if summary.oversized_leaves > 0
         println(
             io,
@@ -3821,7 +3821,7 @@ function _certify_iterator_bsp(
         distinct_certified = distinct_certified,
         distinct_real = distinct_real,
         distinct_complex = distinct_complex,
-        nparts = length(bsp.leaves),
+        nleaves = length(bsp.leaves),
         max_leaf_size = max_leaf_size,
         oversized_leaves = oversized_leaves,
         unsplittable_leaves = length(bsp.unsplittable),
