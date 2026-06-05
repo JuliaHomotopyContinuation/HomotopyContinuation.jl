@@ -2389,9 +2389,9 @@ function foreach_threaded_result(f, iter::ResultIterator, trackers, result_predi
                     isnothing(item) && break
                     result = track(trackers[tid], item[2])
                     selected = result_predicate(result)
-                    is_success = is_success(result)
-                    sol = selected && is_success ? copy(solution(result)) : nothing
-                    f(tid, item[1], selected, is_success, sol)
+                    success = is_success(result)
+                    sol = selected && success ? copy(solution(result)) : nothing
+                    f(tid, item[1], selected, success, sol)
                 end
             end
         end
@@ -2560,7 +2560,7 @@ function assign_initial_leaves!(
             iter,
             workers.trackers,
             result_predicate,
-        ) do tid, idx, selected, is_success, sol
+        ) do tid, idx, selected, success, sol
             local_entries = certified_entries[tid]
             if selected
                 Threads.atomic_add!(npaths, 1)
@@ -2578,7 +2578,7 @@ function assign_initial_leaves!(
                 )
             end
             selected || return
-            is_success || return
+            success || return
 
             Threads.atomic_add!(target_iterator_length, 1)
             cert = certify_solution(
@@ -2743,12 +2743,12 @@ function collect_leaf_entries!(
             iter,
             workers.trackers,
             cache.result_predicate,
-        ) do tid, idx, selected, is_success, sol
+        ) do tid, idx, selected, success, sol
             @lock progress_lock begin
                 advance_iterator_progress!(cache.progress)
             end
             selected || return
-            is_success || return
+            success || return
 
             cert = certify_solution(
                 workers.systems[tid],
@@ -2936,12 +2936,12 @@ function verify_split!(
             iter,
             workers.trackers,
             cache.result_predicate,
-        ) do tid, idx, selected, is_success, sol
+        ) do tid, idx, selected, success, sol
             @lock progress_lock begin
                 advance_iterator_progress!(cache.progress)
             end
             selected || return
-            is_success || return
+            success || return
 
             cert = certify_solution(
                 workers.systems[tid],
@@ -3206,12 +3206,12 @@ function certify_terminal_leaf!(
             leaf_iter,
             workers.trackers,
             Returns(true),
-        ) do tid, idx, selected, is_success, sol
+        ) do tid, idx, selected, success, sol
             @lock progress_lock begin
                 advance_iterator_progress!(cache.progress)
             end
             selected || return
-            is_success || return
+            success || return
 
             Threads.atomic_add!(target_iterator_length, 1)
             cert = certify_solution(
@@ -3676,8 +3676,8 @@ For more details of the implementation see [^BBK26].
 * `certify_oversized_leaves = false`: if a leaf contains more than `leaf_size_bound` solutions, only certify it when `certify_oversized_leaves` is true.
 * `ε = 1e-4`: when proposing a split from one sampled certified interval, place the split at distance `ε` from that interval.
 * `coordinate = 1`: the coordinate of the solutions we project to to compute the binary spatial partition tree.
-* `boundaries = -10:10`: the initial boundaries of the spatial partition.
-* `max_refinement_steps = 50`: the maximal number of times we split leaves to get all leaves containing at most `leaf_size_bound` solutions.
+* `boundaries = -100:0.1:100`: the initial boundaries of the spatial partition.
+* `max_refinement_steps = 300`: the maximal number of times we split leaves to get all leaves containing at most `leaf_size_bound` solutions.
 
 [^BBK26]: Breiding, P., Brysiewicz, T. and Johnson, D. K. "Low-Memory Numerical Certification." arXiv:2604.16623.
 """
@@ -3693,8 +3693,8 @@ function _certify_iterator_bsp(
     threading::Bool = Threads.nthreads() > 1,
     ε::Float64 = 1e-4,
     coordinate::Int = 1,
-    boundaries = -10:10,
-    max_refinement_steps::Int = 50,
+    boundaries = -100:0.1:100,
+    max_refinement_steps::Int = 300,
     check_oversized_leaves::Bool = true,
     max_precision::Int = 256,
     refine_solution::Bool = true,
