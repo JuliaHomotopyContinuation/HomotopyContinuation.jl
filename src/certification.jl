@@ -2216,7 +2216,7 @@ function Base.show(io::IO, summary::IteratorCertificationResult)
         println(
             io,
             "• $(summary.oversized_leaves) oversized leaves remain " *
-            "($(summary.unsplittable_leaves) unsplittable by the first coordinate)",
+            "($(summary.unsplittable_leaves) unsplittable)",
         )
     end
 end
