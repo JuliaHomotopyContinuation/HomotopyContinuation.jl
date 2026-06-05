@@ -2069,6 +2069,7 @@ Final summary returned by the BSP-based [`certify`](@ref) method for`ResultItera
 """
 Base.@kwdef struct IteratorCertificationResult
     bsp::BSPPartition
+    start_iterator_length::Int = 0
     npaths::Int = 0
     target_iterator_length::Int = 0
     certified::Int = 0
@@ -2309,6 +2310,7 @@ Base.@kwdef struct IteratorCertificationCache{S<:AbstractSystem,P,C<:Certificati
     refine_solution::Bool
     extended_certificate::Bool
     result_predicate::Function
+    npaths::Threads.Atomic{Int}
 end
 
 function threaded_certification_data(
@@ -2564,9 +2566,7 @@ function assign_initial_leaves!(
             result_predicate,
         ) do tid, idx, selected, success, sol
             local_entries = certified_entries[tid]
-            if selected
-                Threads.atomic_add!(npaths, 1)
-            end
+            Threads.atomic_add!(npaths, 1)
             @lock progress_lock begin
                 advance_iterator_progress!(
                     progress;
@@ -2634,7 +2634,7 @@ function assign_initial_leaves!(
     for result in iter
         idx += 1
         selected = result_predicate(result)
-        stats.npaths += Int(selected)
+        stats.npaths += 1
         advance_iterator_progress!(
             progress;
             phase = :assignment,
@@ -2746,8 +2746,9 @@ function collect_leaf_entries!(
             workers.trackers,
             cache.result_predicate,
         ) do tid, idx, selected, success, sol
+            Threads.atomic_add!(cache.npaths, 1)
             @lock progress_lock begin
-                advance_iterator_progress!(cache.progress)
+                advance_iterator_progress!(cache.progress; npaths = cache.npaths[])
             end
             selected || return
             success || return
@@ -2793,7 +2794,8 @@ function collect_leaf_entries!(
 
     for result in iter
         idx += 1
-        advance_iterator_progress!(cache.progress)
+        Threads.atomic_add!(cache.npaths, 1)
+        advance_iterator_progress!(cache.progress; npaths = cache.npaths[])
         cache.result_predicate(result) || continue
         is_success(result) || continue
 
@@ -2939,8 +2941,9 @@ function verify_split!(
             workers.trackers,
             cache.result_predicate,
         ) do tid, idx, selected, success, sol
+            Threads.atomic_add!(cache.npaths, 1)
             @lock progress_lock begin
-                advance_iterator_progress!(cache.progress)
+                advance_iterator_progress!(cache.progress; npaths = cache.npaths[])
             end
             selected || return
             success || return
@@ -3024,7 +3027,8 @@ function verify_split!(
 
     for result in iter
         idx += 1
-        advance_iterator_progress!(cache.progress)
+        Threads.atomic_add!(cache.npaths, 1)
+        advance_iterator_progress!(cache.progress; npaths = cache.npaths[])
         cache.result_predicate(result) || continue
         is_success(result) || continue
 
@@ -3209,8 +3213,9 @@ function certify_terminal_leaf!(
             workers.trackers,
             Returns(true),
         ) do tid, idx, selected, success, sol
+            Threads.atomic_add!(cache.npaths, 1)
             @lock progress_lock begin
-                advance_iterator_progress!(cache.progress)
+                advance_iterator_progress!(cache.progress; npaths = cache.npaths[])
             end
             selected || return
             success || return
@@ -3245,7 +3250,8 @@ function certify_terminal_leaf!(
 
     target_iterator_length = 0
     for result in leaf_iter
-        advance_iterator_progress!(cache.progress)
+        Threads.atomic_add!(cache.npaths, 1)
+        advance_iterator_progress!(cache.progress; npaths = cache.npaths[])
         if is_success(result)
             target_iterator_length += 1
             add_solution!(
@@ -3713,9 +3719,14 @@ function _certify_iterator_bsp(
         max_refinement_steps = max_refinement_steps,
     )
     bsp = _build_partition(boundaries)
+    start_iter_length = length(start_solutions(iter))
     iter_length = length(iter)
     progress = show_progress ? make_iterator_certification_progress() : nothing
-    update_iterator_progress!(progress; start_iterator_length = iter_length, force = true)
+    update_iterator_progress!(
+        progress;
+        start_iterator_length = start_iter_length,
+        force = true,
+    )
     # First pass over the full iterator: assign certified intervals to the coarse BSP.
     assignment_stats, leaf_entries_by_id = assign_initial_leaves!(
         bsp,
@@ -3753,6 +3764,7 @@ function _certify_iterator_bsp(
         refine_solution = refine_solution,
         extended_certificate = extended_certificate,
         result_predicate = result_predicate,
+        npaths = Threads.Atomic{Int}(assignment_stats.npaths),
     )
 
     refinement_steps = 0
@@ -3761,7 +3773,7 @@ function _certify_iterator_bsp(
         update_iterator_progress!(
             progress;
             phase = :refinement,
-            npaths = assignment_stats.npaths,
+            npaths = cache.npaths[],
             target_iterator_length = assignment_stats.target_iterator_length,
             certified = assignment_stats.certified,
             certified_real = assignment_stats.certified_real,
@@ -3814,7 +3826,8 @@ function _certify_iterator_bsp(
 
     res = IteratorCertificationResult(;
         bsp = bsp,
-        npaths = assignment_stats.npaths,
+        start_iterator_length = start_iter_length,
+        npaths = cache.npaths[],
         target_iterator_length = assignment_stats.target_iterator_length,
         certified = assignment_stats.certified,
         certified_real = assignment_stats.certified_real,
@@ -3833,7 +3846,7 @@ function _certify_iterator_bsp(
     update_iterator_progress!(
         progress;
         phase = :finished,
-        npaths = assignment_stats.npaths,
+        npaths = cache.npaths[],
         target_iterator_length = assignment_stats.target_iterator_length,
         certified = assignment_stats.certified,
         certified_real = assignment_stats.certified_real,
