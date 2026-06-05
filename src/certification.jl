@@ -58,7 +58,7 @@ abstract type AbstractSolutionCertificate end
 """
     SolutionCertificate
 
-Result of [`certify`](@ref) for a single solution. Contains the initial solutions and if the certification was successfull a vector of complex intervals where the true solution is contained in.
+Result of [`certify`](@ref) for a single solution. Contains the initial solutions and if the certification was successful a vector of complex intervals where the true solution is contained in.
 The complex intervals are given as an `Arblib.AcbMatrix`.
 The `Arblib.AcbMatrix` is printed in the default format of `Arblib`. This means that, if the midpoint of an interval can't be represented with sufficiently many correct digits, `Arblib` will not print the midpoint. Instead, it will print an interval of the form `[+/- r]`, where `r` will be an upper bound for the absolute value of the ball. An enclosure of the correct interval can be printed as follows.
 ```julia
@@ -1892,7 +1892,7 @@ end
 Summary statistics for the BSP.
 """
 Base.@kwdef mutable struct BSPAssignmentStats
-    npaths::Int = 0
+    assignment_npaths::Int = 0
     target_iterator_length::Int = 0
     certified::Int = 0
     certified_real::Int = 0
@@ -1935,9 +1935,9 @@ end
 
 function _phase_label(progress::IteratorCertificationProgress)
     if progress.phase == :assignment
-        "Assign initial leafs/individual certification"
+        "Assign initial leaves/individual certification"
     elseif progress.phase == :refinement
-        "Refine leafs for distinct certification"
+        "Refine leaves for distinct certification"
     else
         "Finished"
     end
@@ -2393,9 +2393,9 @@ function foreach_threaded_result(f, iter::ResultIterator, trackers, result_predi
                     isnothing(item) && break
                     result = track(trackers[tid], item[2])
                     selected = result_predicate(result)
-                    success = is_success(result)
-                    sol = selected && success ? copy(solution(result)) : nothing
-                    f(tid, item[1], selected, success, sol)
+                    path_success = is_success(result)
+                    sol = selected && path_success ? copy(solution(result)) : nothing
+                    f(tid, item[1], selected, path_success, sol)
                 end
             end
         end
@@ -2532,13 +2532,13 @@ function assign_initial_leaves!(
 )
     # Phase 1:
     # 1. stream once through the full iterator;
-    # 2. certify each succesful result individually;
+    # 2. certify each successful result individually;
     # 3. project certified results to one real interval;
     # 4. place those intervals into the current coarse BSP leaves, merging leaves when
     #    a certified interval crosses an existing coarse cut.
     stats = BSPAssignmentStats()
     leaf_entries_by_id = _leaf_entries_dict()
-    register_iterator_pass!(progress, "Intial pass", length(iter))
+    register_iterator_pass!(progress, "Initial pass", length(iter))
 
     if threading && Threads.nthreads() > 1 && length(iter) > 1
         worker_count = min(Threads.nthreads(), length(iter))
@@ -2564,7 +2564,7 @@ function assign_initial_leaves!(
             iter,
             workers.trackers,
             result_predicate,
-        ) do tid, idx, selected, success, sol
+        ) do tid, idx, selected, path_success, sol
             local_entries = certified_entries[tid]
             Threads.atomic_add!(npaths, 1)
             @lock progress_lock begin
@@ -2580,7 +2580,7 @@ function assign_initial_leaves!(
                 )
             end
             selected || return
-            success || return
+            path_success || return
 
             Threads.atomic_add!(target_iterator_length, 1)
             cert = certify_solution(
@@ -2608,7 +2608,7 @@ function assign_initial_leaves!(
             )
         end
 
-        stats.npaths = npaths[]
+        stats.assignment_npaths = npaths[]
         stats.target_iterator_length = target_iterator_length[]
         stats.certified = certified[]
         stats.certified_real = certified_real[]
@@ -2634,11 +2634,11 @@ function assign_initial_leaves!(
     for result in iter
         idx += 1
         selected = result_predicate(result)
-        stats.npaths += 1
+        stats.assignment_npaths += 1
         advance_iterator_progress!(
             progress;
             phase = :assignment,
-            npaths = stats.npaths,
+            npaths = stats.assignment_npaths,
             target_iterator_length = stats.target_iterator_length,
             certified = stats.certified,
             certified_real = stats.certified_real,
@@ -2646,7 +2646,7 @@ function assign_initial_leaves!(
             not_certified = stats.not_certified,
         )
         selected || continue
-        # Non-succesful results never enter the BSP.
+        # Non-successful results never enter the BSP.
         is_success(result) || continue
 
         stats.target_iterator_length += 1
@@ -2666,7 +2666,7 @@ function assign_initial_leaves!(
             update_iterator_progress!(
                 progress;
                 phase = :assignment,
-                npaths = stats.npaths,
+                npaths = stats.assignment_npaths,
                 target_iterator_length = stats.target_iterator_length,
                 certified = stats.certified,
                 certified_real = stats.certified_real,
@@ -2693,7 +2693,7 @@ function assign_initial_leaves!(
         update_iterator_progress!(
             progress;
             phase = :assignment,
-            npaths = stats.npaths,
+            npaths = stats.assignment_npaths,
             target_iterator_length = stats.target_iterator_length,
             certified = stats.certified,
             certified_real = stats.certified_real,
@@ -2745,13 +2745,13 @@ function collect_leaf_entries!(
             iter,
             workers.trackers,
             cache.result_predicate,
-        ) do tid, idx, selected, success, sol
+        ) do tid, idx, selected, path_success, sol
             Threads.atomic_add!(cache.npaths, 1)
             @lock progress_lock begin
                 advance_iterator_progress!(cache.progress; npaths = cache.npaths[])
             end
             selected || return
-            success || return
+            path_success || return
 
             cert = certify_solution(
                 workers.systems[tid],
@@ -2940,13 +2940,13 @@ function verify_split!(
             iter,
             workers.trackers,
             cache.result_predicate,
-        ) do tid, idx, selected, success, sol
+        ) do tid, idx, selected, path_success, sol
             Threads.atomic_add!(cache.npaths, 1)
             @lock progress_lock begin
                 advance_iterator_progress!(cache.progress; npaths = cache.npaths[])
             end
             selected || return
-            success || return
+            path_success || return
 
             cert = certify_solution(
                 workers.systems[tid],
@@ -3206,21 +3206,21 @@ function certify_terminal_leaf!(
         # Certification of individual candidates is independent and can be threaded.
         # Insertion into the distinct-certificate set is done serially, because it compares certificates against each other.
         local_certs = [AbstractSolutionCertificate[] for _ in eachindex(workers.systems)]
-        target_iterator_length = Threads.Atomic{Int}(0)
+        local_target_iterator_length = Threads.Atomic{Int}(0)
 
         foreach_threaded_result(
             leaf_iter,
             workers.trackers,
             Returns(true),
-        ) do tid, idx, selected, success, sol
+        ) do tid, idx, selected, path_success, sol
             Threads.atomic_add!(cache.npaths, 1)
             @lock progress_lock begin
                 advance_iterator_progress!(cache.progress; npaths = cache.npaths[])
             end
             selected || return
-            success || return
+            path_success || return
 
-            Threads.atomic_add!(target_iterator_length, 1)
+            Threads.atomic_add!(local_target_iterator_length, 1)
             cert = certify_solution(
                 workers.systems[tid],
                 sol,
@@ -3245,19 +3245,19 @@ function certify_terminal_leaf!(
             added, _ = add_certificate!(d.distinct_solution_certificates, cert)
             record_add_solution_result!(d, added ? :certified_distinct : :duplicate)
         end
-        return target_iterator_length[]
+        return local_target_iterator_length[]
     end
 
-    target_iterator_length = 0
+    local_target_iterator_length = 0
     for result in leaf_iter
         Threads.atomic_add!(cache.npaths, 1)
         advance_iterator_progress!(cache.progress; npaths = cache.npaths[])
         if is_success(result)
-            target_iterator_length += 1
+            local_target_iterator_length += 1
             add_solution!(
                 d,
                 solution(result),
-                target_iterator_length,
+                local_target_iterator_length,
                 1;
                 max_precision = cache.max_precision,
                 refine_solution = cache.refine_solution,
@@ -3266,7 +3266,7 @@ function certify_terminal_leaf!(
             )
         end
     end
-    return target_iterator_length
+    return local_target_iterator_length
 end
 
 """
@@ -3584,14 +3584,14 @@ function process_leaf!(
     # Step 4: the leaf is terminal. Revisit only the current leaf and add its
     # certified solutions to `d`; the distinct check itself stays serial.
     leaf_iter = _leaf_iterator(iter, entries)
-    target_iterator_length = certify_terminal_leaf!(
+    local_target_iterator_length = certify_terminal_leaf!(
         leaf_iter,
         cache;
         threading = threading,
         certify_solution_kwargs...,
     )
-    target_iterator_length == length(entries) || error(
-        "Re-tracking a BSP leaf produced a target iterator of length $target_iterator_length for " *
+    local_target_iterator_length == length(entries) || error(
+        "Re-tracking a BSP leaf produced a target iterator of length $local_target_iterator_length for " *
         "$(length(entries)) expected entries.",
     )
 
@@ -3668,7 +3668,7 @@ end
 Certify a `ResultIterator` without materializing all solutions at once by using a binary spatial partition of the real line. Returns a [`IteratorCertificationResult`](@ref).
 
 The algorithm works in two phases:
-1. stream through the iterator, certify each succesful result, and place the certified
+1. stream through the iterator, certify each successful result, and place the certified
    interval into a BSP leaf using the real part of the chosen coordinate;
 2. iteratively refine heavy leaves until every splittable leaf contains at most `leaf_size_bound`
    entries, then revisit the iterator leaf-by-leaf and certify only the solutions
@@ -3764,7 +3764,7 @@ function _certify_iterator_bsp(
         refine_solution = refine_solution,
         extended_certificate = extended_certificate,
         result_predicate = result_predicate,
-        npaths = Threads.Atomic{Int}(assignment_stats.npaths),
+        npaths = Threads.Atomic{Int}(assignment_stats.assignment_npaths),
     )
 
     refinement_steps = 0
