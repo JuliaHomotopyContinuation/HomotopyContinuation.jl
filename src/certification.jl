@@ -2114,7 +2114,7 @@ target_iterator_length(R::IteratorCertificationResult) = R.target_iterator_lengt
 """
     ncertified(R::IteratorCertificationResult)
 
-Return the number of finite path results that were certified.
+Return the number of path results that were certified.
 """
 ncertified(R::IteratorCertificationResult) = R.certified
 
@@ -2135,7 +2135,7 @@ ncomplex_certified(R::IteratorCertificationResult) = R.certified_complex
 """
     nnotcertified(R::IteratorCertificationResult)
 
-Return the number of finite path results that could not be certified.
+Return the number of path results that could not be certified.
 """
 nnotcertified(R::IteratorCertificationResult) = R.not_certified
 
@@ -2389,9 +2389,9 @@ function foreach_threaded_result(f, iter::ResultIterator, trackers, result_predi
                     isnothing(item) && break
                     result = track(trackers[tid], item[2])
                     selected = result_predicate(result)
-                    finite = isfinite(result)
-                    sol = selected && finite ? copy(solution(result)) : nothing
-                    f(tid, item[1], selected, finite, sol)
+                    is_success = is_success(result)
+                    sol = selected && is_success ? copy(solution(result)) : nothing
+                    f(tid, item[1], selected, is_success, sol)
                 end
             end
         end
@@ -2528,7 +2528,7 @@ function assign_initial_leaves!(
 )
     # Phase 1:
     # 1. stream once through the full iterator;
-    # 2. certify each finite result individually;
+    # 2. certify each succesful result individually;
     # 3. project certified results to one real interval;
     # 4. place those intervals into the current coarse BSP leaves, merging leaves when
     #    a certified interval crosses an existing coarse cut.
@@ -2560,7 +2560,7 @@ function assign_initial_leaves!(
             iter,
             workers.trackers,
             result_predicate,
-        ) do tid, idx, selected, finite, sol
+        ) do tid, idx, selected, is_success, sol
             local_entries = certified_entries[tid]
             if selected
                 Threads.atomic_add!(npaths, 1)
@@ -2578,7 +2578,7 @@ function assign_initial_leaves!(
                 )
             end
             selected || return
-            finite || return
+            is_success || return
 
             Threads.atomic_add!(target_iterator_length, 1)
             cert = certify_solution(
@@ -2644,8 +2644,8 @@ function assign_initial_leaves!(
             not_certified = stats.not_certified,
         )
         selected || continue
-        # Non-finite results contribute to the global counts but never enter the BSP.
-        isfinite(result) || continue
+        # Non-succesful results never enter the BSP.
+        is_success(result) || continue
 
         stats.target_iterator_length += 1
         cert = certify_solution(
@@ -2743,12 +2743,12 @@ function collect_leaf_entries!(
             iter,
             workers.trackers,
             cache.result_predicate,
-        ) do tid, idx, selected, finite, sol
+        ) do tid, idx, selected, is_success, sol
             @lock progress_lock begin
                 advance_iterator_progress!(cache.progress)
             end
             selected || return
-            finite || return
+            is_success || return
 
             cert = certify_solution(
                 workers.systems[tid],
@@ -2793,7 +2793,7 @@ function collect_leaf_entries!(
         idx += 1
         advance_iterator_progress!(cache.progress)
         cache.result_predicate(result) || continue
-        isfinite(result) || continue
+        is_success(result) || continue
 
         cert = certify_solution(
             cache.F,
@@ -2936,12 +2936,12 @@ function verify_split!(
             iter,
             workers.trackers,
             cache.result_predicate,
-        ) do tid, idx, selected, finite, sol
+        ) do tid, idx, selected, is_success, sol
             @lock progress_lock begin
                 advance_iterator_progress!(cache.progress)
             end
             selected || return
-            finite || return
+            is_success || return
 
             cert = certify_solution(
                 workers.systems[tid],
@@ -3024,7 +3024,7 @@ function verify_split!(
         idx += 1
         advance_iterator_progress!(cache.progress)
         cache.result_predicate(result) || continue
-        isfinite(result) || continue
+        is_success(result) || continue
 
         cert = certify_solution(
             cache.F,
@@ -3206,12 +3206,12 @@ function certify_terminal_leaf!(
             leaf_iter,
             workers.trackers,
             Returns(true),
-        ) do tid, idx, selected, finite, sol
+        ) do tid, idx, selected, is_success, sol
             @lock progress_lock begin
                 advance_iterator_progress!(cache.progress)
             end
             selected || return
-            finite || return
+            is_success || return
 
             Threads.atomic_add!(target_iterator_length, 1)
             cert = certify_solution(
@@ -3244,7 +3244,7 @@ function certify_terminal_leaf!(
     target_iterator_length = 0
     for result in leaf_iter
         advance_iterator_progress!(cache.progress)
-        if isfinite(result)
+        if is_success(result)
             target_iterator_length += 1
             add_solution!(
                 d,
@@ -3583,7 +3583,7 @@ function process_leaf!(
         certify_solution_kwargs...,
     )
     target_iterator_length == length(entries) || error(
-        "Re-tracking a BSP leaf produced $target_iterator_length finite solutions for " *
+        "Re-tracking a BSP leaf produced a target iterator of length $target_iterator_length for " *
         "$(length(entries)) expected entries.",
     )
 
@@ -3660,7 +3660,7 @@ end
 Certify a `ResultIterator` without materializing all solutions at once by using a binary spatial partition of the real line. Returns a [`IteratorCertificationResult`](@ref).
 
 The algorithm works in two phases:
-1. stream through the iterator, certify each finite result, and place the certified
+1. stream through the iterator, certify each succesful result, and place the certified
    interval into a BSP leaf using the real part of the chosen coordinate;
 2. iteratively refine heavy leaves until every splittable leaf contains at most `leaf_size_bound`
    entries, then revisit the iterator leaf-by-leaf and certify only the solutions
