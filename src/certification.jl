@@ -35,8 +35,9 @@ export certify,
     nnotcertified,
     stats,
     bsp,
-    nresults,
-    nfinite,
+    npaths,
+    start_iterator_length,
+    target_iterator_length,
     nparts,
     max_leaf_size,
     oversized_leaves,
@@ -1891,8 +1892,8 @@ end
 Summary statistics for the BSP.
 """
 Base.@kwdef mutable struct BSPAssignmentStats
-    nresults::Int = 0
-    nfinite::Int = 0
+    npaths::Int = 0
+    target_iterator_length::Int = 0
     certified::Int = 0
     certified_real::Int = 0
     certified_complex::Int = 0
@@ -1902,14 +1903,12 @@ end
 Base.@kwdef mutable struct IteratorCertificationProgress
     progress_meter::PM.ProgressUnknown
     phase::Symbol = :assignment
-    known_work::Int = 0
-    streamed_work::Int = 0
-    iterator_length::Int = 0
+    start_iterator_length::Int = 0
+    target_iterator_length::Int = 0
+    npaths::Int = 0
     current_pass::String = "Waiting for iterator pass"
     current_pass_total::Int = 0
     current_pass_done::Int = 0
-    nresults::Int = 0
-    nfinite::Int = 0
     certified::Int = 0
     certified_real::Int = 0
     certified_complex::Int = 0
@@ -1967,9 +1966,9 @@ end
 )
     (
         ("Phase", _phase_label(progress)),
-        ("Total # paths tracked", "$(progress.streamed_work)"),
-        ("Start iterator length", progress.iterator_length),
-        ("Target iterator length", progress.nfinite),
+        ("Total # paths tracked", "$(progress.npaths)"),
+        ("Start iterator length", progress.start_iterator_length),
+        ("Target iterator length", progress.target_iterator_length),
         (
             "Individual certified (real/complex)",
             "$(progress.certified) ($(progress.certified_real)/$(progress.certified_complex))",
@@ -1993,9 +1992,9 @@ advance_iterator_progress!(::Nothing; kwargs...) = nothing
 function update_iterator_progress!(
     progress::IteratorCertificationProgress;
     phase::Union{Nothing,Symbol} = nothing,
-    iterator_length::Union{Nothing,Int} = nothing,
-    nresults::Union{Nothing,Int} = nothing,
-    nfinite::Union{Nothing,Int} = nothing,
+    start_iterator_length::Union{Nothing,Int} = nothing,
+    target_iterator_length::Union{Nothing,Int} = nothing,
+    npaths::Union{Nothing,Int} = nothing,
     certified::Union{Nothing,Int} = nothing,
     certified_real::Union{Nothing,Int} = nothing,
     certified_complex::Union{Nothing,Int} = nothing,
@@ -2010,9 +2009,9 @@ function update_iterator_progress!(
     finish::Bool = false,
 )
     isnothing(phase) || (progress.phase = phase)
-    isnothing(iterator_length) || (progress.iterator_length = iterator_length)
-    isnothing(nresults) || (progress.nresults = nresults)
-    isnothing(nfinite) || (progress.nfinite = nfinite)
+    isnothing(start_iterator_length) || (progress.start_iterator_length = start_iterator_length)
+    isnothing(target_iterator_length) || (progress.target_iterator_length = target_iterator_length)
+    isnothing(npaths) || (progress.npaths = npaths)
     isnothing(certified) || (progress.certified = certified)
     isnothing(certified_real) || (progress.certified_real = certified_real)
     isnothing(certified_complex) || (progress.certified_complex = certified_complex)
@@ -2049,7 +2048,6 @@ function register_iterator_pass!(
     progress.current_pass = String(pass)
     progress.current_pass_total = Int(total)
     progress.current_pass_done = 0
-    progress.known_work += Int(total)
     update_iterator_progress!(progress; force = force)
 end
 
@@ -2058,7 +2056,6 @@ function advance_iterator_progress!(
     step::Integer = 1,
     kwargs...,
 )
-    progress.streamed_work += Int(step)
     progress.current_pass_done += Int(step)
     update_iterator_progress!(progress; kwargs...)
 end
@@ -2070,8 +2067,8 @@ Final summary returned by the BSP-based [`certify`](@ref) method for`ResultItera
 """
 Base.@kwdef struct IteratorCertificationResult
     bsp::BSPPartition
-    nresults::Int = 0
-    nfinite::Int = 0
+    npaths::Int = 0
+    target_iterator_length::Int = 0
     certified::Int = 0
     certified_real::Int = 0
     certified_complex::Int = 0
@@ -2094,18 +2091,25 @@ Return the BSP partition used during iterator certification.
 bsp(R::IteratorCertificationResult) = R.bsp
 
 """
-    nresults(R::IteratorCertificationResult)
+    npaths(R::IteratorCertificationResult)
 
 Return the total number of path results produced by the iterator.
 """
-nresults(R::IteratorCertificationResult) = R.nresults
+npaths(R::IteratorCertificationResult) = R.npaths
 
 """
-    nfinite(R::IteratorCertificationResult)
+    start_iterator_length(R::IteratorCertificationResult)
 
-Return the number of finite path results encountered during certification.
+Return the length of the iterator for the start system.
 """
-nfinite(R::IteratorCertificationResult) = R.nfinite
+start_iterator_length(R::IteratorCertificationResult) = R.start_iterator_length
+
+"""
+    target_iterator_length(R::IteratorCertificationResult)
+
+Return the length of the iterator for the target system.
+"""
+target_iterator_length(R::IteratorCertificationResult) = R.target_iterator_length
 
 """
     ncertified(R::IteratorCertificationResult)
@@ -2544,8 +2548,8 @@ function assign_initial_leaves!(
         progress_lock = ReentrantLock()
         # Only counters and progress are shared while certifying. BSP mutation is
         # deferred until all workers have produced their local leaf entries.
-        nresults = Threads.Atomic{Int}(0)
-        nfinite = Threads.Atomic{Int}(0)
+        npaths = Threads.Atomic{Int}(0)
+        target_iterator_length = Threads.Atomic{Int}(0)
         certified = Threads.Atomic{Int}(0)
         certified_real = Threads.Atomic{Int}(0)
         certified_complex = Threads.Atomic{Int}(0)
@@ -2559,14 +2563,14 @@ function assign_initial_leaves!(
         ) do tid, idx, selected, finite, sol
             local_entries = certified_entries[tid]
             if selected
-                Threads.atomic_add!(nresults, 1)
+                Threads.atomic_add!(npaths, 1)
             end
             @lock progress_lock begin
                 advance_iterator_progress!(
                     progress;
                     phase = :assignment,
-                    nresults = nresults[],
-                    nfinite = nfinite[],
+                    npaths = npaths[],
+                    target_iterator_length = target_iterator_length[],
                     certified = certified[],
                     certified_real = certified_real[],
                     certified_complex = certified_complex[],
@@ -2576,7 +2580,7 @@ function assign_initial_leaves!(
             selected || return
             finite || return
 
-            Threads.atomic_add!(nfinite, 1)
+            Threads.atomic_add!(target_iterator_length, 1)
             cert = certify_solution(
                 workers.systems[tid],
                 sol,
@@ -2602,8 +2606,8 @@ function assign_initial_leaves!(
             )
         end
 
-        stats.nresults = nresults[]
-        stats.nfinite = nfinite[]
+        stats.npaths = npaths[]
+        stats.target_iterator_length = target_iterator_length[]
         stats.certified = certified[]
         stats.certified_real = certified_real[]
         stats.certified_complex = certified_complex[]
@@ -2628,12 +2632,12 @@ function assign_initial_leaves!(
     for result in iter
         idx += 1
         selected = result_predicate(result)
-        stats.nresults += Int(selected)
+        stats.npaths += Int(selected)
         advance_iterator_progress!(
             progress;
             phase = :assignment,
-            nresults = stats.nresults,
-            nfinite = stats.nfinite,
+            npaths = stats.npaths,
+            target_iterator_length = stats.target_iterator_length,
             certified = stats.certified,
             certified_real = stats.certified_real,
             certified_complex = stats.certified_complex,
@@ -2643,7 +2647,7 @@ function assign_initial_leaves!(
         # Non-finite results contribute to the global counts but never enter the BSP.
         isfinite(result) || continue
 
-        stats.nfinite += 1
+        stats.target_iterator_length += 1
         cert = certify_solution(
             F,
             solution(result),
@@ -2660,8 +2664,8 @@ function assign_initial_leaves!(
             update_iterator_progress!(
                 progress;
                 phase = :assignment,
-                nresults = stats.nresults,
-                nfinite = stats.nfinite,
+                npaths = stats.npaths,
+                target_iterator_length = stats.target_iterator_length,
                 certified = stats.certified,
                 certified_real = stats.certified_real,
                 certified_complex = stats.certified_complex,
@@ -2687,8 +2691,8 @@ function assign_initial_leaves!(
         update_iterator_progress!(
             progress;
             phase = :assignment,
-            nresults = stats.nresults,
-            nfinite = stats.nfinite,
+            npaths = stats.npaths,
+            target_iterator_length = stats.target_iterator_length,
             certified = stats.certified,
             certified_real = stats.certified_real,
             certified_complex = stats.certified_complex,
@@ -3196,7 +3200,7 @@ function certify_terminal_leaf!(
         # Certification of individual candidates is independent and can be threaded.
         # Insertion into the distinct-certificate set is done serially, because it compares certificates against each other.
         local_certs = [AbstractSolutionCertificate[] for _ in eachindex(workers.systems)]
-        nfinite = Threads.Atomic{Int}(0)
+        target_iterator_length = Threads.Atomic{Int}(0)
 
         foreach_threaded_result(
             leaf_iter,
@@ -3209,7 +3213,7 @@ function certify_terminal_leaf!(
             selected || return
             finite || return
 
-            Threads.atomic_add!(nfinite, 1)
+            Threads.atomic_add!(target_iterator_length, 1)
             cert = certify_solution(
                 workers.systems[tid],
                 sol,
@@ -3234,18 +3238,18 @@ function certify_terminal_leaf!(
             added, _ = add_certificate!(d.distinct_solution_certificates, cert)
             record_add_solution_result!(d, added ? :certified_distinct : :duplicate)
         end
-        return nfinite[]
+        return target_iterator_length[]
     end
 
-    nfinite = 0
+    target_iterator_length = 0
     for result in leaf_iter
         advance_iterator_progress!(cache.progress)
         if isfinite(result)
-            nfinite += 1
+            target_iterator_length += 1
             add_solution!(
                 d,
                 solution(result),
-                nfinite,
+                target_iterator_length,
                 1;
                 max_precision = cache.max_precision,
                 refine_solution = cache.refine_solution,
@@ -3254,7 +3258,7 @@ function certify_terminal_leaf!(
             )
         end
     end
-    return nfinite
+    return target_iterator_length
 end
 
 """
@@ -3572,14 +3576,14 @@ function process_leaf!(
     # Step 4: the leaf is terminal. Revisit only the current leaf and add its
     # certified solutions to `d`; the distinct check itself stays serial.
     leaf_iter = _leaf_iterator(iter, entries)
-    nfinite = certify_terminal_leaf!(
+    target_iterator_length = certify_terminal_leaf!(
         leaf_iter,
         cache;
         threading = threading,
         certify_solution_kwargs...,
     )
-    nfinite == length(entries) || error(
-        "Re-tracking a BSP leaf produced $nfinite finite solutions for " *
+    target_iterator_length == length(entries) || error(
+        "Re-tracking a BSP leaf produced $target_iterator_length finite solutions for " *
         "$(length(entries)) expected entries.",
     )
 
@@ -3709,7 +3713,7 @@ function _certify_iterator_bsp(
     bsp = _build_partition(boundaries)
     iter_length = length(iter)
     progress = show_progress ? make_iterator_certification_progress() : nothing
-    update_iterator_progress!(progress; iterator_length = iter_length, force = true)
+    update_iterator_progress!(progress; start_iterator_length = iter_length, force = true)
     # First pass over the full iterator: assign certified intervals to the coarse BSP.
     assignment_stats, leaf_entries_by_id = assign_initial_leaves!(
         bsp,
@@ -3755,8 +3759,8 @@ function _certify_iterator_bsp(
         update_iterator_progress!(
             progress;
             phase = :refinement,
-            nresults = assignment_stats.nresults,
-            nfinite = assignment_stats.nfinite,
+            npaths = assignment_stats.npaths,
+            target_iterator_length = assignment_stats.target_iterator_length,
             certified = assignment_stats.certified,
             certified_real = assignment_stats.certified_real,
             certified_complex = assignment_stats.certified_complex,
@@ -3808,8 +3812,8 @@ function _certify_iterator_bsp(
 
     res = IteratorCertificationResult(;
         bsp = bsp,
-        nresults = assignment_stats.nresults,
-        nfinite = assignment_stats.nfinite,
+        npaths = assignment_stats.npaths,
+        target_iterator_length = assignment_stats.target_iterator_length,
         certified = assignment_stats.certified,
         certified_real = assignment_stats.certified_real,
         certified_complex = assignment_stats.certified_complex,
@@ -3827,8 +3831,8 @@ function _certify_iterator_bsp(
     update_iterator_progress!(
         progress;
         phase = :finished,
-        nresults = assignment_stats.nresults,
-        nfinite = assignment_stats.nfinite,
+        npaths = assignment_stats.npaths,
+        target_iterator_length = assignment_stats.target_iterator_length,
         certified = assignment_stats.certified,
         certified_real = assignment_stats.certified_real,
         certified_complex = assignment_stats.certified_complex,
