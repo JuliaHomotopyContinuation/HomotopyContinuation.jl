@@ -2009,8 +2009,10 @@ function update_iterator_progress!(
     finish::Bool = false,
 )
     isnothing(phase) || (progress.phase = phase)
-    isnothing(start_iterator_length) || (progress.start_iterator_length = start_iterator_length)
-    isnothing(target_iterator_length) || (progress.target_iterator_length = target_iterator_length)
+    isnothing(start_iterator_length) ||
+        (progress.start_iterator_length = start_iterator_length)
+    isnothing(target_iterator_length) ||
+        (progress.target_iterator_length = target_iterator_length)
     isnothing(npaths) || (progress.npaths = npaths)
     isnothing(certified) || (progress.certified = certified)
     isnothing(certified_real) || (progress.certified_real = certified_real)
