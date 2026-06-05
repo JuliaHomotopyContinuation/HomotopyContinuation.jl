@@ -466,8 +466,8 @@
 
         @test bsp(res) isa BSPPartition
         @test res isa IteratorCertificationResult
-        @test nresults(res) == 7
-        @test nfinite(res) == 3
+        @test npaths(res) == 7
+        @test target_iterator_length(res) == 3
         @test ncertified(res) == 3
         @test ndistinct_certified(res) == 3
     end
@@ -509,8 +509,8 @@
 
         res = certify(F, iter, params; coordinate = 2, certify_oversized_leaves = true)
 
-        @test nresults(res) == 3
-        @test nfinite(res) == 3
+        @test npaths(res) == 3
+        @test target_iterator_length(res) == 3
         @test ncertified(res) == 3
         @test ndistinct_certified(res) == 3
     end
@@ -540,8 +540,8 @@
         results = collect(second_iter)
         nfinite_results = count(isfinite, results)
 
-        @test nresults(res) == length(results)
-        @test nfinite(res) == nfinite_results
+        @test npaths(res) == length(results)
+        @test target_iterator_length(res) == nfinite_results
         @test ndistinct_certified(res) == ncertified(res)
         @test ncertified(res) ≤ nfinite_results
     end
