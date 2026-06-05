@@ -2216,7 +2216,7 @@ function Base.show(io::IO, summary::IteratorCertificationResult)
         println(
             io,
             "• $(summary.oversized_leaves) oversized leaves remain " *
-            "($(summary.unsplittable_leaves) unsplittable)",
+            "(unable to split $(summary.unsplittable_leaves) in this run)",
         )
     end
 end
