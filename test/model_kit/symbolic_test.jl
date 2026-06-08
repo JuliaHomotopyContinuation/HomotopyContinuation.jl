@@ -376,7 +376,7 @@
             -sin(x)
             exp(x)
             1 + tan(x)^2
-            sqrt(1 - x^2)
+            1 / sqrt(1 - x^2)
             -1 / sqrt(1 - x^2)
             cosh(x)
             sinh(x)
