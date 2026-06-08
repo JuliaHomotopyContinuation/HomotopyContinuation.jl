@@ -382,7 +382,7 @@ function taylor_sinh_impl(K, M)
     quote
         Base.@_inline_meta
         $(untuple(:x, M - 1))
-        sh₀ = sinh(x0);
+        sh₀ = sinh(x0)
         ch₀ = cosh(x0)
         $(to_julia_expr(list))
         $(taylor_tuple(ids))
@@ -401,7 +401,7 @@ function taylor_cosh_impl(K, M)
     quote
         Base.@_inline_meta
         $(untuple(:x, M - 1))
-        sh₀ = sinh(x0);
+        sh₀ = sinh(x0)
         ch₀ = cosh(x0)
         $(to_julia_expr(list))
         $(taylor_tuple(ids))
