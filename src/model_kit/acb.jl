@@ -5,6 +5,14 @@ acb_op_call(op) = Symbol(:acb_, op_call(op), :!)
 acb_op_stop!(t, m) = nothing
 
 # # Arity 1
+# OP_ACOS # cos^-1 (a)
+Base.@propagate_inbounds function acb_op_acos!(t, x, m)
+    Arblib.acos!(t, x)
+end
+# OP_ASIN # sin^-1 (a)
+Base.@propagate_inbounds function acb_op_asin!(t, x, m)
+    Arblib.asin!(t, x)
+end
 # OP_CB # a ^ 3
 Base.@propagate_inbounds function acb_op_cb!(t, x, m)
     Arblib.sqr!(m[1], x)
@@ -13,6 +21,14 @@ end
 # OP_COS # cos(a)
 Base.@propagate_inbounds function acb_op_cos!(t, x, m)
     Arblib.cos!(t, x)
+end
+# OP_COSH # cosh(a)
+Base.@propagate_inbounds function acb_op_cosh!(t, x, m)
+    Arblib.cosh!(t, x)
+end
+# OP_EXP # exp(a)
+Base.@propagate_inbounds function acb_op_exp!(t, x, m)
+    Arblib.exp!(t, x)
 end
 # OP_INV # 1 / a
 Base.@propagate_inbounds function acb_op_inv!(t, x, m)
@@ -35,6 +51,10 @@ end
 Base.@propagate_inbounds function acb_op_sin!(t, x, m)
     Arblib.sin!(t, x)
 end
+# OP_SINH # sinh(a)
+Base.@propagate_inbounds function acb_op_sinh!(t, x, m)
+    Arblib.sinh!(t, x)
+end
 # OP_SQR # a ^ 2
 Base.@propagate_inbounds function acb_op_sqr!(t, x, m)
     Arblib.sqr!(t, x)
@@ -42,6 +62,14 @@ end
 # OP_SQRT # √(a) TODO
 Base.@propagate_inbounds function acb_op_sqrt!(t, x, m)
     Arblib.sqrt!(t, x)
+end
+# OP_TAN # tan(a)
+Base.@propagate_inbounds function acb_op_tan!(t, x, m)
+    Arblib.tan!(t, x)
+end
+# OP_TANH # tanh(a)
+Base.@propagate_inbounds function acb_op_tanh!(t, x, m)
+    Arblib.tanh!(t, x)
 end
 # OP_IDENTITY # a
 Base.@propagate_inbounds function acb_op_identity!(t, x, m)

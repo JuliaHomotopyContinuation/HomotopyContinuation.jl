@@ -367,4 +367,37 @@
         @test expand(P) == expand(f * (x + (y - 1) * (y + z - 1)))
         @test Q == -1 + y
     end
+
+    @testset "trigonometric functions" begin
+        @var x
+        F = [sin(x); cos(x); exp(x); tan(x); asin(x); acos(x); sinh(x); cosh(x); tanh(x)]
+        dF_symbolic = [
+            cos(x)
+            -sin(x)
+            exp(x)
+            1 + tan(x)^2
+            1 / sqrt(1 - x^2)
+            -1 / sqrt(1 - x^2)
+            cosh(x)
+            sinh(x)
+            1 - tanh(x)^2
+        ]
+        dF = differentiate(F, x)
+        @test expand.(dF - dF_symbolic) == Vector{Expression}(zeros(Int, 9))
+
+        x0 = 0.1
+        F0 = evaluate.(F, x => x0)
+        F1 = [
+            sin(x0)
+            cos(x0)
+            exp(x0)
+            tan(x0)
+            asin(x0)
+            acos(x0)
+            sinh(x0)
+            cosh(x0)
+            tanh(x0)
+        ]
+        @test norm(F0 - F1) < 1e-14
+    end
 end
