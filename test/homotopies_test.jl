@@ -214,4 +214,14 @@ end
         H = Homotopy([(1 - 2 * t) + (-2 + 2 * t) * x + x^2], [x], t)
         test_homotopy(MixedHomotopy(H), H)
     end
+
+    @testset "Homotopy with trigonometric functions" begin
+        @var x[1:9] t
+        F = [sin(t); cos(t); exp(t); tan(t); asin(t); acos(t); sinh(t); cosh(t); tanh(t)]
+        x0 = evaluate.(F, t => π / 4)
+
+        G = System(x - F, x, [t])
+        S = solve(G, x0; start_parameters = [π / 4], target_parameters = [π / 8])
+        @test nnonsingular(S) == 1
+    end
 end
