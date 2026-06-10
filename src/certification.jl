@@ -1981,9 +1981,9 @@ end
             "$(progress.distinct_certified) ($(progress.distinct_real)/$(progress.distinct_complex))",
         ),
         ("Total # leaves", "$(progress.total_leaves)"),
-        ("Processed leaves", "$(progress.processed_leaves)"),
+        ("# processed terminal leaves", "$(progress.processed_leaves)"),
+        ("# leaf splits", "$(progress.nleaf_splits)"),
         ("Current tree depth", "$(progress.depth) (max: $(progress.max_depth))"),
-        ("# splits", "$(progress.nleaf_splits)"),
         ("Pass status", progress.current_pass),
         ("Pass progress", _format_local_pass_bar(progress)),
     )
