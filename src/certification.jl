@@ -3680,12 +3680,12 @@ For more details of the implementation see [^BBK26].
 * `threading = true`: If `true`, independent iterator certification passes are threaded. Leafwise distinct-solution checks are always performed serially.
 * `max_precision = 256`: The maximal accuracy (in bits) that is used in the certification process.
 * `compile = false`: See the [`solve`](@ref) documentation.
-* `leaf_size_bound = 10.000`: the algorithm tries to split the real line into leaves each containing at most `leaf_size_bound` solutions.
+* `leaf_size_bound = 50.000`: the algorithm tries to split the real line into leaves each containing at most `leaf_size_bound` solutions.
 * `certify_oversized_leaves = false`: if a leaf contains more than `leaf_size_bound` solutions, only certify it when `certify_oversized_leaves` is true.
 * `ε = 1e-4`: when proposing a split from one sampled certified interval, place the split at distance `ε` from that interval.
 * `coordinate = 1`: the coordinate of the solutions we project to to compute the binary spatial partition tree.
 * `boundaries = -100:0.1:100`: the initial boundaries of the spatial partition.
-* `max_refinement_steps = 300`: the maximal number of times we split leaves to get all leaves containing at most `leaf_size_bound` solutions.
+* `max_refinement_steps = 500`: the maximal number of times we split leaves to get all leaves containing at most `leaf_size_bound` solutions.
 
 [^BBK26]: Breiding, P., Brysiewicz, T. and Johnson, D. K. "Low-Memory Numerical Certification." arXiv:2604.16623.
 """
@@ -3696,13 +3696,13 @@ function _certify_iterator_bsp(
     cert_params,
     certification_cache::CertificationCache;
     show_progress::Bool = true,
-    leaf_size_bound::Integer = 10000,
+    leaf_size_bound::Integer = 50000,
     certify_oversized_leaves::Bool = false,
     threading::Bool = Threads.nthreads() > 1,
     ε::Float64 = 1e-4,
     coordinate::Int = 1,
     boundaries = -100:0.1:100,
-    max_refinement_steps::Int = 300,
+    max_refinement_steps::Int = 500,
     check_oversized_leaves::Bool = true,
     max_precision::Int = 256,
     refine_solution::Bool = true,
