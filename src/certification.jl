@@ -1981,9 +1981,9 @@ end
             "$(progress.distinct_certified) ($(progress.distinct_real)/$(progress.distinct_complex))",
         ),
         ("Total # leaves", "$(progress.total_leaves)"),
-        ("Current leaf", "$(progress.processed_leaves)"),
-        ("Current tree depth",  "$(progress.depth) (max: $(progress.max_depth))"),
-        ("# splits",  "$(progress.nleaf_splits)"),
+        ("Processed leaves", "$(progress.processed_leaves)"),
+        ("Current tree depth", "$(progress.depth) (max: $(progress.max_depth))"),
+        ("# splits", "$(progress.nleaf_splits)"),
         ("Pass status", progress.current_pass),
         ("Pass progress", _format_local_pass_bar(progress)),
     )
@@ -2282,8 +2282,7 @@ function check_iterator_certify_options(
 )
     ε > 0 && isfinite(ε) || throw(ArgumentError("`ε` must be positive and finite."))
     leaf_size_bound > 0 || throw(ArgumentError("`leaf_size_bound` must be positive."))
-    max_depth >= 0 ||
-        throw(ArgumentError("`max_depth` must be non-negative."))
+    max_depth >= 0 || throw(ArgumentError("`max_depth` must be non-negative."))
     1 <= coordinate <= size(F, 2) || throw(
         ArgumentError(
             "`coordinate` must be between 1 and the number of variables ($(size(F, 2))).",
@@ -2320,6 +2319,7 @@ Base.@kwdef struct IteratorCertificationCache{S<:AbstractSystem,P,C<:Certificati
     result_predicate::Function
     npaths::Threads.Atomic{Int}
     nleaf_splits::Threads.Atomic{Int}
+    processed_leaves::Threads.Atomic{Int}
 end
 
 function threaded_certification_data(
@@ -3327,7 +3327,11 @@ function handle_split_verification!(
         # reindex it before passing it to the child recursion.
         left_leaf, right_leaf = split_leaf!(bsp, current_leaf, split_point)
         live_splits = Threads.atomic_add!(cache.nleaf_splits, 1) + 1
-        update_iterator_progress!(cache.progress; nleaf_splits = live_splits)
+        update_iterator_progress!(
+            cache.progress;
+            nleaf_splits = live_splits,
+            total_leaves = length(bsp.leaves),
+        )
         left_iter = _leaf_iterator(leaf_iter, verification.left_entries)
         right_iter = _leaf_iterator(leaf_iter, verification.right_entries)
         left_entries = reindex_leaf_entries(verification.left_entries)
@@ -3390,7 +3394,11 @@ function process_leaf!(
     certify_solution_kwargs...,
 )
     if !isnothing(cache.progress)
-        update_iterator_progress!(cache.progress; depth = max(cache.progress.depth, depth))
+        update_iterator_progress!(
+            cache.progress;
+            total_leaves = length(bsp.leaves),
+            depth = max(cache.progress.depth, depth),
+        )
     end
     # Process one leaf subtree depth-first so only the current branch lives in memory.
     # Step 1: stabilize the current leaf with a tiny sample so we can cheaply decide
@@ -3410,6 +3418,7 @@ function process_leaf!(
         leaf_size = length(entries)
         current_leaf = leaf
     end
+    update_iterator_progress!(cache.progress; total_leaves = length(bsp.leaves))
 
     if leaf_size > cache.leaf_size_bound && depth < cache.max_depth
         # Step 2: this leaf is oversized, so recollect the full local leaf and work
@@ -3559,17 +3568,31 @@ function process_leaf!(
     # From here on we treat the leaf as terminal, either because it is small enough or
     # because refinement stopped without finding a useful split.
     _set_leaf_count!(bsp, current_leaf, leaf_size)
-    isempty(entries) && return (
-        distinct_certified = 0,
-        distinct_real = 0,
-        distinct_complex = 0,
-        nleaf_splits = 0,
-        rightmost_leaf = current_leaf,
-    )
+    if isempty(entries)
+        processed = Threads.atomic_add!(cache.processed_leaves, 1) + 1
+        update_iterator_progress!(
+            cache.progress;
+            processed_leaves = processed,
+            total_leaves = length(bsp.leaves),
+        )
+        return (
+            distinct_certified = 0,
+            distinct_real = 0,
+            distinct_complex = 0,
+            nleaf_splits = 0,
+            rightmost_leaf = current_leaf,
+        )
+    end
 
     # Optionally leave oversized terminal leaves uncertified while still recording
     # their size in the final BSP summary.
     if leaf_size > cache.leaf_size_bound && !cache.certify_oversized_leaves
+        processed = Threads.atomic_add!(cache.processed_leaves, 1) + 1
+        update_iterator_progress!(
+            cache.progress;
+            processed_leaves = processed,
+            total_leaves = length(bsp.leaves),
+        )
         return (
             distinct_certified = 0,
             distinct_real = 0,
@@ -3610,6 +3633,12 @@ function process_leaf!(
     # Distinct counts can be summed across terminal leaves because different leaves
     # are disjoint in the chosen projected coordinate.
     ndistinct, nreal, ncomplex = _count_distinct_certificates!(cache.distinct_solutions)
+    processed = Threads.atomic_add!(cache.processed_leaves, 1) + 1
+    update_iterator_progress!(
+        cache.progress;
+        processed_leaves = processed,
+        total_leaves = length(bsp.leaves),
+    )
     return (
         distinct_certified = ndistinct,
         distinct_real = nreal,
@@ -3779,6 +3808,7 @@ function _certify_iterator_bsp(
         result_predicate = result_predicate,
         npaths = Threads.Atomic{Int}(assignment_stats.assignment_npaths),
         nleaf_splits = Threads.Atomic{Int}(0),
+        processed_leaves = Threads.Atomic{Int}(0),
     )
 
     nleaf_splits = 0
@@ -3793,7 +3823,7 @@ function _certify_iterator_bsp(
             certified_real = assignment_stats.certified_real,
             certified_complex = assignment_stats.certified_complex,
             not_certified = assignment_stats.not_certified,
-            processed_leaves = i - 1,
+            processed_leaves = cache.processed_leaves[],
             total_leaves = length(bsp.leaves),
             distinct_certified = distinct_certified,
             distinct_real = distinct_real,
@@ -3808,6 +3838,12 @@ function _certify_iterator_bsp(
         # that sparse iterator from here on.
         leaf_entries = get(leaf_entries_by_id, _leaf_id(leaf), BSPLeafEntry[])
         if isempty(leaf_entries)
+            processed = Threads.atomic_add!(cache.processed_leaves, 1) + 1
+            update_iterator_progress!(
+                progress;
+                processed_leaves = processed,
+                total_leaves = length(bsp.leaves),
+            )
             i += 1
             continue
         end
@@ -3866,7 +3902,7 @@ function _certify_iterator_bsp(
         certified_real = assignment_stats.certified_real,
         certified_complex = assignment_stats.certified_complex,
         not_certified = assignment_stats.not_certified,
-        processed_leaves = length(bsp.leaves),
+        processed_leaves = cache.processed_leaves[],
         total_leaves = length(bsp.leaves),
         distinct_certified = distinct_certified,
         distinct_real = distinct_real,
