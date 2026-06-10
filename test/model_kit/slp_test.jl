@@ -189,4 +189,24 @@
             @test all(!iszero, U)
         end
     end
+
+    @testset "Evaluation of Acb with fractional powers" begin
+        @var x y
+        f₁ = (x + 1)^(3 / 2) - y
+        f₂ = (x - y^4 + 4)^(-4 / 3)
+        F = System([f₁, f₂])
+        for I in [
+            Arblib.AcbMatrix(randn(ComplexF64, 2, 1)),
+            Arblib.AcbRefVector(randn(ComplexF64, 2)),
+        ]
+            @test all(!iszero, F(I))
+
+            u = Arblib.AcbVector(2)
+            evaluate!(u, InterpretedSystem(System(F)), I)
+            @test all(!iszero, u)
+            U = Arblib.AcbMatrix(2, 2)
+            jacobian!(U, InterpretedSystem(System(F)), I)
+            @test all(!iszero, U)
+        end
+    end
 end
