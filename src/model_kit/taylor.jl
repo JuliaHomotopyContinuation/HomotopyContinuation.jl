@@ -275,7 +275,7 @@ function taylor_op_stop(V::Val{K}) where {K}
 end
 
 #
-# OP_CB # a ^ 3 TODO
+# OP_CB # a ^ 3
 function taylor_op_cb(V::Val{K}, x::TruncatedTaylorSeries{M}) where {K,M}
     taylor_op_mul(V, taylor_op_sqr(V, x), x)
 end

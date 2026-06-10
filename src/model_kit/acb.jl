@@ -59,7 +59,7 @@ end
 Base.@propagate_inbounds function acb_op_sqr!(t, x, m)
     Arblib.sqr!(t, x)
 end
-# OP_SQRT # √(a) TODO
+# OP_SQRT # √(a)
 Base.@propagate_inbounds function acb_op_sqrt!(t, x, m)
     Arblib.sqrt!(t, x)
 end
@@ -97,7 +97,7 @@ Base.@propagate_inbounds function acb_op_add3!(t, x, y, z, m)
     Arblib.add!(m[1], x, y)
     Arblib.add!(t, m[1], z)
 end
-# OP_MUL3 # a * b * c TODO
+# OP_MUL3 # a * b * c
 Base.@propagate_inbounds function acb_op_mul3!(t, x, y, z, m)
     Arblib.mul!(m[1], x, y)
     Arblib.mul!(t, m[1], z)
@@ -125,7 +125,7 @@ Base.@propagate_inbounds function acb_op_add4!(t, x, y, z, w, m)
     Arblib.add!(m[2], z, w)
     Arblib.add!(t, m[1], m[2])
 end
-# OP_MUL4 # a * b * c * d TODO
+# OP_MUL4 # a * b * c * d
 Base.@propagate_inbounds function acb_op_mul4!(t, x, y, z, w, m)
     Arblib.mul!(m[1], x, y)
     Arblib.mul!(m[2], z, w)
