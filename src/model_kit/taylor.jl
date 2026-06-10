@@ -242,6 +242,9 @@ for op in instances(OpType)
         if op == OP_POW_INT
             @eval $f(::Val{K}, x::X, r::Integer) where {K,X} =
                 $f(Val(K), truncated_taylor_series(x), r)
+        elseif op == OP_POW
+            @eval $f(::Val{K}, x::X, r::Number) where {K,X} =
+                $f(Val(K), truncated_taylor_series(x), r)
         else
             @eval $f(::Val{K}, x::X, y::Y) where {K,X,Y} =
                 $f(Val(K), truncated_taylor_series(x), truncated_taylor_series(y))
@@ -745,7 +748,7 @@ end
 #
 # OP_POW_INT # a ^ p where p isa Integer
 
-function taylor_op_pow_int_impl(K, dx)
+function taylor_op_pow_impl(K, dx, op)
     D = DiffMap()
     list = IntermediateRepresentation()
     for k = 0:dx
@@ -775,7 +778,7 @@ function taylor_op_pow_int_impl(K, dx)
         Base.@_inline_meta
         $(untuple(:x, dx))
         iszero(x0) && return $(taylor_tuple([nothing for _ = 0:K]))
-        w₀ = op_pow_int(x0, r)
+        w₀ = $op(x0, r)
         $((K > 0 ? (:(u₀_inv = op_inv(x0)),) : ())...)
         $(to_julia_expr(list))
         $(taylor_tuple(w))
@@ -786,9 +789,16 @@ end
     x::TruncatedTaylorSeries{M,T},
     r::I,
 ) where {K,M,T,I<:Integer}
-    taylor_op_pow_int_impl(K, M - 1)
+    taylor_op_pow_impl(K, M - 1, :op_pow_int)
 end
-# OP_POW # a ^ b  TODO
+# OP_POW # a ^ b where b isa Number
+@generated function taylor_op_pow(
+    ::Val{K},
+    x::TruncatedTaylorSeries{M,T},
+    r::R,
+) where {K,M,T,R<:Number}
+    taylor_op_pow_impl(K, M - 1, :op_pow)
+end
 
 
 # OP_ADD3 # a + b + c

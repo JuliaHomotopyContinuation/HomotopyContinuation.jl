@@ -32,7 +32,7 @@
     OP_SUB # a - b
 
     OP_POW_INT # a ^ p where p isa Integer
-    # OP_POW # a ^ b where b isa Number
+    OP_POW # a ^ b where b isa Number
 
     # Arity 3
     OP_ADD3 # a + b + c
@@ -73,8 +73,8 @@ function arity(op_type::OpType)
            op_type == OP_DIV ||
            op_type == OP_MUL ||
            op_type == OP_SUB ||
-           op_type == OP_POW_INT
-        # || op_type == OP_POW
+           op_type == OP_POW_INT ||
+           op_type == OP_POW
         2
     elseif op_type == OP_ADD3 ||
            op_type == OP_MUL3 ||
@@ -146,8 +146,8 @@ function op_call(op_type::OpType)
 
     elseif op_type == OP_POW_INT
         :op_pow_int
-        # elseif op_type == OP_POW
-        #     :op_pow
+    elseif op_type == OP_POW
+        :op_pow
 
         # Arity 3
     elseif op_type == OP_ADD3

@@ -42,6 +42,37 @@
         end
     end
 
+    @testset "fractional powers" begin
+        @var x p λ
+        f = [(x + 1)^(3 // 2) - p]
+        F = System(f; variables = [x], parameters = [p])
+
+        x₀ = ComplexF64[-0.5]
+        p₀ = ComplexF64[0.1]
+        tx = TaylorVector{4}(reshape(ComplexF64[x₀[1], 0.01, 0.002, -0.003], 4, 1))
+
+        for mode in [InterpretedSystem, CompiledSystem]
+            TF = mode(F)
+
+            u = zeros(ComplexF64, 1)
+            U = zeros(ComplexF64, 1, 1)
+            evaluate_and_jacobian!(u, U, TF, x₀, p₀)
+
+            @test u[1] ≈ (x₀[1] + 1)^(3 // 2) - p₀[1]
+            @test U[1, 1] ≈ (3 // 2) * (x₀[1] + 1)^(1 // 2)
+
+            tu = TaylorVector{4}(ComplexF64, 1)
+            taylor!(tu, Val(3), TF, tx, p₀)
+
+            xλ = sum(tx[1][k] * λ^k for k = 0:3)
+            for k = 0:3
+                expected =
+                    differentiate((xλ + 1)^(3 // 2) - p₀[1], λ, k)(λ => 0) / factorial(k)
+                @test tu[1][k] ≈ expected
+            end
+        end
+    end
+
 
     @testset "Homotopy codegen (Katsura(3))" begin
         n = 3

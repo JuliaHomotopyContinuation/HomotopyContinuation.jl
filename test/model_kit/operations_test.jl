@@ -36,6 +36,8 @@
         elseif ModelKit.arity(op) === 2
             if op === ModelKit.OP_POW_INT
                 f(Val(K), tx, 5)
+            elseif op === ModelKit.OP_POW
+                f(Val(K), tx, 1.5)
             else
                 f(Val(K), tx, ty)
             end

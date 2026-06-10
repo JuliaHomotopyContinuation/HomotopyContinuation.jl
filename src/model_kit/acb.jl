@@ -88,7 +88,8 @@ Base.@propagate_inbounds acb_op_sub!(t, x, y, m) = Arblib.sub!(t, x, y)
 
 # OP_POW_INT # a ^ p where p isa Integer
 Base.@propagate_inbounds acb_op_pow_int!(t, x, k, m) = Arblib.pow!(t, x, k)
-# # OP_POW # a ^ b where b isa Number
+# OP_POW # a ^ b where b isa Number
+Base.@propagate_inbounds acb_op_pow!(t, x, y, m) = Arblib.pow!(t, x, y)
 
 # # Arity 3
 # OP_ADD3 # a + b + c
