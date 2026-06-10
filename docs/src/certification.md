@@ -73,7 +73,7 @@ nleaves
 max_leaf_size
 oversized_leaves
 unsplittable_leaves
-refinement_steps
+nleaf_splits
 save(filename, R::CertificationResult)
 show_straight_line_program
 ```

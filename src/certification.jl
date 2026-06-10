@@ -42,7 +42,7 @@ export certify,
     max_leaf_size,
     oversized_leaves,
     unsplittable_leaves,
-    refinement_steps,
+    nleaf_splits,
     solutions,
     certificates,
     distinct_certified_solutions,
@@ -1918,7 +1918,9 @@ Base.@kwdef mutable struct IteratorCertificationProgress
     distinct_certified::Int = 0
     distinct_real::Int = 0
     distinct_complex::Int = 0
-    refinement_steps::Int = 0
+    nleaf_splits::Int = 0
+    depth::Int = 0
+    max_depth::Int = 0
 end
 
 function make_iterator_certification_progress(; dt::Float64 = 0.4)
@@ -1980,6 +1982,8 @@ end
         ),
         ("Total # leaves", "$(progress.total_leaves)"),
         ("Current leaf", "$(progress.processed_leaves)"),
+        ("Current tree depth",  "$(progress.depth) (max: $(progress.max_depth))"),
+        ("# splits",  "$(progress.nleaf_splits)"),
         ("Pass status", progress.current_pass),
         ("Pass progress", _format_local_pass_bar(progress)),
     )
@@ -2004,7 +2008,9 @@ function update_iterator_progress!(
     distinct_certified::Union{Nothing,Int} = nothing,
     distinct_real::Union{Nothing,Int} = nothing,
     distinct_complex::Union{Nothing,Int} = nothing,
-    refinement_steps::Union{Nothing,Int} = nothing,
+    nleaf_splits::Union{Nothing,Int} = nothing,
+    depth::Union{Nothing,Int} = nothing,
+    max_depth::Union{Nothing,Int} = nothing,
     force::Bool = false,
     finish::Bool = false,
 )
@@ -2023,7 +2029,9 @@ function update_iterator_progress!(
     isnothing(distinct_certified) || (progress.distinct_certified = distinct_certified)
     isnothing(distinct_real) || (progress.distinct_real = distinct_real)
     isnothing(distinct_complex) || (progress.distinct_complex = distinct_complex)
-    isnothing(refinement_steps) || (progress.refinement_steps = refinement_steps)
+    isnothing(nleaf_splits) || (progress.nleaf_splits = nleaf_splits)
+    isnothing(depth) || (progress.depth = depth)
+    isnothing(max_depth) || (progress.max_depth = max_depth)
 
     progress_meter = progress.progress_meter
     if finish
@@ -2083,7 +2091,7 @@ Base.@kwdef struct IteratorCertificationResult
     max_leaf_size::Int = 0
     oversized_leaves::Int = 0
     unsplittable_leaves::Int = 0
-    refinement_steps::Int = 0
+    nleaf_splits::Int = 0
 end
 
 """
@@ -2192,11 +2200,11 @@ Return the number of BSP leaves that could not be refined further in the chosen 
 unsplittable_leaves(R::IteratorCertificationResult) = R.unsplittable_leaves
 
 """
-    refinement_steps(R::IteratorCertificationResult)
+    nleaf_splits(R::IteratorCertificationResult)
 
 Return the number of local BSP refinement steps performed during certification.
 """
-refinement_steps(R::IteratorCertificationResult) = R.refinement_steps
+nleaf_splits(R::IteratorCertificationResult) = R.nleaf_splits
 
 
 function Base.show(io::IO, summary::IteratorCertificationResult)
@@ -2270,12 +2278,12 @@ function check_iterator_certify_options(
     coordinate::Int,
     leaf_size_bound::Integer,
     boundaries,
-    max_refinement_steps::Int,
+    max_depth::Int,
 )
     ε > 0 && isfinite(ε) || throw(ArgumentError("`ε` must be positive and finite."))
     leaf_size_bound > 0 || throw(ArgumentError("`leaf_size_bound` must be positive."))
-    max_refinement_steps >= 0 ||
-        throw(ArgumentError("`max_refinement_steps` must be non-negative."))
+    max_depth >= 0 ||
+        throw(ArgumentError("`max_depth` must be non-negative."))
     1 <= coordinate <= size(F, 2) || throw(
         ArgumentError(
             "`coordinate` must be between 1 and the number of variables ($(size(F, 2))).",
@@ -2305,12 +2313,13 @@ Base.@kwdef struct IteratorCertificationCache{S<:AbstractSystem,P,C<:Certificati
     certify_oversized_leaves::Bool
     ε::Float64
     coordinate::Int
-    max_refinement_steps::Int
+    max_depth::Int
     max_precision::Int
     refine_solution::Bool
     extended_certificate::Bool
     result_predicate::Function
     npaths::Threads.Atomic{Int}
+    nleaf_splits::Threads.Atomic{Int}
 end
 
 function threaded_certification_data(
@@ -3317,6 +3326,8 @@ function handle_split_verification!(
         # The verification output is still indexed relative to `leaf_iter`, so we
         # reindex it before passing it to the child recursion.
         left_leaf, right_leaf = split_leaf!(bsp, current_leaf, split_point)
+        live_splits = Threads.atomic_add!(cache.nleaf_splits, 1) + 1
+        update_iterator_progress!(cache.progress; nleaf_splits = live_splits)
         left_iter = _leaf_iterator(leaf_iter, verification.left_entries)
         right_iter = _leaf_iterator(leaf_iter, verification.right_entries)
         left_entries = reindex_leaf_entries(verification.left_entries)
@@ -3349,9 +3360,7 @@ function handle_split_verification!(
                 distinct_real = left_counts.distinct_real + right_counts.distinct_real,
                 distinct_complex = left_counts.distinct_complex +
                                    right_counts.distinct_complex,
-                refinement_steps = left_counts.refinement_steps +
-                                   right_counts.refinement_steps +
-                                   1,
+                nleaf_splits = left_counts.nleaf_splits + right_counts.nleaf_splits + 1,
                 rightmost_leaf = right_counts.rightmost_leaf,
             ),
         )
@@ -3380,6 +3389,9 @@ function process_leaf!(
     initial_entries::Union{Nothing,Vector{BSPLeafEntry}} = nothing,
     certify_solution_kwargs...,
 )
+    if !isnothing(cache.progress)
+        update_iterator_progress!(cache.progress; depth = max(cache.progress.depth, depth))
+    end
     # Process one leaf subtree depth-first so only the current branch lives in memory.
     # Step 1: stabilize the current leaf with a tiny sample so we can cheaply decide
     # whether this subtree needs further refinement at all.
@@ -3399,7 +3411,7 @@ function process_leaf!(
         current_leaf = leaf
     end
 
-    if leaf_size > cache.leaf_size_bound && depth < cache.max_refinement_steps
+    if leaf_size > cache.leaf_size_bound && depth < cache.max_depth
         # Step 2: this leaf is oversized, so recollect the full local leaf and work
         # only with the corresponding leaf iterator from here on.
         if isnothing(initial_entries)
@@ -3551,7 +3563,7 @@ function process_leaf!(
         distinct_certified = 0,
         distinct_real = 0,
         distinct_complex = 0,
-        refinement_steps = 0,
+        nleaf_splits = 0,
         rightmost_leaf = current_leaf,
     )
 
@@ -3562,7 +3574,7 @@ function process_leaf!(
             distinct_certified = 0,
             distinct_real = 0,
             distinct_complex = 0,
-            refinement_steps = 0,
+            nleaf_splits = 0,
             rightmost_leaf = current_leaf,
         )
     end
@@ -3602,7 +3614,7 @@ function process_leaf!(
         distinct_certified = ndistinct,
         distinct_real = nreal,
         distinct_complex = ncomplex,
-        refinement_steps = 0,
+        nleaf_splits = 0,
         rightmost_leaf = current_leaf,
     )
 end
@@ -3685,7 +3697,7 @@ For more details of the implementation see [^BBK26].
 * `ε = 1e-4`: when proposing a split from one sampled certified interval, place the split at distance `ε` from that interval.
 * `coordinate = 1`: the coordinate of the solutions we project to to compute the binary spatial partition tree.
 * `boundaries = -100:0.1:100`: the initial boundaries of the spatial partition.
-* `max_refinement_steps = 500`: the maximal number of times we split leaves to get all leaves containing at most `leaf_size_bound` solutions.
+* `max_depth = 100`: the maximal depth the tree is allowed to have when we split leaves to get all leaves containing at most `leaf_size_bound` solutions.
 
 [^BBK26]: Breiding, P., Brysiewicz, T. and Johnson, D. K. "Low-Memory Numerical Certification." arXiv:2604.16623.
 """
@@ -3702,7 +3714,7 @@ function _certify_iterator_bsp(
     ε::Float64 = 1e-4,
     coordinate::Int = 1,
     boundaries = -100:0.1:100,
-    max_refinement_steps::Int = 500,
+    max_depth::Int = 500,
     check_oversized_leaves::Bool = true,
     max_precision::Int = 256,
     refine_solution::Bool = true,
@@ -3716,7 +3728,7 @@ function _certify_iterator_bsp(
         coordinate = coordinate,
         leaf_size_bound = leaf_size_bound,
         boundaries = boundaries,
-        max_refinement_steps = max_refinement_steps,
+        max_depth = max_depth,
     )
     bsp = _build_partition(boundaries)
     start_iter_length = length(start_solutions(iter))
@@ -3725,6 +3737,7 @@ function _certify_iterator_bsp(
     update_iterator_progress!(
         progress;
         start_iterator_length = start_iter_length,
+        max_depth = max_depth,
         force = true,
     )
     # First pass over the full iterator: assign certified intervals to the coarse BSP.
@@ -3759,15 +3772,16 @@ function _certify_iterator_bsp(
         certify_oversized_leaves = certify_oversized_leaves,
         ε = ε,
         coordinate = coordinate,
-        max_refinement_steps = max_refinement_steps,
+        max_depth = max_depth,
         max_precision = max_precision,
         refine_solution = refine_solution,
         extended_certificate = extended_certificate,
         result_predicate = result_predicate,
         npaths = Threads.Atomic{Int}(assignment_stats.assignment_npaths),
+        nleaf_splits = Threads.Atomic{Int}(0),
     )
 
-    refinement_steps = 0
+    nleaf_splits = 0
     i = 1
     while i <= length(bsp.leaves)
         update_iterator_progress!(
@@ -3784,7 +3798,7 @@ function _certify_iterator_bsp(
             distinct_certified = distinct_certified,
             distinct_real = distinct_real,
             distinct_complex = distinct_complex,
-            refinement_steps = refinement_steps,
+            nleaf_splits = nleaf_splits,
         )
         # Walk the current leaf partition from left to right. Processing one leaf may
         # split it into a whole local subtree, so we resume after the rightmost child.
@@ -3811,7 +3825,7 @@ function _certify_iterator_bsp(
         distinct_certified += counts.distinct_certified
         distinct_real += counts.distinct_real
         distinct_complex += counts.distinct_complex
-        refinement_steps += counts.refinement_steps
+        nleaf_splits += counts.nleaf_splits
         rightmost_index = findfirst(==(counts.rightmost_leaf), bsp.leaves)
         isnothing(rightmost_index) && error(
             "Internal BSP error: processed leaf $(counts.rightmost_leaf) disappeared.",
@@ -3840,7 +3854,7 @@ function _certify_iterator_bsp(
         max_leaf_size = max_leaf_size,
         oversized_leaves = oversized_leaves,
         unsplittable_leaves = length(bsp.unsplittable),
-        refinement_steps = refinement_steps,
+        nleaf_splits = nleaf_splits,
     )
 
     update_iterator_progress!(
@@ -3857,7 +3871,7 @@ function _certify_iterator_bsp(
         distinct_certified = distinct_certified,
         distinct_real = distinct_real,
         distinct_complex = distinct_complex,
-        refinement_steps = refinement_steps,
+        nleaf_splits = nleaf_splits,
         finish = true,
     )
 

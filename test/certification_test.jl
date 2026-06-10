@@ -526,7 +526,7 @@
             target_parameters = [-2],
         )
 
-        res = certify(F, second_iter, [-2]; max_refinement_steps = 0)
+        res = certify(F, second_iter, [-2]; max_depth = 0)
         results = collect(second_iter)
         nsuccess_results = count(is_success, results)
 
