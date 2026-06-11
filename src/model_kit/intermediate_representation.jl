@@ -233,6 +233,8 @@ function pow!(ir::IntermediateRepresentation, @nospecialize(a), @nospecialize(b)
         return add_op!(ir, OP_POW_INT, a, k)
     elseif k == 1 // 2
         return add_op!(ir, OP_SQRT, a)
+    elseif k isa Number
+        return add_op!(ir, OP_POW, a, k)
     else
         error("Cannot handle exponent: $b")
     end
