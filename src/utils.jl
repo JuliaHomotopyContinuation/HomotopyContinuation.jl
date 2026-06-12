@@ -63,7 +63,7 @@ function read_solutions(filename)
     A = DelimitedFiles.readdlm(filename; skipblanks = false)
     n = convert(Int, A[1, 1])
     # figure out number of variables
-    nvars = 0
+    nvars = size(A, 1) - 2
     for k = 4:size(A, 1)
         if isempty(A[k, 1])
             nvars = k - 3
