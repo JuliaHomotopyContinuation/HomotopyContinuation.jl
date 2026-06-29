@@ -359,7 +359,7 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
     accepted_steps = rejected_steps = ext_accepted_steps = ext_rejected_steps = 0
     last_steps_failed = 0
 
-    TrackerState(
+    TrackerState{Matrix{ComplexF64}}(
         x,
         x̂,
         x̄,

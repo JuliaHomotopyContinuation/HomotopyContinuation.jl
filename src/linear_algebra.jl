@@ -4,12 +4,18 @@
 This is a data structure for the efficient repeated solution of a square or
 overdetermined linear system `Ax=b`.
 """
-struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF64}
-    A::M # Matrix
+const LU_STDLIB_BREAKPOINT = 28
+const QR_STDLIB_BREAKPOINT = 44
+
+struct MatrixWorkspace{M<:Matrix{ComplexF64}} <: AbstractMatrix{ComplexF64}
+    A::M
     d::Vector{Float64} # Inverse of scaling factors
     factorized::Base.RefValue{Bool}
     lu::LA.LU{ComplexF64,M,Vector{Int}} # LU Factorization of D * J
     qr::LA.QR{ComplexF64,Matrix{ComplexF64},Vector{ComplexF64}}
+    stdlib_qr::Base.RefValue{
+        LA.QRCompactWY{ComplexF64,Matrix{ComplexF64},Matrix{ComplexF64}},
+    }
     row_scaling::Vector{Float64}
     scaled::Base.RefValue{Bool}
     # mixed precision iterative refinement
@@ -24,18 +30,18 @@ end
 MatrixWorkspace(m::Integer, n::Integer; kwargs...) =
     MatrixWorkspace(zeros(ComplexF64, m, n); kwargs...)
 function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure = true)
+    _ = optimize_data_structure
     m, n = size(Â)
     m ≥ n || throw(ArgumentError("Expected system with more rows than columns."))
 
     A = Matrix{ComplexF64}(Â)
     d = ones(m)
     factorized = Ref(false)
-    qr = LA.qrfactUnblocked!(copy(A))
-    # experiments show that for m > 25 the data layout as a
-    # struct array is beneficial
-    if m > 25 && optimize_data_structure
-        A = StructArrays.StructArray(A)
-    end
+    qr = LA.QR{ComplexF64,Matrix{ComplexF64},Vector{ComplexF64}}(
+        copy(A),
+        zeros(ComplexF64, min(m, n)),
+    )
+    stdlib_qr = Ref(LA.qr!(copy(A)))
     row_scaling = ones(m)
     scaled = Ref(false)
 
@@ -54,6 +60,7 @@ function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure = true)
         factorized,
         lu,
         qr,
+        stdlib_qr,
         row_scaling,
         scaled,
         x̄,
@@ -254,9 +261,17 @@ end
 function factorize!(WS::MatrixWorkspace)
     m, n = size(WS)
     if m == n
-        lu!(WS.lu.factors, WS.lu.ipiv)
+        if n ≥ LU_STDLIB_BREAKPOINT
+            LA.LAPACK.getrf!(WS.lu.factors, WS.lu.ipiv; check = true)
+        else
+            lu!(WS.lu.factors, WS.lu.ipiv)
+        end
     else
-        qr!(WS.qr)
+        if n ≥ QR_STDLIB_BREAKPOINT
+            WS.stdlib_qr[] = LA.qr!(WS.qr.factors)
+        else
+            qr!(WS.qr)
+        end
     end
     WS.factorized[] = true
     WS
@@ -307,11 +322,26 @@ end
     x
 end
 
-function lu_ldiv!(x, LU::LA.LU, b::AbstractVector)
+@inline function ldiv_upper_stdlib!(A::AbstractMatrix, x::AbstractVector)
+    n = length(x)
+    @inbounds for i = 1:n
+        iszero(A[i, i]) && return ldiv_upper!(A, x)
+    end
+    R = LA.UpperTriangular(view(A, 1:n, 1:n))
+    LA.ldiv!(R, x)
+end
+
+function lu_ldiv_stdlib_upper!(x, LU::LA.LU, b::AbstractVector)
     x === b || copyto!(x, b)
     _ipiv!(LU, x)
     ldiv_unit_lower!(LU.factors, x)
-    ldiv_upper!(LU.factors, x)
+    ldiv_upper_stdlib!(LU.factors, x)
+    x
+end
+
+function lu_ldiv!(x, LU::LA.LU, b::AbstractVector)
+    x === b || copyto!(x, b)
+    LA.ldiv!(x, LU, x)
     x
 end
 
@@ -382,7 +412,7 @@ function qr_ldiv!(x, QR::LA.QR, b::AbstractVector)
     @inbounds for i = 1:length(x)
         x[i] = b[i]
     end
-    ldiv_upper!(QR.factors, x)
+    ldiv_upper_stdlib!(QR.factors, x)
     return x
 end
 
@@ -396,13 +426,25 @@ function LA.ldiv!(x::AbstractVector, WS::MatrixWorkspace, b::AbstractVector)
     if m == n
         if WS.scaled[]
             x .= WS.row_scaling .* b
-            lu_ldiv!(x, WS.lu, x)
+            if n ≥ LU_STDLIB_BREAKPOINT
+                lu_ldiv!(x, WS.lu, x)
+            else
+                lu_ldiv_stdlib_upper!(x, WS.lu, x)
+            end
         else
-            lu_ldiv!(x, WS.lu, b)
+            if n ≥ LU_STDLIB_BREAKPOINT
+                lu_ldiv!(x, WS.lu, b)
+            else
+                lu_ldiv_stdlib_upper!(x, WS.lu, b)
+            end
         end
     else
-        WS.r .= b
-        qr_ldiv!(x, WS.qr, WS.r)
+        if n ≥ QR_STDLIB_BREAKPOINT
+            LA.ldiv!(x, WS.stdlib_qr[], b)
+        else
+            WS.r .= b
+            qr_ldiv!(x, WS.qr, WS.r)
+        end
     end
     x
 end
