@@ -11,6 +11,7 @@ struct MatrixWorkspace{M<:Matrix{ComplexF64}} <: AbstractMatrix{ComplexF64}
     A::M
     d::Vector{Float64} # Inverse of scaling factors
     factorized::Base.RefValue{Bool}
+    upper_singular::Base.RefValue{Bool}
     lu::LA.LU{ComplexF64,M,Vector{Int}} # LU Factorization of D * J
     qr::LA.QR{ComplexF64,Matrix{ComplexF64},Vector{ComplexF64}}
     stdlib_qr::Base.RefValue{
@@ -37,6 +38,7 @@ function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure = true)
     A = Matrix{ComplexF64}(Â)
     d = ones(m)
     factorized = Ref(false)
+    upper_singular = Ref(false)
     qr = LA.QR{ComplexF64,Matrix{ComplexF64},Vector{ComplexF64}}(
         copy(A),
         zeros(ComplexF64, min(m, n)),
@@ -58,6 +60,7 @@ function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure = true)
         A,
         d,
         factorized,
+        upper_singular,
         lu,
         qr,
         stdlib_qr,
@@ -263,14 +266,18 @@ function factorize!(WS::MatrixWorkspace)
     if m == n
         if n ≥ LU_STDLIB_BREAKPOINT
             LA.LAPACK.getrf!(WS.lu.factors, WS.lu.ipiv; check = true)
+            WS.upper_singular[] = false
         else
             lu!(WS.lu.factors, WS.lu.ipiv)
+            WS.upper_singular[] = has_zero_diagonal(WS.lu.factors, n)
         end
     else
         if n ≥ QR_STDLIB_BREAKPOINT
             WS.stdlib_qr[] = LA.qr!(WS.qr.factors)
+            WS.upper_singular[] = false
         else
             qr!(WS.qr)
+            WS.upper_singular[] = has_zero_diagonal(WS.qr.factors, n)
         end
     end
     WS.factorized[] = true
@@ -323,19 +330,36 @@ end
 end
 
 @inline function ldiv_upper_stdlib!(A::AbstractMatrix, x::AbstractVector)
+    ldiv_upper_stdlib!(A, x, has_zero_diagonal(A, length(x)))
+end
+@inline function ldiv_upper_stdlib!(
+    A::AbstractMatrix,
+    x::AbstractVector,
+    upper_singular::Bool,
+)
+    upper_singular && return ldiv_upper!(A, x)
     n = length(x)
-    @inbounds for i = 1:n
-        iszero(A[i, i]) && return ldiv_upper!(A, x)
-    end
     R = LA.UpperTriangular(view(A, 1:n, 1:n))
     LA.ldiv!(R, x)
 end
 
-function lu_ldiv_stdlib_upper!(x, LU::LA.LU, b::AbstractVector)
+@inline function has_zero_diagonal(A::AbstractMatrix, n::Integer)
+    @inbounds for i = 1:n
+        iszero(A[i, i]) && return true
+    end
+    false
+end
+
+function lu_ldiv_stdlib_upper!(
+    x,
+    LU::LA.LU,
+    b::AbstractVector,
+    upper_singular::Bool = has_zero_diagonal(LU.factors, length(x)),
+)
     x === b || copyto!(x, b)
     _ipiv!(LU, x)
     ldiv_unit_lower!(LU.factors, x)
-    ldiv_upper_stdlib!(LU.factors, x)
+    ldiv_upper_stdlib!(LU.factors, x, upper_singular)
     x
 end
 
@@ -405,14 +429,19 @@ function lmul_Q_adj!(A::LA.QR, b::AbstractVector)
     end
     b
 end
-function qr_ldiv!(x, QR::LA.QR, b::AbstractVector)
+function qr_ldiv!(
+    x,
+    QR::LA.QR,
+    b::AbstractVector,
+    upper_singular::Bool = has_zero_diagonal(QR.factors, length(x)),
+)
     # overwrites b
     # assumes QR is a tall matrix
     lmul_Q_adj!(QR, b)
     @inbounds for i = 1:length(x)
         x[i] = b[i]
     end
-    ldiv_upper_stdlib!(QR.factors, x)
+    ldiv_upper_stdlib!(QR.factors, x, upper_singular)
     return x
 end
 
@@ -429,13 +458,13 @@ function LA.ldiv!(x::AbstractVector, WS::MatrixWorkspace, b::AbstractVector)
             if n ≥ LU_STDLIB_BREAKPOINT
                 lu_ldiv!(x, WS.lu, x)
             else
-                lu_ldiv_stdlib_upper!(x, WS.lu, x)
+                lu_ldiv_stdlib_upper!(x, WS.lu, x, WS.upper_singular[])
             end
         else
             if n ≥ LU_STDLIB_BREAKPOINT
                 lu_ldiv!(x, WS.lu, b)
             else
-                lu_ldiv_stdlib_upper!(x, WS.lu, b)
+                lu_ldiv_stdlib_upper!(x, WS.lu, b, WS.upper_singular[])
             end
         end
     else
@@ -443,7 +472,7 @@ function LA.ldiv!(x::AbstractVector, WS::MatrixWorkspace, b::AbstractVector)
             LA.ldiv!(x, WS.stdlib_qr[], b)
         else
             WS.r .= b
-            qr_ldiv!(x, WS.qr, WS.r)
+            qr_ldiv!(x, WS.qr, WS.r, WS.upper_singular[])
         end
     end
     x
