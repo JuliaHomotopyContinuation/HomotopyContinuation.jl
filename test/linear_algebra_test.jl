@@ -23,9 +23,12 @@
         WS .= C
         @test WS.A == C
 
-        #test struct array switch
+        # The legacy optimization keyword is accepted as a no-op.
         A = rand(ComplexF32, 30, 30)
-        WS = HC.MatrixWorkspace(A)
+        WS = HC.MatrixWorkspace(A; optimize_data_structure = true)
+        @test WS.A isa Matrix{ComplexF64}
+        @test WS.lu.factors isa Matrix{ComplexF64}
+        @test WS.qr.factors isa Matrix{ComplexF64}
     end
 
     @testset "QR" begin
@@ -49,7 +52,7 @@
     end
 
     @testset "ldiv" begin
-        for n in [3, 13, 31] # test that struct array also works
+        for n in [3, 13, 31]
             A = randn(ComplexF64, n, n)
             b = randn(ComplexF64, n)
             x = zeros(ComplexF64, n)
@@ -61,6 +64,49 @@
             @test (@allocated ldiv!(x, WS, b)) == 0
             @test (lu(A) \ b) ≈ x rtol = cond(A) * 10
         end
+    end
+
+    @testset "LU breakpoint" begin
+        for n in (27, 28)
+            A = randn(ComplexF64, n, n)
+            b = randn(ComplexF64, n)
+            x = zeros(ComplexF64, n)
+            WS = HC.MatrixWorkspace(A)
+
+            ldiv!(x, WS, b)
+
+            @test WS.factorized[]
+            @test norm(A * x - b) / norm(b) < 1e-12
+            @test x ≈ A \ b rtol = 1e-12
+        end
+    end
+
+    @testset "QR breakpoint" begin
+        for n in (43, 44)
+            m = n + 5
+            A = randn(ComplexF64, m, n)
+            b = randn(ComplexF64, m)
+            b0 = copy(b)
+            x = zeros(ComplexF64, n)
+            WS = HC.MatrixWorkspace(A)
+
+            ldiv!(x, WS, b)
+
+            @test WS.factorized[]
+            @test b == b0
+            @test norm(x - (A \ b0)) / norm(x) < 1e-12
+        end
+    end
+
+    @testset "QR rectangular" begin
+        A = randn(ComplexF64, 61, 17)
+        b = randn(ComplexF64, 61)
+        x = zeros(ComplexF64, 17)
+        WS = HC.MatrixWorkspace(A)
+
+        ldiv!(x, WS, b)
+
+        @test norm(x - (A \ b)) / norm(x) < 1e-12
     end
 
     @testset "Inf-norm estimator / cond" begin
