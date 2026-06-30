@@ -1141,7 +1141,6 @@ function set_solution!(
     set_solution!(view(H.x, 1:length(x)), H.system, x)
     H.x[end] = 1
 
-    @show size(u), size(H.path.γ1'), size(H.x)
     if isone(t)
         LA.mul!(u, H.path.γ1', H.x)
     elseif iszero(t)
