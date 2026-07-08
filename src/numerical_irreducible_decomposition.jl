@@ -1515,7 +1515,8 @@ function decompose_with_monodromy!(
     if dim(L) < n
         update_progress!(progress; is_monodromy = true)
 
-        MS = MonodromySolver(G, L; compile = false, options = options, intrinsic = intrinsic)
+        MS =
+            MonodromySolver(G, L; compile = false, options = options, intrinsic = intrinsic)
         initial_points = check_start_solutions(MS, P, L)
         res = monodromy_solve(
             MS,
