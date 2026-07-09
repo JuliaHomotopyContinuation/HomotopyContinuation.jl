@@ -280,6 +280,7 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
     ℓ::Union{Nothing,Expression}
     ℓ_coeffs::Union{Nothing,Vector{ComplexF64}}
     max_trials_u_homotopy::Int
+    intrinsic::Union{Nothing,Bool}
 
     endgame_options::EndgameOptions
     tracker_options::TrackerOptions
@@ -297,6 +298,7 @@ function RegenerationCache(
     ℓ,
     ℓ_coeffs,
     max_trials_u_homotopy,
+    intrinsic,
     EO,
     TO,
     progress,
@@ -324,6 +326,7 @@ function RegenerationCache(
         ℓ,
         ℓ_coeffs,
         max_trials_u_homotopy,
+        intrinsic,
         EO,
         TO,
         progress,
@@ -394,6 +397,7 @@ function _regeneration(
     ),
     monodromy_options::MonodromyOptions = MonodromyOptions(),
     max_trials_u_homotopy::Int = 5,
+    intrinsic::Union{Nothing,Bool} = true, # always intrinsic linear subspace homotopies
     show_monodromy_progress::Bool = false,
     threading::Bool = Threads.nthreads() > 1,
     seed = nothing,
@@ -482,6 +486,7 @@ function _regeneration(
         ℓ,
         ℓ_coeffs,
         max_trials_u_homotopy,
+        intrinsic,
         endgame_options,
         tracker_options,
         progress,
@@ -1017,10 +1022,22 @@ function initialize_u_homotopy_trackers(u_data, cache)
     projective = cache.projective
     L1 = rand_subspace(ambient_dim(L); dim = dim(L), affine = !projective)
 
-    Hom1 = linear_subspace_homotopy(F, L, L1; homogeneous = projective)
+    Hom1 = linear_subspace_homotopy(
+        F,
+        L,
+        L1;
+        homogeneous = projective,
+        intrinsic = cache.intrinsic,
+    )
     Hom2 = StraightLineHomotopy(slice(F, L1), slice(G, L1); gamma = cis(2 * pi * rand()))
     projective && (Hom2 = on_affine_chart(Hom2))
-    Hom3 = linear_subspace_homotopy(G, L1, L2; homogeneous = projective)
+    Hom3 = linear_subspace_homotopy(
+        G,
+        L1,
+        L2;
+        homogeneous = projective,
+        intrinsic = cache.intrinsic,
+    )
 
     [
         u_homotopy_tracker(Hom1, cache),
@@ -1467,6 +1484,7 @@ function decompose_with_monodromy!(
     warning,
     progress,
     seed;
+    intrinsic::Union{Nothing,Bool} = nothing,
     threading::Bool = Threads.nthreads() > 1,
 )
     update_progress_dim!(progress, dim(W))
@@ -1497,7 +1515,8 @@ function decompose_with_monodromy!(
     if dim(L) < n
         update_progress!(progress; is_monodromy = true)
 
-        MS = MonodromySolver(G, L; compile = false, options = options)
+        MS =
+            MonodromySolver(G, L; compile = false, options = options, intrinsic = intrinsic)
         initial_points = check_start_solutions(MS, P, L)
         res = monodromy_solve(
             MS,
@@ -1983,6 +2002,7 @@ function decompose(
     show_monodromy_progress::Bool = false,
     monodromy_options::MonodromyOptions = MonodromyOptions(),
     max_iters::Int = 500,
+    intrinsic::Union{Nothing,Bool} = nothing,
     warning::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
     seed = nothing,
@@ -2034,6 +2054,7 @@ function decompose(
                 warning,
                 progress,
                 seed;
+                intrinsic = intrinsic,
                 threading = threading,
             )
             if !isnothing(dec)
@@ -2332,6 +2353,8 @@ function numerical_irreducible_decomposition(
     sorted::Bool = true,
     max_codim::Union{Int,Nothing} = nothing,
     max_trials_u_homotopy::Int = 5,
+    intrinsic_for_regeneration::Union{Nothing,Bool} = true,
+    intrinsic_for_decompose::Union{Nothing,Bool} = nothing,
     warning::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
     seed = nothing,
@@ -2355,6 +2378,7 @@ function numerical_irreducible_decomposition(
         endgame_options = endgame_options,
         monodromy_options = monodromy_options_for_regeneration,
         max_trials_u_homotopy = max_trials_u_homotopy,
+        intrinsic = intrinsic_for_regeneration,
         show_monodromy_progress = show_monodromy_for_regeneration_progress,
         threading = threading,
         seed = nothing,
@@ -2371,6 +2395,7 @@ function numerical_irreducible_decomposition(
         show_progress = show_progress,
         monodromy_options = monodromy_options_for_decompose,
         max_iters = max_iters,
+        intrinsic = intrinsic_for_decompose,
         show_monodromy_progress = show_monodromy_for_decompose_progress,
         threading = threading,
         warning = warning,
@@ -2554,6 +2579,7 @@ mutable struct IntersectCache{Sys<:AbstractSystem}
     ℓ_coeffs::Union{Nothing,Vector{ComplexF64}}
 
     max_trials_u_homotopy::Int
+    intrinsic::Union{Nothing,Bool}
 
     endgame_options::EndgameOptions
     tracker_options::TrackerOptions
@@ -2570,6 +2596,7 @@ function IntersectCache(
     ℓ,
     ℓ_coeffs,
     max_trials_u_homotopy,
+    intrinsic,
     EO,
     TO,
     progress,
@@ -2595,6 +2622,7 @@ function IntersectCache(
         ℓ,
         ℓ_coeffs,
         max_trials_u_homotopy,
+        intrinsic,
         EO,
         TO,
         progress,
@@ -2663,6 +2691,7 @@ function _intersect(
     ),
     monodromy_options::MonodromyOptions = MonodromyOptions(),
     max_trials_u_homotopy::Int = 5,
+    intrinsic::Union{Nothing,Bool} = true, # always intrinsic linear subspace homotopies
     show_monodromy_progress::Bool = false,
     threading = Threads.nthreads() > 1,
     atol = 1e-14,
@@ -2711,6 +2740,7 @@ function _intersect(
         ℓ,
         ℓ_coeffs,
         max_trials_u_homotopy,
+        intrinsic,
         endgame_options,
         tracker_options,
         progress,
