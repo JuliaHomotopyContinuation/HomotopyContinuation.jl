@@ -411,9 +411,13 @@ function _regeneration(
     # the algorithm is u-regeneration as proposed 
     # by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869
 
+    f = expressions(F)
     xvars = variables(F)
     projective = is_homogeneous(F)
     vars = copy(xvars)
+    @unique_var u # u-regeneration adds another variable u to F
+    push!(vars, u)
+
     n = size(F, 2) # ambient dimension
     c = size(F, 1) # we can have witness sets of codimesion at most min(c,n)
     expected_max_codim = min(c, n - projective)
@@ -423,10 +427,7 @@ function _regeneration(
     else
         codim = expected_max_codim
     end
-    # u-regeneration adds another variable u to F
-    @unique_var u
-    push!(vars, u)
-
+    
     # progress bar
     if show_progress
         progress = WitnessSetsProgress(
@@ -453,8 +454,9 @@ function _regeneration(
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
     update_progress!(progress; is_computing_hypersurfaces = true)
     H = initialize_hypersurfaces(
-        F,
+        f,
         vars,
+        xvars,
         linear_subspace(out[1]),
         projective;
         threading = threading,
@@ -614,20 +616,19 @@ function initialize_witness_sets(codim, n; affine::Bool = true)
     end
 end
 function initialize_hypersurfaces(
-    F::System,
+    f::Vector{Expression},
     vars,
+    xvars,
     L,
     projective;
     threading::Bool = Threads.nthreads() > 1,
 )
-    f = expressions(F)
     c = length(f)
     out = Vector{WitnessSet}(undef, c)
     for i = 1:c
         fᵢ = f[i]
         h = fixed(System([fᵢ], variables = vars), compile = false)
         pᵢ, qᵢ = get_num_den(fᵢ) # fᵢ = pᵢ / qᵢ
-        xvars = vars[1:(end-1)]
         if projective
             E = extrinsic(L)
             A = E.A[2:end, 1:(end-1)]
