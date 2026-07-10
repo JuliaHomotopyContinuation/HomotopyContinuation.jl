@@ -357,7 +357,7 @@ The implementation is based on the algorithm [u-regeneration](https://arxiv.org/
 
 ### Options
 
-* `sorted = true`: if `true`, the polynomials in F will be sorted by degree in increasing order. 
+* `sorted = true`: the polynomials in `F`` will be sorted by degree in increasing order. If `F` is not homogeneous, it will additionally me multiplied with a random lower triangular matrix. If `F` is a system of rational functions, we first compute witness sets for each entry of `F` and then sort `F` according to their degrees. 
 * `max_codim`: the maximal codimension until which witness supersets should be computed.
 * `show_progress = true`: indicate whether a progress bar should be displayed.
 * `show_monodromy_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) should be displayed. If `false`, minimal info about the monodromy computations are still displayed in the progress bar of `regeneration`.
@@ -2295,7 +2295,7 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 ### Options
 
 * `show_progress = true`: indicate whether a progress bar should be displayed.
-* `sorted = true`: the polynomials in F will be sorted by degree in increasing order. 
+* `sorted = true`: the polynomials in `F`` will be sorted by degree in increasing order. If `F` is not homogeneous, it will additionally me multiplied with a random lower triangular matrix. If `F` is a system of rational functions, we first compute witness sets for each entry of `F` and then sort `F` according to their degrees. 
 * `max_codim`: the maximal codimension until which witness supersets should be computed.
 * `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
 * `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
