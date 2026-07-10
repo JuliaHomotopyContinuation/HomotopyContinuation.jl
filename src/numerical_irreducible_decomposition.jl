@@ -411,11 +411,12 @@ function _regeneration(
     # the algorithm is u-regeneration as proposed 
     # by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869
 
-    f = expressions(F)
+    # declare variables:
+    # u-regeneration adds another variable u to F
     xvars = variables(F)
     projective = is_homogeneous(F)
     vars = copy(xvars)
-    @unique_var u # u-regeneration adds another variable u to F
+    @unique_var u 
     push!(vars, u)
 
     n = size(F, 2) # ambient dimension
@@ -426,6 +427,14 @@ function _regeneration(
         codim = max_codim + 1
     else
         codim = expected_max_codim
+    end
+
+    # sort polynomials by degree 
+    f = expressions(F)
+    is_poly = all(is_polynomial, f)
+    if sorted && is_poly
+        sort!(f, by = ModelKit.degree)
+        f = projective ? f : random_triangular_matrix(c) * f
     end
     
     # progress bar
@@ -465,13 +474,11 @@ function _regeneration(
         return nothing
     end
 
-    # sort expressions by degree
-    if sorted
+    # # sort expressions by degree of hypersurfaces when we have rational functions 
+    if sorted && !is_poly
         σ = sortperm(H, by = ModelKit.degree)
-        f = expressions(F)[σ]
+        f = f[σ]
         H = H[σ]
-    else
-        f = expressions(F)
     end
 
     # Initialize a cache
@@ -571,6 +578,16 @@ function _regeneration(
     return ws
 end
 
+function random_triangular_matrix(c)
+    T = zeros(ComplexF64, c, c)
+    for i in 1:c 
+        T[i, i] = one(ComplexF64)
+        for j in 1:(i-1)
+            T[i, j] = randn(ComplexF64)
+        end
+    end
+    T
+end 
 
 function get_flag(iter, L₀)
     # this gives the flag of linear spaces containing L₀ = {Ax=b} and {Ax=b, u=c} indexed by iter; for i in iter, this returns the linear space obtained by deleting the first (i-1) rows from A and b.
@@ -624,6 +641,7 @@ function initialize_hypersurfaces(
     threading::Bool = Threads.nthreads() > 1,
 )
     c = length(f)
+    @show f, vars, xvars
     out = Vector{WitnessSet}(undef, c)
     for i = 1:c
         fᵢ = f[i]
