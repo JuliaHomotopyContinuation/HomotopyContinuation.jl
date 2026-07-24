@@ -9,6 +9,7 @@ on:
       - main
 env:
   HC_TESTSET: "model_kit"
+  JULIA_NUM_THREADS: "2"
 
 jobs:
   test:
