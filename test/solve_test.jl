@@ -431,6 +431,7 @@
             show_progress = false,
             start_system = :total_degree,
         )
+        @test !isempty(results)
         @test length(results) < 125
     end
 
