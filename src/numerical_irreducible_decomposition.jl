@@ -356,8 +356,7 @@ This solves ``F=0`` equation-by-equations and returns a [`WitnessSet`](@ref) for
 The implementation is based on the algorithm [u-regeneration](https://arxiv.org/abs/2206.02869) by Duff, Leykin and Rodriguez. 
 
 ### Options
-
-* `sorted = true`: the polynomials in `F`` will be sorted by degree in increasing order. If `F` is not homogeneous, it will additionally me multiplied with a random lower triangular matrix. If `F` is a system of rational functions, we first compute witness sets for each entry of `F` and then sort `F` according to their degrees. 
+* `sorted`: if `true` (default), the polynomials in `F`` will be sorted by degree in increasing order (when `F` is a system of rational functions, we first compute witness sets for each entry of `F` and then sort `F` according to their degrees). If `false, the polynomials in `F` will not be sorted. The third option is `:randomized`, which multiplies `F` by a random matrix.
 * `max_codim`: the maximal codimension until which witness supersets should be computed.
 * `show_progress = true`: indicate whether a progress bar should be displayed.
 * `show_monodromy_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) should be displayed. If `false`, minimal info about the monodromy computations are still displayed in the progress bar of `regeneration`.
@@ -386,7 +385,7 @@ regeneration(F::System; kwargs...) = _regeneration(deepcopy(F); kwargs...)
 regeneration(F::Vector{Expression}; kwargs...) = regeneration(System(F); kwargs...)
 function _regeneration(
     F::System;
-    sorted::Bool = true,
+    sorted::Union{Bool, Symbol} = true,
     max_codim::Union{Int,Nothing} = nothing,
     show_progress::Bool = true,
     tracker_options = TrackerOptions(),
@@ -429,12 +428,11 @@ function _regeneration(
         codim = expected_max_codim
     end
 
-    # sort polynomials by degree 
+    # prepare equations
     f = expressions(F)
     is_poly = all(is_polynomial, f)
-    if sorted && is_poly
-        sort!(f, by = ModelKit.degree)
-        f = projective ? f : random_triangular_matrix(c) * f
+    if is_poly
+        prepare_polynomials!(f, sorted, projective)
     end
     
     # progress bar
@@ -475,7 +473,7 @@ function _regeneration(
     end
 
     # # sort expressions by degree of hypersurfaces when we have rational functions 
-    if sorted && !is_poly
+    if sorted == true && !is_poly
         σ = sortperm(H, by = ModelKit.degree)
         f = f[σ]
         H = H[σ]
@@ -578,16 +576,22 @@ function _regeneration(
     return ws
 end
 
-function random_triangular_matrix(c)
-    T = zeros(ComplexF64, c, c)
-    for i in 1:c 
-        T[i, i] = one(ComplexF64)
-        for j in 1:(i-1)
-            T[i, j] = randn(ComplexF64)
+function prepare_polynomials!(f, sorted, projective)
+    if sorted == true 
+        sort!(f, by = ModelKit.degree)
+    elseif sorted == :randomized 
+        if projective 
+            @error "Randomization is not available for homogeneous systems."
+        else
+            sort!(f, by = ModelKit.degree, rev = true)
+            # random triangular system
+            g = map(1:length(f)) do i 
+                sum(randn(ComplexF64) * f[j] for j in 1:i)
+            end
+            f .= g
         end
     end
-    T
-end 
+end
 
 function get_flag(iter, L₀)
     # this gives the flag of linear spaces containing L₀ = {Ax=b} and {Ax=b, u=c} indexed by iter; for i in iter, this returns the linear space obtained by deleting the first (i-1) rows from A and b.
@@ -641,7 +645,6 @@ function initialize_hypersurfaces(
     threading::Bool = Threads.nthreads() > 1,
 )
     c = length(f)
-    @show f, vars, xvars
     out = Vector{WitnessSet}(undef, c)
     for i = 1:c
         fᵢ = f[i]
@@ -2295,7 +2298,7 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 ### Options
 
 * `show_progress = true`: indicate whether a progress bar should be displayed.
-* `sorted = true`: the polynomials in `F`` will be sorted by degree in increasing order. If `F` is not homogeneous, it will additionally me multiplied with a random lower triangular matrix. If `F` is a system of rational functions, we first compute witness sets for each entry of `F` and then sort `F` according to their degrees. 
+* `sorted`: if `true` (default), the polynomials in `F`` will be sorted by degree in increasing order (when `F` is a system of rational functions, we first compute witness sets for each entry of `F` and then sort `F` according to their degrees). If `false, the polynomials in `F` will not be sorted. The third option is `:randomized`, which multiplies `F` by a random matrix.
 * `max_codim`: the maximal codimension until which witness supersets should be computed.
 * `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
 * `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
@@ -2369,7 +2372,7 @@ function numerical_irreducible_decomposition(
     show_monodromy_for_regeneration_progress::Bool = false,
     show_monodromy_for_decompose_progress::Bool = false,
     max_iters::Int = 500,
-    sorted::Bool = true,
+    sorted::Union{Bool, Symbol} = true,
     max_codim::Union{Int,Nothing} = nothing,
     max_trials_u_homotopy::Int = 5,
     intrinsic_for_regeneration::Union{Nothing,Bool} = true,
