@@ -68,6 +68,14 @@
         @test n_components(N2, 1) == 2
     end
 
+    @testset "randomization" begin
+        @var x y 
+        f = System([(x - 1)^2; x - 1], variables = [x, y])
+        N = nid(f; sorted = :randomized, show_progress = false)
+        degs = degrees(N)
+        @test degs[1] == [1]
+    end
+
     @testset "rational systems" begin
         @var x y z
         g = System([x^2 + y^2 - z; x / (y - 1) + y + z - 1], variables = [x, y, z])
