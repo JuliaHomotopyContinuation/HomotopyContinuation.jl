@@ -431,11 +431,8 @@ function _regeneration(
     # prepare equations
     f = expressions(F)
     is_poly = all(is_polynomial, f)
-    if is_poly
-        code = prepare_polynomials!(f, sorted, projective)
-        if !isnothing(code) 
-            return nothing
-        end
+    if is_poly && prepare_polynomials!(f, sorted, projective)
+        return nothing
     end
     
     # progress bar
@@ -582,7 +579,6 @@ end
 function prepare_polynomials!(f, sorted, projective)
     if sorted == true 
         sort!(f, by = ModelKit.degree)
-        return nothing
     elseif sorted == :randomized 
         if projective 
             @error "Randomization is not available for homogeneous systems."
@@ -595,9 +591,9 @@ function prepare_polynomials!(f, sorted, projective)
                 sum(randn(ComplexF64) * f[j] for j in i:c)
             end
             f .= g
-            return nothing
         end
     end
+    return false
 end
 
 function get_flag(iter, L₀)
