@@ -434,6 +434,7 @@ function _regeneration(
     if is_poly
         prepare_polynomials!(f, sorted, projective)
     end
+    @show f
     
     # progress bar
     if show_progress
@@ -585,8 +586,9 @@ function prepare_polynomials!(f, sorted, projective)
         else
             sort!(f, by = ModelKit.degree, rev = true)
             # random triangular system
-            g = map(1:length(f)) do i 
-                sum(randn(ComplexF64) * f[j] for j in 1:i)
+            c = length(f)
+            g = map(1:c) do i 
+                sum(randn(ComplexF64) * f[j] for j in i:c)
             end
             f .= g
         end
