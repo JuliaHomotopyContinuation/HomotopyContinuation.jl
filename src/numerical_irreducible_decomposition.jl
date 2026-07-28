@@ -385,7 +385,7 @@ regeneration(F::System; kwargs...) = _regeneration(deepcopy(F); kwargs...)
 regeneration(F::Vector{Expression}; kwargs...) = regeneration(System(F); kwargs...)
 function _regeneration(
     F::System;
-    sorted::Union{Bool, Symbol} = true,
+    sorted::Union{Bool,Symbol} = true,
     max_codim::Union{Int,Nothing} = nothing,
     show_progress::Bool = true,
     tracker_options = TrackerOptions(),
@@ -415,7 +415,7 @@ function _regeneration(
     xvars = variables(F)
     projective = is_homogeneous(F)
     vars = copy(xvars)
-    @unique_var u 
+    @unique_var u
     push!(vars, u)
 
     n = size(F, 2) # ambient dimension
@@ -434,7 +434,7 @@ function _regeneration(
     if is_poly && prepare_polynomials!(f, sorted, projective)
         return nothing
     end
-    
+
     # progress bar
     if show_progress
         progress = WitnessSetsProgress(
@@ -577,18 +577,18 @@ function _regeneration(
 end
 
 function prepare_polynomials!(f, sorted, projective)
-    if sorted == true 
+    if sorted == true
         sort!(f, by = ModelKit.degree)
-    elseif sorted == :randomized 
-        if projective 
+    elseif sorted == :randomized
+        if projective
             @error "Randomization is not available for homogeneous systems."
             return true
         else
             sort!(f, by = ModelKit.degree, rev = true)
             # random triangular system
             c = length(f)
-            g = map(1:c) do i 
-                sum(randn(ComplexF64) * f[j] for j in i:c)
+            g = map(1:c) do i
+                sum(randn(ComplexF64) * f[j] for j = i:c)
             end
             f .= g
         end
@@ -2375,7 +2375,7 @@ function numerical_irreducible_decomposition(
     show_monodromy_for_regeneration_progress::Bool = false,
     show_monodromy_for_decompose_progress::Bool = false,
     max_iters::Int = 500,
-    sorted::Union{Bool, Symbol} = true,
+    sorted::Union{Bool,Symbol} = true,
     max_codim::Union{Int,Nothing} = nothing,
     max_trials_u_homotopy::Int = 5,
     intrinsic_for_regeneration::Union{Nothing,Bool} = true,

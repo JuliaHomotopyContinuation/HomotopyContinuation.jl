@@ -69,7 +69,7 @@
     end
 
     @testset "randomization" begin
-        @var x y 
+        @var x y
         f = System([(x - 1)^2; x - 1], variables = [x, y])
         N = nid(f; sorted = :randomized, show_progress = false)
         degs = degrees(N)
