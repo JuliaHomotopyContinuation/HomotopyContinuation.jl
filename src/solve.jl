@@ -636,7 +636,6 @@ function threaded_solve(
     N = length(S)
     path_results = Vector{PathResult}(undef, N)
     interrupted = Threads.Atomic{Bool}(false)
-    started = Threads.Atomic{Int}(0)
     finished = Threads.Atomic{Int}(0)
     next_k = Threads.Atomic{Int}(1)  # next index k to process
 
@@ -693,10 +692,10 @@ function threaded_solve(
             rethrow(e)
         end
     end
-    # if we got interrupted we need to remove the unassigned filedds
+    # if we got interrupted we need to remove the unassigned fields
     if interrupted[]
         assigned_results = Vector{PathResult}()
-        for i = 1:started[]
+        for i in eachindex(path_results)
             if isassigned(path_results, i)
                 push!(assigned_results, path_results[i])
             end
