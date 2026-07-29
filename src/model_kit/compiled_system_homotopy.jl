@@ -1,4 +1,5 @@
 const TSYSTEM_TABLE = Dict{UInt,Vector{System}}()
+const _TSYSTEM_TABLE_LOCK = ReentrantLock()
 
 """
     CompiledSystem <: AbstractSystem
@@ -37,22 +38,25 @@ function CompiledSystem(F::System)
     cleard_exprs = subs(expressions(F), D)
     sys = System(cleard_exprs, _x_, _p_)
     h = hash(cleard_exprs)
-    k = 0
-    if haskey(TSYSTEM_TABLE, h)
-        # check that it is identical
-        for (i, vi) in enumerate(TSYSTEM_TABLE[h])
-            if vi == sys
-                k = i
-                break
+    k = lock(_TSYSTEM_TABLE_LOCK) do
+        k = 0
+        if haskey(TSYSTEM_TABLE, h)
+            # check that it is identical
+            for (i, vi) in enumerate(TSYSTEM_TABLE[h])
+                if vi == sys
+                    k = i
+                    break
+                end
             end
+            if k == 0
+                push!(TSYSTEM_TABLE[h], sys)
+                k = length(TSYSTEM_TABLE[h])
+            end
+        else
+            k = 1
+            TSYSTEM_TABLE[h] = [sys]
         end
-        if k == 0
-            push!(TSYSTEM_TABLE[h], sys)
-            k = length(TSYSTEM_TABLE[h])
-        end
-    else
-        k = 1
-        TSYSTEM_TABLE[h] = [sys]
+        k
     end
     return CompiledSystem{(h, k)}(n, nvars, nparams, F)
 end
@@ -64,7 +68,11 @@ end
 (F::CompiledSystem)(x, p = nothing) = F.system(x, p)
 
 interpret(TS::CompiledSystem) = TS.system
-interpret(::Type{CompiledSystem{HI}}) where {HI} = TSYSTEM_TABLE[first(HI)][last(HI)]
+function interpret(::Type{CompiledSystem{HI}}) where {HI}
+    lock(_TSYSTEM_TABLE_LOCK) do
+        TSYSTEM_TABLE[first(HI)][last(HI)]
+    end
+end
 
 Base.size(CS::CompiledSystem) = (CS.nexpressions, CS.nvariables)
 Base.size(CS::CompiledSystem, i::Integer) = size(CS)[i]
@@ -84,6 +92,7 @@ Base.:(==)(::CompiledSystem{A}, ::CompiledSystem{B}) where {A,B} = A == B
 ######################
 
 const THOMOTOPY_TABLE = Dict{UInt,Vector{Homotopy}}()
+const _THOMOTOPY_TABLE_LOCK = ReentrantLock()
 
 """
     CompiledHomotopy <: AbstractHomotopy
@@ -124,22 +133,25 @@ function CompiledHomotopy(H::Homotopy)
     homotopy = Homotopy(cleard_exprs, _x_, _t_, _p_)
     h = hash(cleard_exprs)
 
-    k = 0
-    if haskey(THOMOTOPY_TABLE, h)
-        # check that it is identical
-        for (i, vi) in enumerate(THOMOTOPY_TABLE[h])
-            if vi == homotopy
-                k = i
-                break
+    k = lock(_THOMOTOPY_TABLE_LOCK) do
+        k = 0
+        if haskey(THOMOTOPY_TABLE, h)
+            # check that it is identical
+            for (i, vi) in enumerate(THOMOTOPY_TABLE[h])
+                if vi == homotopy
+                    k = i
+                    break
+                end
             end
+            if k == 0
+                push!(THOMOTOPY_TABLE[h], homotopy)
+                k = length(THOMOTOPY_TABLE[h])
+            end
+        else
+            k = 1
+            THOMOTOPY_TABLE[h] = [homotopy]
         end
-        if k == 0
-            push!(THOMOTOPY_TABLE[h], homotopy)
-            k = length(THOMOTOPY_TABLE[h])
-        end
-    else
-        k = 1
-        THOMOTOPY_TABLE[h] = [homotopy]
+        k
     end
     return CompiledHomotopy{(h, k)}(n, nvars, nparams, H)
 end
@@ -156,7 +168,11 @@ function Base.show(io::IO, TH::CompiledHomotopy)
 end
 
 interpret(CH::CompiledHomotopy) = CH.homotopy
-interpret(::Type{CompiledHomotopy{HI}}) where {HI} = THOMOTOPY_TABLE[first(HI)][last(HI)]
+function interpret(::Type{CompiledHomotopy{HI}}) where {HI}
+    lock(_THOMOTOPY_TABLE_LOCK) do
+        THOMOTOPY_TABLE[first(HI)][last(HI)]
+    end
+end
 
 
 ################
