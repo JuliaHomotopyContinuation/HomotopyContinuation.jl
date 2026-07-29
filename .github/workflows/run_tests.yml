@@ -19,7 +19,7 @@ jobs:
         julia-version: ['lts', '1']
         os: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@latest
         with:
           version: ${{ matrix.julia-version }}
