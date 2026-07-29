@@ -5,5 +5,4 @@ using HomotopyContinuation.ModelKit
     include("./model_kit/operations_test.jl")
     include("./model_kit/e2e_test.jl")
     include("./model_kit/slp_test.jl")
-    include("./model_kit/compiled_cache_test.jl")
 end

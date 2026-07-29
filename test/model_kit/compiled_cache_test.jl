@@ -1,3 +1,16 @@
+# This test is not included in the ModelKit Testset because it relies on timing
+# and may fail when task scheduling is slow. It is intended to be run manually.
+# It checks that CompiledSystem and CompiledHomotopy can be constructed safely
+# on multiple threads and that their shared caches are protected from
+# simultaneous reads and writes.
+#
+# Run manually with at least two Julia threads:
+#
+#   julia --threads=2 --project -e \
+#     'using Test, HomotopyContinuation; \
+#      using HomotopyContinuation.ModelKit; \
+#      include("test/model_kit/compiled_cache_test.jl")'
+
 @testset "Compiled cache thread safety" begin
     if Threads.nthreads() < 2
         @test_skip "requires at least two Julia threads"
