@@ -128,6 +128,7 @@ function solver_startsolutions(
     start_subspace = nothing,
     target_subspace = nothing,
     intrinsic = nothing,
+    show_progress::Bool = true,
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
@@ -164,6 +165,7 @@ function solver_startsolutions(
                 F;
                 compile = compile,
                 target_parameters = target_parameters,
+                show_progress = show_progress,
                 kwargs...,
             )
         elseif start_system == :total_degree
@@ -200,6 +202,7 @@ function solver_startsolutions(
     seed = rand(UInt32),
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(),
+    show_progress::Bool = true,
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
@@ -355,6 +358,7 @@ function solver_startsolutions(
     starts = nothing;
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
     seed = nothing,
+    show_progress::Bool = true,
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
@@ -467,6 +471,7 @@ function solve(
         solver, starts = solver_startsolutions(
             args...;
             target_subspace = first(target_subspaces),
+            show_progress = show_progress,
             kwargs...,
         )
         target_parameters = target_subspaces
@@ -477,17 +482,20 @@ function solve(
             solver, starts = solver_startsolutions(
                 args...;
                 target_parameters = transform_parameters(first(target_parameters)),
+                show_progress = show_progress,
                 kwargs...,
             )
         else
             solver, starts = solver_startsolutions(
                 args...;
                 target_parameters = target_parameters,
+                show_progress = show_progress,
                 kwargs...,
             )
         end
     else
-        solver, starts = solver_startsolutions(args...; kwargs...)
+        solver, starts =
+            solver_startsolutions(args...; show_progress = show_progress, kwargs...)
     end
     if many_parameters
         if iterator_only
