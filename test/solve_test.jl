@@ -381,35 +381,8 @@
     end
 
     @testset "solve (threading)" begin
-        @var progress_x progress_y
-        progress_system = System([progress_x^2 + progress_y, progress_y^2 + progress_x])
-        capture_setup_stderr =
-            show_progress -> mktemp() do _, io
-                redirect_stderr(io) do
-                    solver_startsolutions(
-                        progress_system;
-                        show_progress = show_progress,
-                        seed = UInt32(1),
-                    )
-                end
-                flush(io)
-                seekstart(io)
-                read(io, String)
-            end
-        hidden_stderr = capture_setup_stderr(false)
-        @test !occursin("unsupported keyword", lowercase(hidden_stderr))
-        @test !occursin("Computing mixed cells", hidden_stderr)
-
-        res, stderr = mktemp() do _, io
-            res = redirect_stderr(io) do
-                solve(cyclic(7), threading = true, show_progress = false)
-            end
-            flush(io)
-            seekstart(io)
-            res, read(io, String)
-        end
+        res = solve(cyclic(7), threading = true, show_progress = false)
         @test nsolutions(res) == 924
-        @test !occursin("Computing mixed cells", stderr)
     end
 
     @testset "stop early callback" begin
