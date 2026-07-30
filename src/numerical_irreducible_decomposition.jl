@@ -437,16 +437,15 @@ function _regeneration(
 
     # progress bar
     if show_progress
-        progress = WitnessSetsProgress(
-            n,
-            c,
+        progress_meter =
             PM.ProgressUnknown(
                 dt = 0.4,
                 desc = "Computing witness sets...",
                 enabled = true,
                 spinner = true,
-            ),
-        )
+            )
+        progress_meter.tlast += 0.3
+        progress = WitnessSetsProgress(n, c, progress_meter)
     else
         progress = nothing
     end
@@ -1359,8 +1358,7 @@ function update_progress!(progress::DecomposeProgress; is_monodromy = nothing)
         PM.update!(
             progress.progress_meter,
             progress.step,
-            showvalues = showstatus(progress);
-            force = true,
+            showvalues = showstatus(progress),
         )
     end
 end
@@ -1962,7 +1960,7 @@ function decompose_with_monodromy_options(
         duplicate_check = M.duplicate_check,
         certification_max_precision = M.certification_max_precision,
         certification_refine_solution = M.certification_refine_solution,
-        trace_test_tol = min(1e-10, M.trace_test_tol),
+        trace_test_tol = M.trace_test_tol,
         target_solutions_count = M.target_solutions_count,
         timeout = M.timeout,
         min_solutions = M.min_solutions,
@@ -2052,15 +2050,16 @@ function decompose(
     n = ambient_dim(linear_subspace(Ws[1]))
 
     if show_progress
-        progress = DecomposeProgress(
-            progress_meter = PM.ProgressUnknown(
+        progress_meter =
+            PM.ProgressUnknown(
                 dt = 0.1,
                 desc = "Decomposing $c witness sets",
                 enabled = true,
                 spinner = true,
-            ),
-            n_witness_sets = c,
-        )
+            )
+        progress_meter.tlast += 0.3
+        progress =
+            DecomposeProgress(progress_meter = progress_meter, n_witness_sets = c)
     else
         progress = nothing
     end
@@ -2731,14 +2730,15 @@ function _intersect(
 
     # progress bar
     if show_progress
-        progress = IntersectProgress(
+        progress_meter =
             PM.ProgressUnknown(
                 dt = 0.4,
                 desc = "Intersecting...",
                 enabled = true,
                 spinner = true,
-            ),
-        )
+            )
+        progress_meter.tlast += 0.3
+        progress = IntersectProgress(progress_meter)
     else
         progress = nothing
     end
