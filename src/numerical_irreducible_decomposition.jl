@@ -437,13 +437,12 @@ function _regeneration(
 
     # progress bar
     if show_progress
-        progress_meter =
-            PM.ProgressUnknown(
-                dt = 0.4,
-                desc = "Computing witness sets...",
-                enabled = true,
-                spinner = true,
-            )
+        progress_meter = PM.ProgressUnknown(
+            dt = 0.4,
+            desc = "Computing witness sets...",
+            enabled = true,
+            spinner = true,
+        )
         progress_meter.tlast += 0.3
         progress = WitnessSetsProgress(n, c, progress_meter)
     else
@@ -2050,16 +2049,14 @@ function decompose(
     n = ambient_dim(linear_subspace(Ws[1]))
 
     if show_progress
-        progress_meter =
-            PM.ProgressUnknown(
-                dt = 0.1,
-                desc = "Decomposing $c witness sets",
-                enabled = true,
-                spinner = true,
-            )
+        progress_meter = PM.ProgressUnknown(
+            dt = 0.1,
+            desc = "Decomposing $c witness sets",
+            enabled = true,
+            spinner = true,
+        )
         progress_meter.tlast += 0.3
-        progress =
-            DecomposeProgress(progress_meter = progress_meter, n_witness_sets = c)
+        progress = DecomposeProgress(progress_meter = progress_meter, n_witness_sets = c)
     else
         progress = nothing
     end
@@ -2730,13 +2727,12 @@ function _intersect(
 
     # progress bar
     if show_progress
-        progress_meter =
-            PM.ProgressUnknown(
-                dt = 0.4,
-                desc = "Intersecting...",
-                enabled = true,
-                spinner = true,
-            )
+        progress_meter = PM.ProgressUnknown(
+            dt = 0.4,
+            desc = "Intersecting...",
+            enabled = true,
+            spinner = true,
+        )
         progress_meter.tlast += 0.3
         progress = IntersectProgress(progress_meter)
     else
