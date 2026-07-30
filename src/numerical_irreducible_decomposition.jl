@@ -437,16 +437,14 @@ function _regeneration(
 
     # progress bar
     if show_progress
-        progress = WitnessSetsProgress(
-            n,
-            c,
-            PM.ProgressUnknown(
-                dt = 0.4,
-                desc = "Computing witness sets...",
-                enabled = true,
-                spinner = true,
-            ),
+        progress_meter = PM.ProgressUnknown(
+            dt = 0.4,
+            desc = "Computing witness sets...",
+            enabled = true,
+            spinner = true,
         )
+        progress_meter.tlast += 0.3
+        progress = WitnessSetsProgress(n, c, progress_meter)
     else
         progress = nothing
     end
@@ -1359,8 +1357,7 @@ function update_progress!(progress::DecomposeProgress; is_monodromy = nothing)
         PM.update!(
             progress.progress_meter,
             progress.step,
-            showvalues = showstatus(progress);
-            force = true,
+            showvalues = showstatus(progress),
         )
     end
 end
@@ -1524,7 +1521,6 @@ function decompose_with_monodromy!(
     rtol = something(options.unique_points_rtol, 1e-8)
 
     # first check that all points in P are unique
-    id = 1
     certified_up = UniquePoints(first(P₀), 1; distance = InfNorm())
     P = Vector{eltype(P₀)}()
     for (i, pᵢ) in enumerate(P₀)
@@ -1599,7 +1595,8 @@ function decompose_with_monodromy!(
                 allow_degree1_iter = 0
                 # now compute phantom points
                 for (i, p) in pairs(updated_points)
-                    if !isnothing(search_in_radius(certified_up, p, atol))
+                    rad = max(atol, norm(p, Inf) * rtol)
+                    if !isnothing(search_in_radius(certified_up, p, rad))
                         push!(phantom_indices, i)
                     end
                 end
@@ -1660,11 +1657,11 @@ function decompose_with_monodromy!(
                 # only continue when trace test succeeds
                 if trace(res_orbit) < options.trace_test_tol
 
-                    # We do not want to add orbits of degree 1 as long as allow_degree1_iter < 5.
+                    # We do not want to add orbits of degree 1 as long as allow_degree1_iter < 15.
                     # Single orbits tend to have small trace, even if their points are on an irreducible component of degree > 1.
                     # allow_degree1_iter is reset once we find new points.
                     if length(clean_orbit) > 1 ||
-                       allow_degree1_iter ≥ 10 ||
+                       allow_degree1_iter ≥ 15 ||
                        iter ≥ max_iters - 1
                         P_certified = indexed_solutions(res_orbit)
                         W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
@@ -1986,7 +1983,7 @@ This function decomposes a [`WitnessSet`](@ref) or a vector of [`WitnessSet`](@r
 * `show_progress = true`: indicate whether a progress bar should be displayed.
 * `show_monodromy_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) should be displayed. If `false`, minimal info about the monodromy computations are still displayed in the progress bar of `decompose`.
 * `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
-* `max_iters = 500`: maximal number of iterations for the decomposition step.
+* `max_iters = 5000`: maximal number of iterations for the decomposition step.
 * `warning = true`: if `true`, prints a warning when the [`trace_test`](@ref) fails.
 * `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
 * `seed`: choose the random seed.
@@ -2026,7 +2023,7 @@ function decompose(
     show_progress::Bool = true,
     show_monodromy_progress::Bool = false,
     monodromy_options::MonodromyOptions = MonodromyOptions(),
-    max_iters::Int = 500,
+    max_iters::Int = 5000,
     intrinsic::Union{Nothing,Bool} = nothing,
     warning::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
@@ -2052,15 +2049,14 @@ function decompose(
     n = ambient_dim(linear_subspace(Ws[1]))
 
     if show_progress
-        progress = DecomposeProgress(
-            progress_meter = PM.ProgressUnknown(
-                dt = 0.1,
-                desc = "Decomposing $c witness sets",
-                enabled = true,
-                spinner = true,
-            ),
-            n_witness_sets = c,
+        progress_meter = PM.ProgressUnknown(
+            dt = 0.1,
+            desc = "Decomposing $c witness sets",
+            enabled = true,
+            spinner = true,
         )
+        progress_meter.tlast += 0.3
+        progress = DecomposeProgress(progress_meter = progress_meter, n_witness_sets = c)
     else
         progress = nothing
     end
@@ -2310,7 +2306,7 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 * `show_monodromy_progress = false`: if `true`, sets `show_monodromy_for_regeneration_progress` and `show_monodromy_for_decompose_progress` to `true`. If `false`, minimal info about the monodromy computations are still displayed in the progress bar of each substep.
 * `show_monodromy_for_regeneration_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) in [`regeneration`](@ref) should be displayed. 
 * `show_monodromy_for_decompose_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) in [`decompose`](@ref) should be displayed.
-* `max_iters = 500`: maximal number of iterations for the decomposition step.
+* `max_iters = 5000`: maximal number of iterations for the decomposition step.
 * `atol = 1e-14` and `rtol = sqrt(eps())`: a point `y` is considered equal to `x` when the distance between `x`and `y` is smaller than `max(atol, norm(x, Inf) * rtol).` This option is used for [`regeneration`](@ref).
 * `warning = true`: if `true`, prints warnings when the [`trace_test`](@ref) or an intermediate u-regeneration intersection step fails.
 * `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
@@ -2374,7 +2370,7 @@ function numerical_irreducible_decomposition(
     show_monodromy_progress::Bool = false,
     show_monodromy_for_regeneration_progress::Bool = false,
     show_monodromy_for_decompose_progress::Bool = false,
-    max_iters::Int = 500,
+    max_iters::Int = 5000,
     sorted::Union{Bool,Symbol} = true,
     max_codim::Union{Int,Nothing} = nothing,
     max_trials_u_homotopy::Int = 5,
@@ -2731,14 +2727,14 @@ function _intersect(
 
     # progress bar
     if show_progress
-        progress = IntersectProgress(
-            PM.ProgressUnknown(
-                dt = 0.4,
-                desc = "Intersecting...",
-                enabled = true,
-                spinner = true,
-            ),
+        progress_meter = PM.ProgressUnknown(
+            dt = 0.4,
+            desc = "Intersecting...",
+            enabled = true,
+            spinner = true,
         )
+        progress_meter.tlast += 0.3
+        progress = IntersectProgress(progress_meter)
     else
         progress = nothing
     end

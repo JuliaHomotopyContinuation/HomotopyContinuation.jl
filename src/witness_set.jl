@@ -326,6 +326,7 @@ function membership(
             barlen = barlen,
             output = stdout,
         )
+        progress_meter.tlast += 0.3
         progress = MembershipProgress(progress_meter)
     else
         progress = nothing
