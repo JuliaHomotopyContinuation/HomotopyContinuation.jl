@@ -1524,7 +1524,6 @@ function decompose_with_monodromy!(
     rtol = something(options.unique_points_rtol, 1e-8)
 
     # first check that all points in P are unique
-    id = 1
     certified_up = UniquePoints(first(P₀), 1; distance = InfNorm())
     P = Vector{eltype(P₀)}()
     for (i, pᵢ) in enumerate(P₀)
@@ -1599,7 +1598,8 @@ function decompose_with_monodromy!(
                 allow_degree1_iter = 0
                 # now compute phantom points
                 for (i, p) in pairs(updated_points)
-                    if !isnothing(search_in_radius(certified_up, p, atol))
+                    rad = max(atol, norm(p, Inf) * rtol)
+                    if !isnothing(search_in_radius(certified_up, p, rad))
                         push!(phantom_indices, i)
                     end
                 end
@@ -1660,11 +1660,11 @@ function decompose_with_monodromy!(
                 # only continue when trace test succeeds
                 if trace(res_orbit) < options.trace_test_tol
 
-                    # We do not want to add orbits of degree 1 as long as allow_degree1_iter < 5.
+                    # We do not want to add orbits of degree 1 as long as allow_degree1_iter < 15.
                     # Single orbits tend to have small trace, even if their points are on an irreducible component of degree > 1.
                     # allow_degree1_iter is reset once we find new points.
                     if length(clean_orbit) > 1 ||
-                       allow_degree1_iter ≥ 10 ||
+                       allow_degree1_iter ≥ 15 ||
                        iter ≥ max_iters - 1
                         P_certified = indexed_solutions(res_orbit)
                         W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
@@ -1962,7 +1962,7 @@ function decompose_with_monodromy_options(
         duplicate_check = M.duplicate_check,
         certification_max_precision = M.certification_max_precision,
         certification_refine_solution = M.certification_refine_solution,
-        trace_test_tol = M.trace_test_tol,
+        trace_test_tol = min(1e-10, M.trace_test_tol),
         target_solutions_count = M.target_solutions_count,
         timeout = M.timeout,
         min_solutions = M.min_solutions,
