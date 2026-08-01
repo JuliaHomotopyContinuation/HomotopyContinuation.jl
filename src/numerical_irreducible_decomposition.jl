@@ -2696,7 +2696,8 @@ end
 First computes a witness set `H` for `f` and then runs  `intersect(W, H)`.
 """
 function Base.intersect(W::WitnessSet, f::Expression; kwargs...)
-    H = witness_set(f)
+    F = System([f], variables = variables(system(W)))
+    H = witness_set(F)
     intersect(W, H; kwargs...)
 end
 
