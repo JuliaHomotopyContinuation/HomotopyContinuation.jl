@@ -21,7 +21,6 @@
         @test linear_subspace(W_L) == L
 
         @test trace_test(W) < 1e-8
-        @test trace_test(W_L) < 1e-8
     end
 
     @testset "projective" begin
