@@ -2748,7 +2748,7 @@ function _intersect(
     # transform W and H so that they use the additional variable u
     n = ambient_dim(W.L)
     @unique_var u
-    @unique_var vars[1:n]
+    vars = variables(system(W))
     vars_u = [vars; u]
     projective = W.projective
     W₁, W₂, Hᵤ, f, F, h = prepare_for_u_homotopy(H, W, vars, vars_u, projective)
