@@ -2696,7 +2696,11 @@ end
 First computes a witness set `H` for `f` and then runs  `intersect(W, H)`.
 """
 function Base.intersect(W::WitnessSet, f::Expression; kwargs...)
-    F = System([f], variables = variables(system(W)))
+
+    vars = variables(system(W))
+    @assert all(v -> v ∈ vars, variables(f)) "Witness sets must be in the same ambient space."
+
+    F = System([f], variables = vars)
     H = witness_set(F)
     intersect(W, H; kwargs...)
 end
@@ -2722,7 +2726,7 @@ function _intersect(
     kwargs...,
 )
     @assert size(system(H), 1) == 1 "The second argument must be defined by a single polynomial."
-    @assert size(system(W), 2) == size(system(H), 2) "Witness sets must be in the same ambient space."
+    @assert variables(system(W)) == variables(system(H)) "Witness sets must be in the same ambient space."
     W.projective == H.projective ||
         throw(ArgumentError("Witness sets must both be affine or projective."))
 
