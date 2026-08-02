@@ -678,8 +678,15 @@ end
 
 Translate the (affine) linear subspace `L` by `δb`.
 """
-function translate(L::LinearSubspace, δb, ::Coordinates{:Extrinsic} = Extrinsic)
-    translate!(copy(L), δb, Extrinsic)
+function translate(
+    L::LinearSubspace{T1},
+    δb::Vector{T2},
+    ::Coordinates{:Extrinsic} = Extrinsic,
+) where {T1,T2<:Number}
+    T = promote_type(T1, T2)
+    LT = convert(LinearSubspace{T}, copy(L))
+    δbT = convert(Vector{T}, δb)
+    translate!(LT, δbT, Extrinsic)
 end
 function translate!(L::LinearSubspace, δb, ::Coordinates{:Extrinsic} = Extrinsic)
     ext = extrinsic(L)
