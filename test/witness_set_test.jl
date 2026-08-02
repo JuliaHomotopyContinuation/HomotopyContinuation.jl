@@ -110,6 +110,14 @@
         B = intersect(H[1], H[2])
         C = vcat([intersect(Hi, H[3]; show_progress = false) for Hi in B]...)
         @test degree.(C) == [2, 8, 8]
+        D = intersect(H[1], x + y - 1; show_progress = false)
+        @test degree(D) == 8
+
+        # test incompatible ambient spaces
+        @var t
+        @test_throws AssertionError intersect(H[1], x + t - 1; show_progress = false)
+        E = witness_set(x + t - 1)
+        @test_throws AssertionError intersect(H[1], E; show_progress = false)
     end
 
     @var x[1:4]
