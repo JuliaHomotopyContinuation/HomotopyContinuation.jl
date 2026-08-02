@@ -467,10 +467,10 @@ function rand_subspace(
         throw(ArgumentError("Neither `dim` nor `codim` specified."))
 
     if !isnothing(dim)
-        0 < dim < n || throw(ArgumentError("`dim` has to be between 0 and `n`."))
+        0 ≤ dim ≤ n || throw(ArgumentError("`dim` has to be between 0 and `n`."))
         k = dim
     else
-        0 < codim < n || throw(ArgumentError("`codim` has to be between 0 and `n`."))
+        0 ≤ codim ≤ n || throw(ArgumentError("`codim` has to be between 0 and `n`."))
         k = n - codim
     end
     T = real ? Float64 : ComplexF64
@@ -491,10 +491,10 @@ function rand_subspace(
         throw(ArgumentError("Neither `dim` nor `codim` specified."))
 
     if !isnothing(dim)
-        0 < dim < n || throw(ArgumentError("`dim` has to be between 0 and `n`."))
+        0 ≤ dim ≤ n || throw(ArgumentError("`dim` has to be between 0 and `n`."))
         k = dim
     else
-        0 < codim < n || throw(ArgumentError("`codim` has to be between 0 and `n`."))
+        0 ≤ codim ≤ n || throw(ArgumentError("`codim` has to be between 0 and `n`."))
         k = n - codim
     end
     A = zeros(eltype(x), n - k, n)

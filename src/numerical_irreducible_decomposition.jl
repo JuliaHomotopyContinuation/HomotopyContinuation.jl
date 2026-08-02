@@ -627,9 +627,7 @@ end
 function initialize_witness_sets(codim, n; affine::Bool = true)
     # we need an initial slice from which the u-regeneration flag is derived
     dim = affine ? 1 : 2
-    L₀ =
-        dim == n ? LinearSubspace(zeros(ComplexF64, 0, n)) :
-        rand_subspace(n; dim = dim, affine = affine)
+    L₀ = rand_subspace(n; dim = dim, affine = affine)
     flag = get_flag(1:codim, L₀)
 
     map(flag) do F

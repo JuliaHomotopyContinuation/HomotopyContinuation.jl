@@ -50,6 +50,24 @@
         L2 = rand_subspace(x; dim = 2, affine = false)
         @test is_linear(L2)
         @test norm(L2(x)) ≈ 0 atol = 1e-8
+
+        # Test dimension 0 and codimension 0 case
+        L3 = rand_subspace(3; dim = 0)
+        @test dim(L3) == 0
+        @test codim(L3) == 3
+
+        L4 = rand_subspace(3; dim = 3)
+        @test dim(L4) == 3
+        @test codim(L4) == 0
+        @test is_linear(L4)
+
+        L5 = rand_subspace(3; codim = 3)
+        @test codim(L5) == 3
+        @test dim(L5) == 0
+
+        L6 = rand_subspace(x; codim = 0)
+        @test codim(L6) == 0
+        @test dim(L6) == length(x)
     end
 
     @testset "Intersect subspaces" begin
