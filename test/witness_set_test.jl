@@ -22,7 +22,6 @@
 
         @test trace_test(W) < 1e-8
     end
-
     @testset "projective" begin
         @var x y z
 
@@ -82,6 +81,17 @@
         @test degree(witness_set(f; dim = 2, compile = false)) == 16
         @test degree(witness_set(f; codim = 4, compile = false)) == 16
         @test degree(witness_set(f; compile = false)) == 16
+    end
+
+    @testset "dimension zero" begin
+        @var x y
+
+        F = System([x^2 - 1, y - x], [x, y])
+        W = witness_set(F; dim = 0, compile = false)
+
+        @test dim(W) == 0
+        @test codim(W) == 2
+        @test degree(W) == 2
     end
 
     @var x, y, z
