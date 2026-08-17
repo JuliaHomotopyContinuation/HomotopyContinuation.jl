@@ -272,7 +272,7 @@ function MembershipCache(W, EO, TO, progress)
     F = system(W)
     m, n = size(F)
     i = codim(W)
-    A0 = zeros(ComplexF64, n - i, n)
+    A0 = randn(ComplexF64, n - i, n)
     A = LA.svd(A0).Vt # need to orthonormalize A
     b = zeros(ComplexF64, n - i)
     x0 = zeros(ComplexF64, n)
