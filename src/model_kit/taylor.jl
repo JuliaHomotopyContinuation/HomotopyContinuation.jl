@@ -625,6 +625,26 @@ end
 function taylor_op_invsqr(V::Val{K}, x::TruncatedTaylorSeries{M}) where {K,M}
     taylor_op_div(V, 1, taylor_op_sqr(V, x))
 end
+# OP_LOG # log(a) (principal value)
+@generated function taylor_op_log(
+    ::Val{K},
+    x::TruncatedTaylorSeries{M},
+) where {K,M}
+    taylor_impl(K, M - 1) do list, D
+        coefficients = Any[add_op!(list, OP_LOG, D[:x, 0])]
+        for k = 1:K
+            # k*x_k - sum_{j=1}^{k-1} x_j*(k-j)*ℓ_{k-j}
+            numerator = mul!(list, k, D[:x, k])
+            for j = 1:(k - 1)
+                term = mul!(list, k - j, coefficients[k - j + 1])
+                numerator = submul!(list, D[:x, j], term,  numerator)
+            end
+            denominator = mul!(list, k, D[:x, 0])
+            push!(coefficients, div!(list, numerator, denominator))
+        end
+        coefficients
+    end
+end
 # OP_NEG # -a
 @generated function taylor_op_neg(::Val{K}, x::TruncatedTaylorSeries{M}) where {K,M}
     taylor_impl(K, M - 1) do list, D
