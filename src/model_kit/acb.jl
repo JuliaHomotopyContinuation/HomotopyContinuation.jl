@@ -43,6 +43,10 @@ Base.@propagate_inbounds function acb_op_invsqr!(t, x, m)
     Arblib.sqr!(m[1], x)
     Arblib.inv!(t, m[1])
 end
+# OP_LOG # log(a)
+Base.@propagate_inbounds function acb_op_log!(t, x, m)
+    Arblib.log!(t, x)
+end
 # OP_NEG # -a
 Base.@propagate_inbounds function acb_op_neg!(t, x, m)
     Arblib.neg!(t, x)

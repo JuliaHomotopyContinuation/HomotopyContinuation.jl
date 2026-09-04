@@ -520,6 +520,9 @@ function expr_to_ir_statements!(
     elseif t == :Exp || t == :exp
         x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
         return add_op!(ir, OP_EXP, x)
+    elseif t == :Log || t == :log
+        x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
+        return add_op!(ir, OP_LOG, x)
     elseif t == :Sqrt || t == :SquareRott
         x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
         return add_op!(ir, OP_SQRT, x)
