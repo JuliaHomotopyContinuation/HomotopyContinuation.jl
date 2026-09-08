@@ -384,7 +384,7 @@
             1 - tanh(x)^2
         ]
         dF = differentiate(F, x)
-        @test expand.(dF - dF_symbolic) == Vector{Expression}(zeros(Int, 9))
+        @test expand.(dF - dF_symbolic) == Vector{Expression}(zeros(Int, 10))
 
         x0 = 0.1
         F0 = evaluate.(F, x => x0)

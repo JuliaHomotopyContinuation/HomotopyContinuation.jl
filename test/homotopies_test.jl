@@ -216,7 +216,7 @@ end
     end
 
     @testset "Homotopy with transcendental functions" begin
-        @var x[1:9] t
+        @var x[1:10] t
         F = [
             sin(t);
             cos(t);
