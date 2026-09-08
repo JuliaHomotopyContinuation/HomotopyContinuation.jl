@@ -370,12 +370,22 @@
 
     @testset "transcendental functions" begin
         @var x
-        F = [sin(x); cos(x); exp(x); tan(x); asin(x); acos(x); sinh(x); cosh(x); tanh(x)]
+        F = [sin(x)
+            cos(x)
+            exp(x)
+            log(x)
+            tan(x)
+            asin(x)
+            acos(x)
+            sinh(x)
+            cosh(x)
+            tanh(x)
+        ]
         dF_symbolic = [
             cos(x)
             -sin(x)
             exp(x)
-            log(x)
+            1/x
             1 + tan(x)^2
             1 / sqrt(1 - x^2)
             -1 / sqrt(1 - x^2)
