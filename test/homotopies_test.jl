@@ -218,15 +218,15 @@ end
     @testset "Homotopy with transcendental functions" begin
         @var x[1:10] t
         F = [
-            sin(t);
-            cos(t);
-            exp(t);
-            log(t);
-            tan(t);
-            asin(t);
-            acos(t);
-            sinh(t);
-            cosh(t);
+            sin(t)
+            cos(t)
+            exp(t)
+            log(t)
+            tan(t)
+            asin(t)
+            acos(t)
+            sinh(t)
+            cosh(t)
             tanh(t)
         ]
         x0 = evaluate.(F, t => π / 4)
