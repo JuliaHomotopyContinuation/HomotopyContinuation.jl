@@ -12,6 +12,27 @@ Variable
 variables(prefix::Union{Symbol,String}, indices...)
 ```
 
+## Supported operations
+
+`Expression`s support the usual arithmetic operations (`+`, `-`, `*` and `/`), powers `x^r` with a constant exponent  `r`, as well as the following elementary functions:
+
+```julia
+sin(x)
+cos(x)
+tan(x)
+asin(x)
+acos(x)
+sinh(x)
+cosh(x)
+tanh(x)
+exp(x)
+log(x)
+sqrt(x)
+```
+
+!!! note "Branch conventions"
+    The multivalued complex fuctions `asin`, `acos`, `log` and `sqrt`, as well as non-integer powers, are evaluated using their [principal branches](https://en.wikipedia.org/wiki/Principal_value). For these functions to vary analytically during path tracking, the arguments must stay in the domain of the principal branch. In particular, arguments must not cross a branch cut or pass through a branch point.
+
 ## Methods
 ```@docs
 coefficients(f::Expression, vars::AbstractVector{Variable})
