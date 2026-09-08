@@ -370,7 +370,8 @@
 
     @testset "transcendental functions" begin
         @var x
-        F = [sin(x)
+        F = [
+            sin(x)
             cos(x)
             exp(x)
             log(x)
@@ -385,7 +386,7 @@
             cos(x)
             -sin(x)
             exp(x)
-            1/x
+            1 / x
             1 + tan(x)^2
             1 / sqrt(1 - x^2)
             -1 / sqrt(1 - x^2)
