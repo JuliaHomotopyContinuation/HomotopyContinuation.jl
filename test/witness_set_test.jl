@@ -21,8 +21,8 @@
         @test linear_subspace(W_L) == L
 
         @test trace_test(W) < 1e-8
+        @test trace_test(W_L) < 1e-8
     end
-
     @testset "projective" begin
         @var x y z
 
@@ -84,6 +84,17 @@
         @test degree(witness_set(f; compile = false)) == 16
     end
 
+    @testset "dimension zero" begin
+        @var x y
+
+        F = System([x^2 - 1, y - x], [x, y])
+        W = witness_set(F; dim = 0, compile = false)
+
+        @test dim(W) == 0
+        @test codim(W) == 2
+        @test degree(W) == 2
+    end
+
     @var x, y, z
     p = (x * y - x^2) + 1 - z
     q = x^4 + x^2 - y - 1
@@ -92,7 +103,6 @@
         p * q * (y - 3) * (y - 5)
         p * (z - 3) * (z - 5)
     ]
-
     @testset "membership" begin
         W = witness_set(F; codim = 2)
 
@@ -101,8 +111,8 @@
 
         @test !membership(p, W)
         @test membership(q, W; show_progress = false)
-        a = membership([p, q], W; show_progress = false)
-        @test a == [false, true]
+        memb = membership([p, q], W; show_progress = false)
+        @test memb == [false, true]
     end
 
     @testset "intersect" begin
@@ -110,6 +120,38 @@
         B = intersect(H[1], H[2])
         C = vcat([intersect(Hi, H[3]; show_progress = false) for Hi in B]...)
         @test degree.(C) == [2, 8, 8]
+        D = intersect(H[1], x + y - 1; show_progress = false)
+        @test degree(D) == 8
+
+        # test incompatible ambient spaces
+        @var t
+        @test_throws AssertionError intersect(H[1], x + t - 1; show_progress = false)
+        E = witness_set(x + t - 1)
+        @test_throws AssertionError intersect(H[1], E; show_progress = false)
+    end
+
+    @var x[1:4]
+    a = x[1]^2 + x[2]^2 + x[3]^2 + x[4]^2
+    b = x[1]^3 + x[2]^3 + 2x[3]^3 + 3x[4]^3
+    c = x[1]^4 + 2x[2]^4 + 4x[3]^4 - x[4]^4
+    G = System([a * c; b * c]; variables = x)
+
+    @testset "membership projective" begin
+        W = witness_set(G; codim = 2)
+
+        p = randn(4)
+        q = solutions(W)[1]
+
+        @test !membership(p, W)
+        @test membership(q, W; show_progress = false)
+        memb = membership([p, q], W; show_progress = false)
+        @test memb == [false, true]
+    end
+
+    @testset "intersect projective" begin
+        H = [witness_set(g) for g in G]
+        B = intersect(H[1], H[2])
+        @test degree.(B) == [4, 6]
     end
 
 end

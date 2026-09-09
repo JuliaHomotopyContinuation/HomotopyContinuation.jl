@@ -128,6 +128,7 @@ function solver_startsolutions(
     start_subspace = nothing,
     target_subspace = nothing,
     intrinsic = nothing,
+    show_progress::Bool = true,
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
@@ -164,6 +165,7 @@ function solver_startsolutions(
                 F;
                 compile = compile,
                 target_parameters = target_parameters,
+                show_progress = show_progress,
                 kwargs...,
             )
         elseif start_system == :total_degree
@@ -200,6 +202,7 @@ function solver_startsolutions(
     seed = rand(UInt32),
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(),
+    show_progress::Bool = true,
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
@@ -265,7 +268,7 @@ end
 """
     linear_subspace_homotopy(F, V::LinearSubspace, W::LinearSubspace, intrinsic = nothing)
 
-Constructs an [`IntrinsicSubspaceHomotopy`](@ref) (if `dim(V) < codim(V)` or
+Constructs an [`IntrinsicSubspaceHomotopy`](@ref) (if `dim(V) <= codim(V)` or
 `intrinsic = true`) or [`ExtrinsicSubspaceHomotopy`](@ref).
 Compared to the direct constructor, this also takes care of homogeneous systems.
 """
@@ -275,12 +278,14 @@ function linear_subspace_homotopy(
     W::LinearSubspace;
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
     intrinsic = nothing,
+    homogeneous::Union{Nothing,Bool} = nothing,
     gamma = cis(2 * pi * randn()),
 )
 
+    is_hom = isnothing(homogeneous) ? is_homogeneous(System(F)) : homogeneous
 
     if dim(V) <= codim(V) || something(intrinsic, false)
-        if is_linear(V) && is_linear(W) && is_homogeneous(System(F))
+        if is_linear(V) && is_linear(W) && is_hom
             IntrinsicSubspaceHomotopy(
                 on_affine_chart(F; compile = compile),
                 V,
@@ -292,7 +297,7 @@ function linear_subspace_homotopy(
         end
     else
         H = ExtrinsicSubspaceHomotopy(F, V, W; compile = compile, gamma = gamma)
-        if is_linear(V) && is_linear(W) && is_homogeneous(System(F))
+        if is_linear(V) && is_linear(W) && is_hom
             on_affine_chart(H)
         else
             H
@@ -353,6 +358,7 @@ function solver_startsolutions(
     starts = nothing;
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
     seed = nothing,
+    show_progress::Bool = true,
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
@@ -465,6 +471,7 @@ function solve(
         solver, starts = solver_startsolutions(
             args...;
             target_subspace = first(target_subspaces),
+            show_progress = show_progress,
             kwargs...,
         )
         target_parameters = target_subspaces
@@ -475,17 +482,20 @@ function solve(
             solver, starts = solver_startsolutions(
                 args...;
                 target_parameters = transform_parameters(first(target_parameters)),
+                show_progress = show_progress,
                 kwargs...,
             )
         else
             solver, starts = solver_startsolutions(
                 args...;
                 target_parameters = target_parameters,
+                show_progress = show_progress,
                 kwargs...,
             )
         end
     else
-        solver, starts = solver_startsolutions(args...; kwargs...)
+        solver, starts =
+            solver_startsolutions(args...; show_progress = show_progress, kwargs...)
     end
     if many_parameters
         if iterator_only
@@ -634,7 +644,6 @@ function threaded_solve(
     N = length(S)
     path_results = Vector{PathResult}(undef, N)
     interrupted = Threads.Atomic{Bool}(false)
-    started = Threads.Atomic{Int}(0)
     finished = Threads.Atomic{Int}(0)
     next_k = Threads.Atomic{Int}(1)  # next index k to process
 
@@ -691,10 +700,10 @@ function threaded_solve(
             rethrow(e)
         end
     end
-    # if we got interrupted we need to remove the unassigned filedds
+    # if we got interrupted we need to remove the unassigned fields
     if interrupted[]
         assigned_results = Vector{PathResult}()
-        for i = 1:started[]
+        for i in eachindex(path_results)
             if isassigned(path_results, i)
                 push!(assigned_results, path_results[i])
             end

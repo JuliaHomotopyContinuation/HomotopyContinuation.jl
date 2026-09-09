@@ -5,6 +5,14 @@ acb_op_call(op) = Symbol(:acb_, op_call(op), :!)
 acb_op_stop!(t, m) = nothing
 
 # # Arity 1
+# OP_ACOS # cos^-1 (a)
+Base.@propagate_inbounds function acb_op_acos!(t, x, m)
+    Arblib.acos!(t, x)
+end
+# OP_ASIN # sin^-1 (a)
+Base.@propagate_inbounds function acb_op_asin!(t, x, m)
+    Arblib.asin!(t, x)
+end
 # OP_CB # a ^ 3
 Base.@propagate_inbounds function acb_op_cb!(t, x, m)
     Arblib.sqr!(m[1], x)
@@ -13,6 +21,14 @@ end
 # OP_COS # cos(a)
 Base.@propagate_inbounds function acb_op_cos!(t, x, m)
     Arblib.cos!(t, x)
+end
+# OP_COSH # cosh(a)
+Base.@propagate_inbounds function acb_op_cosh!(t, x, m)
+    Arblib.cosh!(t, x)
+end
+# OP_EXP # exp(a)
+Base.@propagate_inbounds function acb_op_exp!(t, x, m)
+    Arblib.exp!(t, x)
 end
 # OP_INV # 1 / a
 Base.@propagate_inbounds function acb_op_inv!(t, x, m)
@@ -27,6 +43,10 @@ Base.@propagate_inbounds function acb_op_invsqr!(t, x, m)
     Arblib.sqr!(m[1], x)
     Arblib.inv!(t, m[1])
 end
+# OP_LOG # log(a)
+Base.@propagate_inbounds function acb_op_log!(t, x, m)
+    Arblib.log!(t, x)
+end
 # OP_NEG # -a
 Base.@propagate_inbounds function acb_op_neg!(t, x, m)
     Arblib.neg!(t, x)
@@ -35,13 +55,25 @@ end
 Base.@propagate_inbounds function acb_op_sin!(t, x, m)
     Arblib.sin!(t, x)
 end
+# OP_SINH # sinh(a)
+Base.@propagate_inbounds function acb_op_sinh!(t, x, m)
+    Arblib.sinh!(t, x)
+end
 # OP_SQR # a ^ 2
 Base.@propagate_inbounds function acb_op_sqr!(t, x, m)
     Arblib.sqr!(t, x)
 end
-# OP_SQRT # √(a) TODO
+# OP_SQRT # √(a)
 Base.@propagate_inbounds function acb_op_sqrt!(t, x, m)
     Arblib.sqrt!(t, x)
+end
+# OP_TAN # tan(a)
+Base.@propagate_inbounds function acb_op_tan!(t, x, m)
+    Arblib.tan!(t, x)
+end
+# OP_TANH # tanh(a)
+Base.@propagate_inbounds function acb_op_tanh!(t, x, m)
+    Arblib.tanh!(t, x)
 end
 # OP_IDENTITY # a
 Base.@propagate_inbounds function acb_op_identity!(t, x, m)
@@ -60,7 +92,8 @@ Base.@propagate_inbounds acb_op_sub!(t, x, y, m) = Arblib.sub!(t, x, y)
 
 # OP_POW_INT # a ^ p where p isa Integer
 Base.@propagate_inbounds acb_op_pow_int!(t, x, k, m) = Arblib.pow!(t, x, k)
-# # OP_POW # a ^ b where b isa Number
+# OP_POW # a ^ b where b isa Number
+Base.@propagate_inbounds acb_op_pow!(t, x, y, m) = Arblib.pow!(t, x, y)
 
 # # Arity 3
 # OP_ADD3 # a + b + c
@@ -68,7 +101,7 @@ Base.@propagate_inbounds function acb_op_add3!(t, x, y, z, m)
     Arblib.add!(m[1], x, y)
     Arblib.add!(t, m[1], z)
 end
-# OP_MUL3 # a * b * c TODO
+# OP_MUL3 # a * b * c
 Base.@propagate_inbounds function acb_op_mul3!(t, x, y, z, m)
     Arblib.mul!(m[1], x, y)
     Arblib.mul!(t, m[1], z)
@@ -96,7 +129,7 @@ Base.@propagate_inbounds function acb_op_add4!(t, x, y, z, w, m)
     Arblib.add!(m[2], z, w)
     Arblib.add!(t, m[1], m[2])
 end
-# OP_MUL4 # a * b * c * d TODO
+# OP_MUL4 # a * b * c * d
 Base.@propagate_inbounds function acb_op_mul4!(t, x, y, z, w, m)
     Arblib.mul!(m[1], x, y)
     Arblib.mul!(m[2], z, w)

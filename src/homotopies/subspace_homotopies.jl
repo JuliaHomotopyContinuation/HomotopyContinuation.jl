@@ -83,6 +83,15 @@ const PROJECTIVE_INTRINSIC_LRU =
     )
 
 
+@inline function copy_first!(dest::AbstractVector, src)
+    axes(dest) == axes(src) || throw(DimensionMismatch("vectors must have matching axes"))
+    @inbounds for i in eachindex(dest, src)
+        dest[i] = first(src[i])
+    end
+    dest
+end
+
+
 """
     ExtrinsicSubspaceHomotopy(F::System, V::LinearSubspace, W::LinearSubspace)
     ExtrinsicSubspaceHomotopy(F::AbstractSystem, V::LinearSubspace, W::LinearSubspace)
@@ -485,9 +494,17 @@ function set_subspaces!(H::SubspaceHomotopy, start::LinearSubspace, target::Line
         H.path = get!(LRU, (start, target)) do
             GrassmannianGeodesic(extrinsic(start), extrinsic(target))
         end
-    else
+    elseif isa(H, IntrinsicSubspaceHomotopy)
         H.path = get!(LRU, (start, target)) do
             GrassmannianGeodesic(intrinsic(start), intrinsic(target))
+        end
+    else
+        H.path = get!(LRU, (start, target)) do
+            GrassmannianGeodesic(
+                intrinsic(start),
+                intrinsic(target);
+                embedded_projective = true,
+            )
         end
     end
 
@@ -724,7 +741,7 @@ function ModelKit.taylor!(
     m = first(size(H.system))
     k = size(γ̇, 2) # recall that A(t) = transpose(γ(t)), so A(t) is kxn
 
-    H.v .= first.(v)
+    copy_first!(H.v, v)
 
     LA.mul!(H.L̇, transpose(γ̇), H.v)
     offset_at_t!(H, t)
@@ -893,7 +910,7 @@ function set_solution!(u::Vector, H::IntrinsicSubspaceHomotopy, x::AbstractVecto
 
     set_solution!(H.x, H.system, x)
     offset_at_t!(H, t)
-    H.x .= H.x .- H.offset
+    LA.axpy!(-1, H.offset, H.x)
 
     if isone(t)
         LA.mul!(u, H.path.γ1', H.x)
@@ -975,7 +992,7 @@ function ModelKit.taylor!(
     γ = γ!(H, t)
     γ̇ = γ̇!(H, t)
 
-    H.v .= first.(v)
+    copy_first!(H.v, v)
     LA.mul!(H.x, γ, H.v)
     LA.mul!(H.ẋ, γ̇, H.v)
 
@@ -1212,7 +1229,7 @@ function ModelKit.taylor!(
     γ = γ!(H, t)
     γ̇ = γ̇!(H, t)
 
-    H.v .= first.(v)
+    copy_first!(H.v, v)
     LA.mul!(H.x, γ, H.v)
     LA.mul!(H.ẋ, γ̇, H.v)
 

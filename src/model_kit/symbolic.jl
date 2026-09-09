@@ -556,9 +556,14 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
                         break
                     end
                 end
+            elseif arg_cls == :Exp ||
+                   arg_cls == :exp ||
+                   (arg_cls == :Pow && class(args(arg)[1]) == :Euler)
+                is_coeff = true
             elseif arg_cls == :Pow
                 vec = args!(pow_args, arg)
                 x = vec[1]
+                class(vec[2]) == :Integer || throw(PolynomialError())
                 k = convert(Int, vec[2])
                 if k < 0
                     throw(PolynomialError())
@@ -587,11 +592,14 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
         if !is_in_vars
             coeff = copy(op)
         end
+    elseif cls == :Exp || cls == :exp || (cls == :Pow && class(args(op)[1]) == :Euler)
+        coeff = copy(op)
     elseif cls == :Pow
         vec = args!(pow_args, op)
         # check that base is one of the variables
         x = vec[1]
         is_var_pow = false
+        class(vec[2]) == :Integer || throw(PolynomialError())
         k = convert(Int, vec[2])
         if k < 0
             throw(PolynomialError())
@@ -786,7 +794,7 @@ function is_homogeneous(f::Expression, vars::Vector{Variable}; expanded::Bool = 
         if err isa PolynomialError
             return false
         else
-            rethrow(e)
+            rethrow(err)
         end
     end
 end

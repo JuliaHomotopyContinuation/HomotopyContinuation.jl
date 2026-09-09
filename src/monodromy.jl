@@ -2,6 +2,7 @@ export monodromy_solve,
     find_start_pair,
     MonodromyOptions,
     MonodromyResult,
+    independent_normal,
     is_success,
     is_heuristic_stop,
     ncertified_distinct,
@@ -9,7 +10,8 @@ export monodromy_solve,
     parameters,
     permutations,
     trace,
-    verify_solution_completeness
+    verify_solution_completeness,
+    weighted_normal
 
 #####################
 # Monodromy Options #
@@ -227,6 +229,7 @@ also stored separately and returned by [`solutions`](@ref) and [`nsolutions`](@r
 struct MonodromyResult{P,LP}
     returncode::Symbol
     results::Vector{PathResult}
+    indexed_solution_indices::UnitRange{Int}
     parameters::P
     loops::Vector{MonodromyLoop{LP}}
     statistics::MonodromyStatistics
@@ -292,7 +295,8 @@ function TreeViews.nodelabel(
 end
 function TreeViews.treenode(r::MonodromyResult, i::Integer)
     if i == 1
-        return isnothing(r.certified_solutions) ? r.results : r.certified_solutions
+        return isnothing(r.certified_solutions) ? indexed_solutions(r) :
+               r.certified_solutions
     elseif i == 2
         return r.returncode
     elseif i == 3
@@ -346,6 +350,15 @@ certified-distinct solution approximations.
 """
 solutions(r::MonodromyResult) =
     isnothing(r.certified_solutions) ? solutions(r.results) : r.certified_solutions
+
+"""
+    indexed_solutions(result::MonodromyResult)
+
+Return the solutions in the index order used by [`permutations`](@ref).
+"""
+indexed_solutions(r::MonodromyResult) =
+    map(i -> solution(r.results[i]), r.indexed_solution_indices)
+nindexed_solutions(r::MonodromyResult) = length(r.indexed_solution_indices)
 
 """
     nsolutions(result::MonodromyResult)
@@ -432,15 +445,21 @@ and `permutations(S, reduced = false)` returns
 """
 function permutations(r::MonodromyResult; reduced::Bool = true)
     π = r.statistics.permutations
-    N = nresults(r)
 
-    π = filter(πⱼ -> length(πⱼ) == N, π)
     if reduced
         π = unique(π)
     end
 
+    N = nresults(r)
+    for πⱼ in π
+        N = max(N, length(πⱼ))
+        if !isempty(πⱼ)
+            N = max(N, maximum(πⱼ))
+        end
+    end
+
     A = zeros(Int, N, length(π))
-    for (j, πⱼ) in enumerate(π), i = 1:N
+    for (j, πⱼ) in enumerate(π), i = 1:length(πⱼ)
         A[i, j] = πⱼ[i]
     end
 
@@ -678,7 +697,7 @@ See also [`linear_subspace_homotopy`](@ref) for the `intrinsic` option.
 * `trace_test = true`: If `true` a trace test is performed to check whether all solutions
   are found. This is only applicable if monodromy is performed with a linear subspace.
   See also [`trace_test`](@ref).
-* `trace_test_tol = 1e-10`: The tolerance for the trace test to be successfull.
+* `trace_test_tol = 1e-6`: The tolerance for the trace test to be successfull.
   The trace is divided by the number of solutions before compared to the trace_test_tol.
 * `unique_points_rtol`: the relative tolerance for [`unique_points`](@ref).
 * `unique_points_atol`: the absolute tolerance for [`unique_points`](@ref).
@@ -703,6 +722,7 @@ function monodromy_solve(
     seed = rand(UInt32),
     tracker_options = TrackerOptions(),
     show_progress::Bool = true,
+    progress = nothing,
     threading::Bool = Threads.nthreads() > 1,
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
     catch_interrupt::Bool = true,
@@ -778,6 +798,7 @@ function monodromy_solve(
         p,
         seed;
         show_progress = show_progress,
+        progress = progress,
         threading = threading,
         catch_interrupt = catch_interrupt,
         warning = warning,
@@ -898,13 +919,12 @@ function monodromy_solve(
     p,
     seed;
     show_progress::Bool = true,
+    progress = nothing,
     threading::Bool = Threads.nthreads() > 1,
     catch_interrupt::Bool = true,
     warning::Bool = true,
 )
-    if !show_progress
-        progress = nothing
-    else
+    if isnothing(progress) && show_progress
         if MS.options.equivalence_classes
             desc = "Solutions (modulo group action) found:"
         else
@@ -920,7 +940,9 @@ function monodromy_solve(
     end
     reset_trace!(MS)
     reset_loops!(MS)
-    results = check_start_solutions(MS, X, p)
+    results =
+        MS.options.check_startsolutions ? check_start_solutions(MS, X, p) :
+        initialize_start_solutions(MS, X)
     if isempty(results)
         if warning
             @warn "None of the provided solutions is a valid start solution (Newton's method did not converge)."
@@ -956,6 +978,7 @@ function monodromy_solve(
     MonodromyResult(
         retcode,
         results,
+        1:length(results),
         p,
         MS.loops,
         MS.statistics,
@@ -984,6 +1007,78 @@ function check_start_solutions(MS::MonodromySolver, X, p)
     end
 
     results
+end
+
+function initialize_start_solutions(MS::MonodromySolver, X)
+    results = PathResult[]
+    for x in X
+        p = convert(Vector{ComplexF64}, x)
+        res = PathResult(
+            return_code = :success,
+            solution = p,
+            t = 1.0,
+            accuracy = eps(),
+            residual = NaN,
+            singular = false,
+            condition_jacobian = NaN,
+            winding_number = nothing,
+            extended_precision = false,
+            path_number = nothing,
+            start_solution = x,
+            last_path_point = (p, 1.0),
+            valuation = nothing,
+            ω = 1.0,
+            μ = eps(),
+            accepted_steps = 0,
+            rejected_steps = 0,
+            extended_precision_used = false,
+        )
+        _, added = add!(MS, res, length(results) + 1)
+        if added
+            push!(results, res)
+        end
+    end
+    results
+end
+
+function find_existing_point(MS::MonodromySolver, res::PathResult)
+    atol, rtol = monodromy_add_tolerances(MS, res)
+    rad = max(
+        atol,
+        rtol * MS.unique_points.tree.distance(solution(res), MS.unique_points.zero_vec),
+    )
+    search_in_radius(MS.unique_points, solution(res), rad)
+end
+
+function validate_new_result(MS::MonodromySolver, res::PathResult, p, tid::Int = 1)
+    tracker = MS.trackers[tid]
+    parameters!(tracker, p, p)
+    validated_res = track(tracker, solution(res))
+    if is_success(validated_res) && !validated_res.singular
+        validated_res
+    else
+        nothing
+    end
+end
+
+function add_tracked_result!(MS::MonodromySolver, res::PathResult, id, p, tid::Int = 1)
+    if duplicate_check_is_certified(MS)
+        added_id, got_added = add!(MS, res, id, tid)
+        return added_id, got_added, res
+    end
+
+    existing_id = find_existing_point(MS, res)
+    if !isnothing(existing_id)
+        return (existing_id, false, res)
+    end
+
+    validated_res = validate_new_result(MS, res, p, tid)
+    if isnothing(validated_res)
+        return (0, false, res)
+    end
+
+    added_id, got_added = add!(MS, validated_res, id, tid)
+    added_id, got_added, validated_res
 end
 
 function add!(MS::MonodromySolver, res::PathResult, id, tid::Int = 1)
@@ -1086,11 +1181,12 @@ function serial_monodromy_solve!(
                 MS.trace_lock;
                 collect_trace = MS.options.trace_test && nloops(MS) == job.loop_id,
             )
-            if !isnothing(res)
+            if !isnothing(res) && !res.singular
                 loop_tracked!(stats)
 
-                # 1) check whether solutions already exists
-                id, got_added = add!(MS, res, length(results) + 1)
+                # 1) check whether solution already exists. In heuristic mode, validate
+                # genuinely new endpoints before later monodromy calls can use them as starts.
+                id, got_added, res = add_tracked_result!(MS, res, length(results) + 1, p)
 
                 if MS.options.permutations
                     add_permutation!(stats, job.loop_id, job.id, id)
@@ -1226,14 +1322,21 @@ function threaded_monodromy_solve!(
                                                 nloops(MS) == job.loop_id,
                             )
 
-                            if !isnothing(res)
+                            if !isnothing(res) && !res.singular
                                 loop_tracked!(stats)
 
-                                # 1) check whether solutions already exists
+                                # 1) check whether solution already exists. In heuristic mode,
+                                # validate genuinely new endpoints before insertion.
                                 lock(data_lock)
                                 if length(results) <
                                    something(MS.options.target_solutions_count, Inf)
-                                    id, got_added = add!(MS, res, length(results) + 1, tid)
+                                    id, got_added, res = add_tracked_result!(
+                                        MS,
+                                        res,
+                                        length(results) + 1,
+                                        p,
+                                        tid,
+                                    )
 
                                     if MS.options.permutations
                                         add_permutation!(stats, job.loop_id, job.id, id)

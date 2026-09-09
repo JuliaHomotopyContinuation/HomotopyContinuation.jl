@@ -15,22 +15,21 @@ The result of [`certify`](@ref) is a [`CertificationResult`](@ref):
 
 ```@docs
 CertificationResult
-certificates
-distinct_certificates
-ncertified
-nreal_certified
-ncomplex_certified
-ndistinct_certified
-ndistinct_real_certified
-ndistinct_complex_certified
-save(filename, R::CertificationResult)
-show_straight_line_program
+```
+
+## IteratorCertificationResult
+Certifying a [`ResultIterator`](@ref) produces a [`IteratorCertificationResult`](@ref):
+```@docs
+IteratorCertificationResult
+bsp
 ```
 
 ## SolutionCertificate
 A [`CertificationResult`](@ref) contains in particular all [`SolutionCertificate`](@ref)s:
 ```@docs
 SolutionCertificate
+certificates
+distinct_certificates
 is_certified
 is_real(::SolutionCertificate)
 is_complex(::SolutionCertificate)
@@ -53,4 +52,28 @@ add_solution!
 distinct_certified_solutions
 distinct_certified_solutions!
 stats
+```
+
+## Helper functions
+
+```@docs
+ncertified
+nreal_certified
+ncomplex_certified
+ndistinct_certified
+ndistinct_real_certified
+ndistinct_complex_certified
+nprocessed
+nduplicates
+nnotcertified
+npaths
+start_iterator_length
+target_iterator_length
+nleaves
+max_leaf_size
+oversized_leaves
+unsplittable_leaves
+nleaf_splits
+save(filename, R::CertificationResult)
+show_straight_line_program
 ```

@@ -1,9 +1,12 @@
 using Arblib: Acb, AcbRef, AcbVector, AcbRefVector, AcbMatrix, AcbRefMatrix
+using Random: rand
 
 export certify,
     SolutionCertificate,
     CertificationResult,
+    IteratorCertificationResult,
     CertificationCache,
+    BSPPartition,
     is_certified,
     is_real,
     is_complex,
@@ -31,6 +34,15 @@ export certify,
     nduplicates,
     nnotcertified,
     stats,
+    bsp,
+    npaths,
+    start_iterator_length,
+    target_iterator_length,
+    nleaves,
+    max_leaf_size,
+    oversized_leaves,
+    unsplittable_leaves,
+    nleaf_splits,
     solutions,
     certificates,
     distinct_certified_solutions,
@@ -46,7 +58,7 @@ abstract type AbstractSolutionCertificate end
 """
     SolutionCertificate
 
-Result of [`certify`](@ref) for a single solution. Contains the initial solutions and if the certification was successfull a vector of complex intervals where the true solution is contained in.
+Result of [`certify`](@ref) for a single solution. Contains the initial solutions and if the certification was successful a vector of complex intervals where the true solution is contained in.
 The complex intervals are given as an `Arblib.AcbMatrix`.
 The `Arblib.AcbMatrix` is printed in the default format of `Arblib`. This means that, if the midpoint of an interval can't be represented with sufficiently many correct digits, `Arblib` will not print the midpoint. Instead, it will print an interval of the form `[+/- r]`, where `r` will be an upper bound for the absolute value of the ball. An enclosure of the correct interval can be printed as follows.
 ```julia
@@ -772,7 +784,7 @@ function _certify(
     show_progress::Bool = true,
     check_distinct::Bool = true,
     extended_certificate::Bool = false,
-    threading::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
     certify_solution_kwargs...,
 )
     N = length(solution_candidates)
@@ -995,7 +1007,7 @@ function certify_solution(
     F::AbstractSystem,
     solution_candidate::AbstractVector,
     cert_params::Union{Nothing,CertificationParameters},
-    cert_cache::CertificationCache,
+    certification_cache::CertificationCache,
     index::Int;
     max_precision::Int = 256,
     refine_solution::Bool = true,
@@ -1005,7 +1017,7 @@ function certify_solution(
         F,
         solution_candidate,
         cert_params,
-        cert_cache,
+        certification_cache,
         index,
         ModelKit.is_real(F);
         max_precision = max_precision,
@@ -1018,14 +1030,14 @@ function certify_solution(
     F::AbstractSystem,
     solution_candidate::AbstractVector,
     cert_params::Union{Nothing,CertificationParameters},
-    cert_cache::CertificationCache,
+    certification_cache::CertificationCache,
     index::Int,
     is_real_system::Bool;
     max_precision::Int = 256,
     refine_solution::Bool = true,
     extended_certificate::Bool = false,
 )
-    @unpack C, arb_C, arb_x̃₀ = cert_cache
+    @unpack C, arb_C, arb_x̃₀ = certification_cache
 
     # refine solution to machine precicision
     if refine_solution
@@ -1034,7 +1046,7 @@ function certify_solution(
             solution_candidate,
             complexF64_params(cert_params),
             InfNorm(),
-            cert_cache.newton_cache;
+            certification_cache.newton_cache;
             rtol = 8 * eps(),
             atol = 0.0,
             # this should already be an approximate zero
@@ -1046,9 +1058,10 @@ function certify_solution(
         x̃₀ = solution_candidate
     end
 
-    LA.inv!(C, cert_cache.newton_cache.J)
+    LA.inv!(C, certification_cache.newton_cache.J)
 
-    certified, x₁, x₀, is_real = ε_inflation_krawczyk(x̃₀, cert_params, C, cert_cache)
+    certified, x₁, x₀, is_real =
+        ε_inflation_krawczyk(x̃₀, cert_params, C, certification_cache)
 
     if !is_real_system
         is_real = false
@@ -1092,7 +1105,7 @@ function certify_solution(
         solution_candidate,
         x̃₀,
         cert_params,
-        cert_cache,
+        certification_cache,
         index,
         is_real_system;
         max_precision = max_precision,
@@ -1105,19 +1118,19 @@ function extended_prec_certify_solution(
     solution_candidate::AbstractVector,
     x̃₀::AbstractVector,
     cert_params::Union{Nothing,CertificationParameters},
-    cert_cache::CertificationCache,
+    certification_cache::CertificationCache,
     index::Int,
     is_real_system::Bool;
     max_precision::Int = 256,
     extended_certificate::Bool = false,
 )
-    @unpack C, arb_C, arb_x̃₀ = cert_cache
+    @unpack C, arb_C, arb_x̃₀ = certification_cache
 
     n = size(C, 1)
 
     # If not certified we do the computation in higher precision using Arb
     prec = 128
-    set_arb_precision!(cert_cache, prec)
+    set_arb_precision!(certification_cache, prec)
 
     # We keep the same C matrix for now.
     for j = 1:n, i = 1:n
@@ -1127,8 +1140,13 @@ function extended_prec_certify_solution(
         arb_x̃₀[i][] = x̃₀_i
     end
     while (prec <= max_precision)
-        certified, arb_x₁, arb_x₀, is_real =
-            arb_ε_inflation_krawczyk(arb_x̃₀, cert_params, arb_C, cert_cache; prec = prec)
+        certified, arb_x₁, arb_x₀, is_real = arb_ε_inflation_krawczyk(
+            arb_x̃₀,
+            cert_params,
+            arb_C,
+            certification_cache;
+            prec = prec,
+        )
 
         if !is_real_system
             is_real = false
@@ -1179,7 +1197,7 @@ function extended_prec_certify_solution(
         end
 
         prec += 64
-        set_arb_precision!(cert_cache, prec)
+        set_arb_precision!(certification_cache, prec)
     end
 
     # certification failed
@@ -1204,15 +1222,20 @@ function Base.Vector{ComplexF64}(A::Arblib.AcbMatrixLike)
     [ComplexF64(Arblib.ref(A, i, 1).acb_ptr) for i = 1:size(A, 1)]
 end
 
-function ε_inflation_krawczyk(x̃₀, p::Union{Nothing,CertificationParameters}, C, cert_cache)
-    @unpack C, r₀, Δx₀, ix̃₀, Jx₀, M, δx = cert_cache
+function ε_inflation_krawczyk(
+    x̃₀,
+    p::Union{Nothing,CertificationParameters},
+    C,
+    certification_cache,
+)
+    @unpack C, r₀, Δx₀, ix̃₀, Jx₀, M, δx = certification_cache
     J_x₀ = Jx₀
 
     ix̃₀ .= IComplexF64.(x̃₀)
     # r₀ = F(ix̃₀)
     ModelKit.execute!(
         r₀,
-        cert_cache.eval_interpreter_F64,
+        certification_cache.eval_interpreter_F64,
         ix̃₀,
         complexF64_interval_params(p),
     )
@@ -1232,7 +1255,7 @@ function ε_inflation_krawczyk(x̃₀, p::Union{Nothing,CertificationParameters}
     ModelKit.execute!(
         nothing,
         J_x₀,
-        cert_cache.jac_interpreter_F64,
+        certification_cache.jac_interpreter_F64,
         x₀,
         complexF64_interval_params(p),
     )
@@ -1267,11 +1290,11 @@ function arb_ε_inflation_krawczyk(
     x̃₀::AcbRefMatrix,
     p::Union{Nothing,CertificationParameters},
     C::Arblib.AcbMatrixLike,
-    cert_cache;
+    certification_cache;
     prec::Int,
 )
     @unpack arb_r₀, arb_Δx₀, arb_x̃₀, arb_J_x₀, arb_M, arb_δx, arb_mag, arb_x₀, arb_x₁ =
-        cert_cache
+        certification_cache
     r₀, Δx₀, x̃₀, x₀, x₁, J_x₀, M, δx, m =
         arb_r₀, arb_Δx₀, arb_x̃₀, arb_x₀, arb_x₁, arb_J_x₀, arb_M, arb_δx, arb_mag
 
@@ -1282,7 +1305,12 @@ function arb_ε_inflation_krawczyk(
     acc = Inf
     max_iters = 10
     for i = 1:max_iters
-        ModelKit.execute!(r₀, cert_cache.eval_interpreter_acb, x̃₀, arb_interval_params(p))
+        ModelKit.execute!(
+            r₀,
+            certification_cache.eval_interpreter_acb,
+            x̃₀,
+            arb_interval_params(p),
+        )
         Arblib.mul!(Δx₀, C, r₀)
 
         acc_new = Arblib.get(Arblib.bound_inf_norm!(m, Δx₀))
@@ -1310,7 +1338,7 @@ function arb_ε_inflation_krawczyk(
     ModelKit.execute!(
         nothing,
         J_x₀,
-        cert_cache.jac_interpreter_acb,
+        certification_cache.jac_interpreter_acb,
         x₀,
         arb_interval_params(p),
     )
@@ -1503,7 +1531,7 @@ function certify(
     cert_params = certification_parameters(params; prec = max_precision)
     _certify(
         F,
-        solutions(X; only_nonsingular = true),
+        solutions(X; only_nonsingular = false),
         cert_params,
         cache;
         max_precision = max_precision,
@@ -1715,7 +1743,7 @@ function Base.merge!(dest::DistinctCertifiedSolutions, src::DistinctCertifiedSol
 end
 
 """
-    distinct_certified_solutions(F, S, p = nothing; threading::Bool = true, show_progress::Bool = true, certify_solution_kwargs...)
+    distinct_certified_solutions(F, S, p = nothing; threading::Bool = Threads.nthreads() > 1, show_progress::Bool = true, certify_solution_kwargs...)
 
 Return a `DistinctCertifiedSolutions` struct containing distinct certified solutions obtained from a vector of solutions `S` of a system `F`.
 Compared to `certify` this only keeps the distinct certified solutions and not all certificates. This in in particular
@@ -1725,7 +1753,7 @@ function distinct_certified_solutions(
     F::Union{System,AbstractSystem},
     S::AbstractVector{Vector{ComplexF64}},
     p = nothing;
-    threading::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
     kwargs...,
 )
     d = DistinctCertifiedSolutions(F, p; thread_safe = threading)
@@ -1733,14 +1761,14 @@ function distinct_certified_solutions(
 end
 
 """
-    distinct_certified_solutions!(d::DistinctCertifiedSolutions, S; threading::Bool = true, show_progress::Bool = true, certify_solution_kwargs...)
+    distinct_certified_solutions!(d::DistinctCertifiedSolutions, S; threading::Bool = Threads.nthreads() > 1, show_progress::Bool = true, certify_solution_kwargs...)
 
 Add a vector of solutions `S` to a `DistinctCertifiedSolutions` struct `d`.
 """
 function distinct_certified_solutions!(
     d::DistinctCertifiedSolutions,
     S::AbstractVector{Vector{ComplexF64}};
-    threading::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
     show_progress::Bool = true,
     kwargs...,
 )
@@ -1811,4 +1839,2144 @@ function distinct_certified_solutions!(
     end
 
     return d
+end
+
+
+################################
+#### Certification of iterators 
+################################
+
+
+
+"""
+    BSPPartition
+
+Binary spatial partition of the real line used to group certified solutions from a
+`ResultIterator` without materializing all solutions at once.
+
+A `BSPPartition` contains three objects: `tree`, `leaves` and `unsplittable`:
+* The partition is based on a `tree` whose leaves correspond to intervals, and a map defined on the leaves (implemented by an `IntervalTrees.IntervalMap`). This map assigns to each interval leaf the number of certified solutions assigned to that leaf. 
+* The `leaves` vector stores the leaf intervals in sorted order.
+* `unsplittable` records leaves that cannot be refined further.
+"""
+mutable struct BSPPartition
+    tree::IntervalTrees.IntervalMap{Float64,Int}
+    leaves::Vector{IntervalTrees.Interval{Float64}}
+    unsplittable::Set{Tuple{Float64,Float64}}
+end
+
+function Base.show(io::IO, bsp::BSPPartition; nshow::Int = 10)
+    println(io, "BSPPartition")
+    println(io, "============")
+    k = 1
+    l = 1
+    L = bsp.leaves
+    nleaves = length(L)
+    while k ≤ nleaves && l ≤ nshow
+        leaf = L[k]
+        c = _leaf_count(bsp, leaf)
+        if c > 0
+            println(io, "• ($(first(leaf)), $(last(leaf))) => $c")
+            l += 1
+        end
+        k += 1
+    end
+    if l == nshow + 1
+        println(io, " ... (skipped $(k - l - 1))")
+    end
+end
+
+"""
+    BSPAssignmentStats
+
+Summary statistics for the BSP.
+"""
+Base.@kwdef mutable struct BSPAssignmentStats
+    assignment_npaths::Int = 0
+    target_iterator_length::Int = 0
+    certified::Int = 0
+    certified_real::Int = 0
+    certified_complex::Int = 0
+    not_certified::Int = 0
+end
+
+Base.@kwdef mutable struct IteratorCertificationProgress
+    progress_meter::PM.ProgressUnknown
+    phase::Symbol = :assignment
+    start_iterator_length::Int = 0
+    target_iterator_length::Int = 0
+    npaths::Int = 0
+    current_pass::String = "Waiting for iterator pass"
+    current_pass_total::Int = 0
+    current_pass_done::Int = 0
+    certified::Int = 0
+    certified_real::Int = 0
+    certified_complex::Int = 0
+    not_certified::Int = 0
+    processed_leaves::Int = 0
+    total_leaves::Int = 0
+    distinct_certified::Int = 0
+    distinct_real::Int = 0
+    distinct_complex::Int = 0
+    nleaf_splits::Int = 0
+    depth::Int = 0
+    max_depth::Int = 0
+end
+
+function make_iterator_certification_progress(; dt::Float64 = 0.4)
+    progress_meter = PM.ProgressUnknown(;
+        dt = dt,
+        desc = "Certifying iterator:",
+        color = :green,
+        output = stdout,
+        spinner = true,
+    )
+    progress_meter.tlast += 0.3
+    IteratorCertificationProgress(progress_meter = progress_meter)
+end
+
+function _phase_label(progress::IteratorCertificationProgress)
+    if progress.phase == :assignment
+        "Assign initial leaves/individual certification"
+    elseif progress.phase == :refinement
+        "Refine leaves for distinct certification"
+    else
+        "Finished"
+    end
+end
+
+function _format_local_pass_bar(progress::IteratorCertificationProgress; barlen::Int = 20)
+    total = progress.current_pass_total
+    done = min(progress.current_pass_done, total)
+    filled = total == 0 ? 0 : clamp(fld(done * barlen, total), 0, barlen)
+    pct = total == 0 ? 100.0 : 100 * done / total
+    string(
+        lpad(string(round(pct; digits = 1), "%"), 6),
+        "|",
+        repeat("█", filled),
+        repeat(" ", barlen - filled),
+        "| ",
+        done,
+        "/",
+        total,
+    )
+end
+
+
+@noinline function _iterator_certification_showvalues(
+    progress::IteratorCertificationProgress,
+)
+    (
+        ("Phase", _phase_label(progress)),
+        ("Total # paths tracked", "$(progress.npaths)"),
+        ("Start iterator length", progress.start_iterator_length),
+        ("Target iterator length", progress.target_iterator_length),
+        (
+            "Individual certified (real/complex)",
+            "$(progress.certified) ($(progress.certified_real)/$(progress.certified_complex))",
+        ),
+        ("Not certified", progress.not_certified),
+        (
+            "Total distinct (real/complex)",
+            "$(progress.distinct_certified) ($(progress.distinct_real)/$(progress.distinct_complex))",
+        ),
+        ("Total # leaves", "$(progress.total_leaves)"),
+        ("# processed terminal leaves", "$(progress.processed_leaves)"),
+        ("# leaf splits", "$(progress.nleaf_splits)"),
+        ("Current tree depth", "$(progress.depth) (max: $(progress.max_depth))"),
+        ("Pass status", progress.current_pass),
+        ("Pass progress", _format_local_pass_bar(progress)),
+    )
+end
+
+update_iterator_progress!(::Nothing; kwargs...) = nothing
+register_iterator_pass!(::Nothing, pass, total; kwargs...) = nothing
+advance_iterator_progress!(::Nothing; kwargs...) = nothing
+
+function update_iterator_progress!(
+    progress::IteratorCertificationProgress;
+    phase::Union{Nothing,Symbol} = nothing,
+    start_iterator_length::Union{Nothing,Int} = nothing,
+    target_iterator_length::Union{Nothing,Int} = nothing,
+    npaths::Union{Nothing,Int} = nothing,
+    certified::Union{Nothing,Int} = nothing,
+    certified_real::Union{Nothing,Int} = nothing,
+    certified_complex::Union{Nothing,Int} = nothing,
+    not_certified::Union{Nothing,Int} = nothing,
+    processed_leaves::Union{Nothing,Int} = nothing,
+    total_leaves::Union{Nothing,Int} = nothing,
+    distinct_certified::Union{Nothing,Int} = nothing,
+    distinct_real::Union{Nothing,Int} = nothing,
+    distinct_complex::Union{Nothing,Int} = nothing,
+    nleaf_splits::Union{Nothing,Int} = nothing,
+    depth::Union{Nothing,Int} = nothing,
+    max_depth::Union{Nothing,Int} = nothing,
+    force::Bool = false,
+    finish::Bool = false,
+)
+    isnothing(phase) || (progress.phase = phase)
+    isnothing(start_iterator_length) ||
+        (progress.start_iterator_length = start_iterator_length)
+    isnothing(target_iterator_length) ||
+        (progress.target_iterator_length = target_iterator_length)
+    isnothing(npaths) || (progress.npaths = npaths)
+    isnothing(certified) || (progress.certified = certified)
+    isnothing(certified_real) || (progress.certified_real = certified_real)
+    isnothing(certified_complex) || (progress.certified_complex = certified_complex)
+    isnothing(not_certified) || (progress.not_certified = not_certified)
+    isnothing(processed_leaves) || (progress.processed_leaves = processed_leaves)
+    isnothing(total_leaves) || (progress.total_leaves = total_leaves)
+    isnothing(distinct_certified) || (progress.distinct_certified = distinct_certified)
+    isnothing(distinct_real) || (progress.distinct_real = distinct_real)
+    isnothing(distinct_complex) || (progress.distinct_complex = distinct_complex)
+    isnothing(nleaf_splits) || (progress.nleaf_splits = nleaf_splits)
+    isnothing(depth) || (progress.depth = depth)
+    isnothing(max_depth) || (progress.max_depth = max_depth)
+
+    progress_meter = progress.progress_meter
+    if finish
+        PM.update!(progress_meter)
+        PM.finish!(
+            progress_meter;
+            showvalues = _iterator_certification_showvalues(progress),
+        )
+    elseif force || time() > progress_meter.tlast + progress_meter.dt
+        PM.update!(
+            progress_meter;
+            showvalues = _iterator_certification_showvalues(progress),
+        )
+    end
+    nothing
+end
+
+function register_iterator_pass!(
+    progress::IteratorCertificationProgress,
+    pass::AbstractString,
+    total::Integer;
+    force::Bool = false,
+)
+    progress.current_pass = String(pass)
+    progress.current_pass_total = Int(total)
+    progress.current_pass_done = 0
+    update_iterator_progress!(progress; force = force)
+end
+
+function advance_iterator_progress!(
+    progress::IteratorCertificationProgress;
+    step::Integer = 1,
+    kwargs...,
+)
+    progress.current_pass_done += Int(step)
+    update_iterator_progress!(progress; kwargs...)
+end
+
+"""
+    IteratorCertificationResult
+
+Final summary returned by the BSP-based [`certify`](@ref) method for`ResultIterator`. 
+"""
+Base.@kwdef struct IteratorCertificationResult
+    bsp::BSPPartition
+    start_iterator_length::Int = 0
+    npaths::Int = 0
+    target_iterator_length::Int = 0
+    certified::Int = 0
+    certified_real::Int = 0
+    certified_complex::Int = 0
+    not_certified::Int = 0
+    distinct_certified::Int = 0
+    distinct_real::Int = 0
+    distinct_complex::Int = 0
+    nleaves::Int = 0
+    max_leaf_size::Int = 0
+    oversized_leaves::Int = 0
+    unsplittable_leaves::Int = 0
+    nleaf_splits::Int = 0
+end
+
+"""
+    bsp(R::IteratorCertificationResult)
+
+Return the BSP partition used during iterator certification.
+"""
+bsp(R::IteratorCertificationResult) = R.bsp
+
+"""
+    npaths(R::IteratorCertificationResult)
+
+Return the total number of path results produced by the iterator.
+"""
+npaths(R::IteratorCertificationResult) = R.npaths
+
+"""
+    start_iterator_length(R::IteratorCertificationResult)
+
+Return the length of the iterator for the start system.
+"""
+start_iterator_length(R::IteratorCertificationResult) = R.start_iterator_length
+
+"""
+    target_iterator_length(R::IteratorCertificationResult)
+
+Return the length of the iterator for the target system.
+"""
+target_iterator_length(R::IteratorCertificationResult) = R.target_iterator_length
+
+"""
+    ncertified(R::IteratorCertificationResult)
+
+Return the number of path results that were certified.
+"""
+ncertified(R::IteratorCertificationResult) = R.certified
+
+"""
+    nreal_certified(R::IteratorCertificationResult)
+
+Return the number of certified path results that were certified real.
+"""
+nreal_certified(R::IteratorCertificationResult) = R.certified_real
+
+"""
+    ncomplex_certified(R::IteratorCertificationResult)
+
+Return the number of certified path results that were certified non-real complex.
+"""
+ncomplex_certified(R::IteratorCertificationResult) = R.certified_complex
+
+"""
+    nnotcertified(R::IteratorCertificationResult)
+
+Return the number of path results that could not be certified.
+"""
+nnotcertified(R::IteratorCertificationResult) = R.not_certified
+
+"""
+    ndistinct_certified(R::IteratorCertificationResult)
+
+Return the number of distinct certified solutions obtained after leafwise certification.
+"""
+ndistinct_certified(R::IteratorCertificationResult) = R.distinct_certified
+
+"""
+    ndistinct_real_certified(R::IteratorCertificationResult)
+
+Return the number of distinct certified solutions that were certified real.
+"""
+ndistinct_real_certified(R::IteratorCertificationResult) = R.distinct_real
+
+"""
+    ndistinct_complex_certified(R::IteratorCertificationResult)
+
+Return the number of distinct certified solutions that were certified non-real complex.
+"""
+ndistinct_complex_certified(R::IteratorCertificationResult) = R.distinct_complex
+
+"""
+    nleaves(R::IteratorCertificationResult)
+
+Return the number of BSP leaves in the final partition.
+"""
+nleaves(R::IteratorCertificationResult) = R.nleaves
+
+"""
+    max_leaf_size(R::IteratorCertificationResult)
+
+Return the size of the largest BSP leaf.
+"""
+max_leaf_size(R::IteratorCertificationResult) = R.max_leaf_size
+
+"""
+    oversized_leaves(R::IteratorCertificationResult)
+
+Return the number of terminal BSP leaves whose size exceeds the requested `leaf_size_bound`.
+"""
+oversized_leaves(R::IteratorCertificationResult) = R.oversized_leaves
+
+"""
+    unsplittable_leaves(R::IteratorCertificationResult)
+
+Return the number of BSP leaves that could not be refined further in the chosen projection.
+"""
+unsplittable_leaves(R::IteratorCertificationResult) = R.unsplittable_leaves
+
+"""
+    nleaf_splits(R::IteratorCertificationResult)
+
+Return the number of local BSP refinement steps performed during certification.
+"""
+nleaf_splits(R::IteratorCertificationResult) = R.nleaf_splits
+
+
+function Base.show(io::IO, summary::IteratorCertificationResult)
+    println(io, "IteratorCertificationResult")
+    println(io, "===========================")
+    println(
+        io,
+        "• $(summary.certified) certified intervals " *
+        "($(summary.certified_real) real, $(summary.certified_complex) complex)",
+    )
+    println(io, "• $(summary.not_certified) not certified")
+    println(
+        io,
+        "• $(summary.distinct_certified) distinct certified intervals " *
+        "($(summary.distinct_real) real, $(summary.distinct_complex) complex)",
+    )
+    println(io, "• max leaf size: $(summary.max_leaf_size)")
+    println(io, "• BSP leaves: $(summary.nleaves) ")
+    if summary.oversized_leaves > 0
+        println(
+            io,
+            "• $(summary.oversized_leaves) oversized leaves remain " *
+            "(unable to split $(summary.unsplittable_leaves) in this run)",
+        )
+    end
+end
+
+
+"""
+    _convert_to_interval(cert; coordinate = 1)
+
+Project a certified solution interval to the real part of one coordinate and convert it to an `IntervalTrees.Interval`.
+"""
+function _convert_to_interval(cert; coordinate::Int = 1)
+    cert_interval = certified_solution_interval(cert)[coordinate]
+    real_part_interval = real(IComplexF64(cert_interval))
+    IntervalTrees.Interval(real_part_interval.lo, real_part_interval.hi)
+end
+
+# We always work with a sorted list of finite cut points and extend it by `±Inf`
+function _normalize_boundaries(boundaries)
+    b = unique!(sort!(collect(float.(boundaries))))
+    [-Inf, b..., Inf]
+end
+
+"""
+    _build_partition(boundaries)
+
+Create the initial BSP partition of the real line from a set of finite boundaries.
+"""
+function _build_partition(boundaries)
+    # Build the initial coarse partition of the real line.
+    # Each leaf stores only a count; per-solution intervals are recollected locally.
+    tree = IntervalTrees.IntervalMap{Float64,Int}()
+    leaves = IntervalTrees.Interval{Float64}[]
+    normalized = _normalize_boundaries(boundaries)
+    for i = 1:(length(normalized)-1)
+        interval = IntervalTrees.Interval(normalized[i], normalized[i+1])
+        tree[interval] = 0
+        push!(leaves, interval)
+    end
+    BSPPartition(tree, leaves, Set{Tuple{Float64,Float64}}())
+end
+
+_leaf_count(bsp::BSPPartition, leaf) = IntervalTrees.value(bsp.tree[leaf])
+_leaf_id(interval) = (first(interval), last(interval))
+
+function check_iterator_certify_options(
+    F::AbstractSystem;
+    ε::Float64,
+    coordinate::Int,
+    leaf_size_bound::Integer,
+    boundaries,
+    max_depth::Int,
+)
+    ε > 0 && isfinite(ε) || throw(ArgumentError("`ε` must be positive and finite."))
+    leaf_size_bound > 0 || throw(ArgumentError("`leaf_size_bound` must be positive."))
+    max_depth >= 0 || throw(ArgumentError("`max_depth` must be non-negative."))
+    1 <= coordinate <= size(F, 2) || throw(
+        ArgumentError(
+            "`coordinate` must be between 1 and the number of variables ($(size(F, 2))).",
+        ),
+    )
+    all(isfinite, float.(boundaries)) ||
+        throw(ArgumentError("`boundaries` must contain only finite values."))
+
+    return nothing
+end
+
+"""
+    IteratorCertificationCache
+
+Carrier for the stable objects and options used while recursively processing BSP
+leaves. The `certification_cache` field is the numerical [`CertificationCache`](@ref)
+used by `certify_solution`; the outer `IteratorCertificationCache` stores only
+references and scalar options for the iterator-certification pass.
+"""
+Base.@kwdef struct IteratorCertificationCache{S<:AbstractSystem,P,C<:CertificationCache,D}
+    F::S
+    cert_params::P
+    certification_cache::C
+    distinct_solutions::D
+    progress::Union{Nothing,IteratorCertificationProgress}
+    leaf_size_bound::Int
+    certify_oversized_leaves::Bool
+    ε::Float64
+    coordinate::Int
+    max_depth::Int
+    max_precision::Int
+    refine_solution::Bool
+    extended_certificate::Bool
+    result_predicate::Function
+    npaths::Threads.Atomic{Int}
+    nleaf_splits::Threads.Atomic{Int}
+    processed_leaves::Threads.Atomic{Int}
+end
+
+function threaded_certification_data(
+    iter::ResultIterator,
+    F::AbstractSystem,
+    cert_params,
+    certification_cache::CertificationCache,
+    nworkers::Int,
+)
+    nworkers = max(1, nworkers)
+    nworkers == 1 && return (
+        trackers = [solver(iter).trackers[1]],
+        systems = [F],
+        params = [cert_params],
+        caches = [certification_cache],
+    )
+
+    # These are the mutable numerical workspaces used by `certify_solution`.
+    # The start iterator itself is consumed once by the caller and is not copied.
+    tracker = solver(iter).trackers[1]
+    trackers = [tracker; [deepcopy(tracker) for _ = 2:nworkers]]
+    systems = [F; [deepcopy(F) for _ = 2:nworkers]]
+    params = fill(cert_params, nworkers)
+    caches = [certification_cache; [deepcopy(certification_cache) for _ = 2:nworkers]]
+    return (trackers = trackers, systems = systems, params = params, caches = caches)
+end
+
+function foreach_threaded_result(f, iter::ResultIterator, trackers, result_predicate)
+    nworkers = length(trackers)
+    starts = start_solutions(iter)
+    starts_workspace = start_solution_workspace(starts)
+    selected_indices = indices(iter)
+    current_bitmask = bitmask(iter)
+    starts_lock = ReentrantLock()
+    started = Ref(false)
+    state = Ref{Any}(nothing)
+    start_index = Ref(0)
+    output_index = Ref(0)
+    selected_index = Ref(1)
+
+    Threads.@sync begin
+        for tid = 1:nworkers
+            Threads.@spawn begin
+                while true
+                    item = lock(starts_lock) do
+                        while true
+                            if !isnothing(selected_indices) &&
+                               selected_index[] > length(selected_indices)
+                                return nothing
+                            end
+
+                            next = if started[]
+                                iterate_start_solution(starts, starts_workspace, state[])
+                            else
+                                started[] = true
+                                iterate_start_solution(starts, starts_workspace)
+                            end
+                            isnothing(next) && return nothing
+
+                            start_value, next_state = next
+                            state[] = next_state
+                            start_index[] += 1
+
+                            if !isnothing(selected_indices)
+                                target_index = selected_indices[selected_index[]]
+                                start_index[] < target_index && continue
+                                start_index[] == target_index || error(
+                                    "ResultIterator indices must be sorted increasingly.",
+                                )
+                                selected_index[] += 1
+                            elseif !isnothing(current_bitmask) &&
+                                   !current_bitmask[start_index[]]
+                                continue
+                            end
+
+                            output_index[] += 1
+                            return (output_index[], start_value)
+                        end
+                    end
+                    isnothing(item) && break
+                    result = track(trackers[tid], item[2])
+                    selected = result_predicate(result)
+                    path_success = is_success(result)
+                    sol = selected && path_success ? copy(solution(result)) : nothing
+                    f(tid, item[1], selected, path_success, sol)
+                end
+            end
+        end
+    end
+    nothing
+end
+
+function merge_covering_leaves!(bsp::BSPPartition, interval)
+    # Find the block of leaves touched by `interval`.
+    # this implementation exploits that the intervals at the leaves of bsp are ordered 
+    left = 0
+    right = 0
+    for i in eachindex(bsp.leaves)
+        leaf = bsp.leaves[i]
+        # suppose leaf = (a,b) and interval = (x,y)
+        # if b < x continue
+        if last(leaf) < first(interval)
+            continue
+        end
+        left == 0 && (left = i)
+        # if y < a stop
+        if last(interval) < first(leaf)
+            break
+        end
+        right = i # only assigned when x ≤ b and a ≤ y; i.e., when (x,y) intersects (a,b) but is not contained in it
+    end
+    left == 0 && return false
+    right == 0 && (right = left)
+
+    if left == right &&
+       first(bsp.leaves[left]) <= first(interval) &&
+       last(interval) <= last(bsp.leaves[left])
+        return true
+    end
+
+    # we only arrive here, when interval is not contained in a single leaf interval. In this case, it touches two subsequent intervals and we merge them into one larger leaf so `interval` fits into a single leaf.
+    # Only counts survive this merge; the leaf-local entries will be recollected on demand.
+    merged_leaf = IntervalTrees.Interval(first(bsp.leaves[left]), last(bsp.leaves[right]))
+    merged_count = 0
+    for i = left:right
+        leaf = bsp.leaves[i]
+        merged_count += _leaf_count(bsp, leaf)
+        delete!(bsp.tree, leaf)
+        delete!(bsp.unsplittable, _leaf_id(leaf))
+    end
+
+    splice!(bsp.leaves, left:right, [merged_leaf])
+    bsp.tree[merged_leaf] = merged_count
+    return true
+end
+
+# this function finds the interval in bsp containing the given interval
+function _find_leaf(bsp::BSPPartition, interval)
+    for match in IntervalTrees.intersect(bsp.tree, interval)
+        if first(match) <= first(interval) && last(interval) <= last(match)
+            return match
+        end
+    end
+    nothing
+end
+
+function _ensure_leaf!(bsp::BSPPartition, interval)
+    while true
+        match = _find_leaf(bsp, interval)
+        !isnothing(match) && return match
+        # If `interval` crosses a current cut, coarsen the BSP locally and try again.
+        merge_covering_leaves!(bsp, interval) || error(
+            "Could not place certified interval $interval into the current BSP leaves.",
+        )
+    end
+end
+
+"""
+    BSPLeafEntry
+
+Stores the information we keep per certified solution during the BSP phase: the position of the path result in the `ResultIterator` and the certified interval for the chosen real coordinate.
+"""
+struct BSPLeafEntry
+    index::Int
+    interval::IntervalTrees.Interval{Float64}
+end
+
+_leaf_entries_dict() = Dict{Tuple{Float64,Float64},Vector{BSPLeafEntry}}()
+
+function ensure_leaf_entries!(
+    leaf_entries_by_id::Dict{Tuple{Float64,Float64},Vector{BSPLeafEntry}},
+    leaf,
+)
+    # Keep the entry table synchronized with the current BSP leaves.
+    # If `leaf` is new because several leaves were merged, collect all entry vectors
+    # whose keys are now covered by `leaf` and store them under the merged key.
+    key = _leaf_id(leaf)
+    if haskey(leaf_entries_by_id, key)
+        return leaf_entries_by_id[key]
+    end
+
+    merged_entries = BSPLeafEntry[]
+    for (old_key, old_entries) in collect(leaf_entries_by_id)
+        if first(leaf) <= old_key[1] && old_key[2] <= last(leaf)
+            append!(merged_entries, old_entries)
+            delete!(leaf_entries_by_id, old_key)
+        end
+    end
+    leaf_entries_by_id[key] = merged_entries
+    merged_entries
+end
+
+function reindex_leaf_entries(entries::Vector{BSPLeafEntry})
+    # Convert entry indices from the current iterator's output numbering into the
+    # local numbering of a freshly built leaf iterator.
+    sorted_entries = sort!(copy(entries); by = entry -> entry.index)
+    reindexed = BSPLeafEntry[]
+    sizehint!(reindexed, length(sorted_entries))
+    for (i, entry) in enumerate(sorted_entries)
+        push!(reindexed, BSPLeafEntry(i, entry.interval))
+    end
+    reindexed
+end
+
+function assign_initial_leaves!(
+    bsp::BSPPartition,
+    iter::ResultIterator,
+    F,
+    cert_params,
+    certification_cache;
+    progress::Union{Nothing,IteratorCertificationProgress} = nothing,
+    threading::Bool = Threads.nthreads() > 1,
+    coordinate::Int = 1,
+    max_precision::Int = 256,
+    refine_solution::Bool = true,
+    extended_certificate::Bool = false,
+    result_predicate::Function = Returns(true),
+    certify_solution_kwargs...,
+)
+    # Phase 1:
+    # 1. stream once through the full iterator;
+    # 2. certify each successful result individually;
+    # 3. project certified results to one real interval;
+    # 4. place those intervals into the current coarse BSP leaves, merging leaves when
+    #    a certified interval crosses an existing coarse cut.
+    stats = BSPAssignmentStats()
+    leaf_entries_by_id = _leaf_entries_dict()
+    register_iterator_pass!(progress, "Initial pass", length(iter))
+
+    if threading && Threads.nthreads() > 1 && length(iter) > 1
+        worker_count = min(Threads.nthreads(), length(iter))
+        workers = threaded_certification_data(
+            iter,
+            F,
+            cert_params,
+            certification_cache,
+            worker_count,
+        )
+        progress_lock = ReentrantLock()
+        # Only counters and progress are shared while certifying. BSP mutation is
+        # deferred until all workers have produced their local leaf entries.
+        npaths = Threads.Atomic{Int}(0)
+        target_iterator_length = Threads.Atomic{Int}(0)
+        certified = Threads.Atomic{Int}(0)
+        certified_real = Threads.Atomic{Int}(0)
+        certified_complex = Threads.Atomic{Int}(0)
+        not_certified = Threads.Atomic{Int}(0)
+        certified_entries = [BSPLeafEntry[] for _ in eachindex(workers.systems)]
+
+        foreach_threaded_result(
+            iter,
+            workers.trackers,
+            result_predicate,
+        ) do tid, idx, selected, path_success, sol
+            local_entries = certified_entries[tid]
+            Threads.atomic_add!(npaths, 1)
+            @lock progress_lock begin
+                advance_iterator_progress!(
+                    progress;
+                    phase = :assignment,
+                    npaths = npaths[],
+                    target_iterator_length = target_iterator_length[],
+                    certified = certified[],
+                    certified_real = certified_real[],
+                    certified_complex = certified_complex[],
+                    not_certified = not_certified[],
+                )
+            end
+            selected || return
+            path_success || return
+
+            Threads.atomic_add!(target_iterator_length, 1)
+            cert = certify_solution(
+                workers.systems[tid],
+                sol,
+                workers.params[tid],
+                workers.caches[tid],
+                idx;
+                max_precision = max_precision,
+                refine_solution = refine_solution,
+                extended_certificate = extended_certificate,
+                certify_solution_kwargs...,
+            )
+            if !is_certified(cert)
+                Threads.atomic_add!(not_certified, 1)
+                return
+            end
+
+            Threads.atomic_add!(certified, 1)
+            Threads.atomic_add!(certified_real, Int(is_real(cert)))
+            Threads.atomic_add!(certified_complex, Int(is_complex(cert)))
+            push!(
+                local_entries,
+                BSPLeafEntry(idx, _convert_to_interval(cert; coordinate = coordinate)),
+            )
+        end
+
+        stats.assignment_npaths = npaths[]
+        stats.target_iterator_length = target_iterator_length[]
+        stats.certified = certified[]
+        stats.certified_real = certified_real[]
+        stats.certified_complex = certified_complex[]
+        stats.not_certified = not_certified[]
+
+        for entry in sort!(
+            reduce(vcat, certified_entries; init = BSPLeafEntry[]);
+            by = entry -> entry.index,
+        )
+            # Apply leaf updates serially.
+            match = _ensure_leaf!(bsp, entry.interval)
+            leaf = IntervalTrees.Interval(first(match), last(match))
+            entries = ensure_leaf_entries!(leaf_entries_by_id, leaf)
+            push!(entries, entry)
+            bsp.tree[leaf] = _leaf_count(bsp, leaf) + 1
+        end
+
+        return stats, leaf_entries_by_id
+    end
+
+    idx = 0
+    for result in iter
+        idx += 1
+        selected = result_predicate(result)
+        stats.assignment_npaths += 1
+        advance_iterator_progress!(
+            progress;
+            phase = :assignment,
+            npaths = stats.assignment_npaths,
+            target_iterator_length = stats.target_iterator_length,
+            certified = stats.certified,
+            certified_real = stats.certified_real,
+            certified_complex = stats.certified_complex,
+            not_certified = stats.not_certified,
+        )
+        selected || continue
+        # Non-successful results never enter the BSP.
+        is_success(result) || continue
+
+        stats.target_iterator_length += 1
+        cert = certify_solution(
+            F,
+            solution(result),
+            cert_params,
+            certification_cache,
+            idx;
+            max_precision = max_precision,
+            refine_solution = refine_solution,
+            extended_certificate = extended_certificate,
+            certify_solution_kwargs...,
+        )
+        if !is_certified(cert)
+            stats.not_certified += 1
+            update_iterator_progress!(
+                progress;
+                phase = :assignment,
+                npaths = stats.assignment_npaths,
+                target_iterator_length = stats.target_iterator_length,
+                certified = stats.certified,
+                certified_real = stats.certified_real,
+                certified_complex = stats.certified_complex,
+                not_certified = stats.not_certified,
+            )
+            continue
+        end
+
+        stats.certified += 1
+        stats.certified_real += Int(is_real(cert))
+        stats.certified_complex += Int(is_complex(cert))
+
+        # `_ensure_leaf!` may merge neighboring leaves before returning a container
+        # leaf for the current certified interval.
+        interval = _convert_to_interval(cert; coordinate = coordinate)
+        match = _ensure_leaf!(bsp, interval)
+        leaf = IntervalTrees.Interval(first(match), last(match))
+        entries = ensure_leaf_entries!(leaf_entries_by_id, leaf)
+        # At the root these indices are global iterator positions. Later, child leaves
+        # are reindexed relative to their local leaf iterators.
+        push!(entries, BSPLeafEntry(idx, interval))
+        bsp.tree[leaf] = _leaf_count(bsp, leaf) + 1
+        update_iterator_progress!(
+            progress;
+            phase = :assignment,
+            npaths = stats.assignment_npaths,
+            target_iterator_length = stats.target_iterator_length,
+            certified = stats.certified,
+            certified_real = stats.certified_real,
+            certified_complex = stats.certified_complex,
+            not_certified = stats.not_certified,
+        )
+    end
+
+    return stats, leaf_entries_by_id
+end
+
+function collect_leaf_entries!(
+    bsp::BSPPartition,
+    leaf,
+    iter::ResultIterator,
+    cache::IteratorCertificationCache;
+    threading::Bool = Threads.nthreads() > 1,
+    max_entries::Union{Nothing,Int} = nothing,
+    certify_solution_kwargs...,
+)
+    # Revisit the iterator and keep projected intervals only for the current leaf.
+    # If `max_entries` is set, we keep a bounded reservoir sample while still counting
+    # the full size of the current leaf.
+    entries = BSPLeafEntry[]
+    !isnothing(max_entries) && sizehint!(entries, max_entries)
+    idx = 0
+    leaf_size = 0
+    register_iterator_pass!(
+        cache.progress,
+        isnothing(max_entries) ? "Recollect leaf" : "Sample leaf",
+        length(iter),
+    )
+
+    if threading && Threads.nthreads() > 1 && isnothing(max_entries) && length(iter) > 1
+        worker_count = min(Threads.nthreads(), length(iter))
+        workers = threaded_certification_data(
+            iter,
+            cache.F,
+            cache.cert_params,
+            cache.certification_cache,
+            worker_count,
+        )
+        progress_lock = ReentrantLock()
+        # The threaded path is only used for full recollection.
+        local_entries = [BSPLeafEntry[] for _ in eachindex(workers.systems)]
+        crossing_intervals = [nothing for _ in eachindex(workers.systems)]
+
+        foreach_threaded_result(
+            iter,
+            workers.trackers,
+            cache.result_predicate,
+        ) do tid, idx, selected, path_success, sol
+            Threads.atomic_add!(cache.npaths, 1)
+            @lock progress_lock begin
+                advance_iterator_progress!(cache.progress; npaths = cache.npaths[])
+            end
+            selected || return
+            path_success || return
+
+            cert = certify_solution(
+                workers.systems[tid],
+                sol,
+                workers.params[tid],
+                workers.caches[tid],
+                idx;
+                max_precision = cache.max_precision,
+                refine_solution = cache.refine_solution,
+                extended_certificate = cache.extended_certificate,
+                certify_solution_kwargs...,
+            )
+            is_certified(cert) || return
+
+            interval = _convert_to_interval(cert; coordinate = cache.coordinate)
+            if last(interval) < first(leaf) || last(leaf) < first(interval)
+                return
+            elseif first(leaf) <= first(interval) && last(interval) <= last(leaf)
+                push!(local_entries[tid], BSPLeafEntry(idx, interval))
+            elseif isnothing(crossing_intervals[tid])
+                crossing_intervals[tid] = interval
+            end
+        end
+
+        first_crossing = findfirst(!isnothing, crossing_intervals)
+        if !isnothing(first_crossing)
+            # A thread found a certified interval crossing the current BSP leaf boundary; the leaf partition is outdated for this interval, so the main task merges the affected leaves and restarts processing.
+            interval = crossing_intervals[first_crossing]
+            match = _ensure_leaf!(bsp, interval)
+            merged_leaf = IntervalTrees.Interval(first(match), last(match))
+            return BSPLeafEntry[], 0, merged_leaf, false
+        end
+
+        entries = sort!(
+            reduce(vcat, local_entries; init = BSPLeafEntry[]);
+            by = entry -> entry.index,
+        )
+        return entries, length(entries), leaf, true
+    end
+
+    for result in iter
+        idx += 1
+        Threads.atomic_add!(cache.npaths, 1)
+        advance_iterator_progress!(cache.progress; npaths = cache.npaths[])
+        cache.result_predicate(result) || continue
+        is_success(result) || continue
+
+        cert = certify_solution(
+            cache.F,
+            solution(result),
+            cache.cert_params,
+            cache.certification_cache,
+            idx;
+            max_precision = cache.max_precision,
+            refine_solution = cache.refine_solution,
+            extended_certificate = cache.extended_certificate,
+            certify_solution_kwargs...,
+        )
+        is_certified(cert) || continue
+
+        interval = _convert_to_interval(cert; coordinate = cache.coordinate)
+        # Ignore certified intervals completely outside the leaf.
+        if last(interval) < first(leaf) || last(leaf) < first(interval)
+            continue
+            # Keep certified intervals fully contained in the leaf.
+        elseif first(leaf) <= first(interval) && last(interval) <= last(leaf)
+            leaf_size += 1
+            if isnothing(max_entries)
+                # Full recollection mode: keep every entry.
+                push!(entries, BSPLeafEntry(idx, interval))
+            elseif length(entries) < max_entries
+                # Sampling mode: fill the reservoir first.
+                push!(entries, BSPLeafEntry(idx, interval))
+            else
+                # Reservoir sampling keeps a uniform random sample of the leaf entries
+                # while storing at most `max_entries` of them.
+                j = rand(1:leaf_size)
+                if j <= max_entries
+                    entries[j] = BSPLeafEntry(idx, interval)
+                end
+            end
+        else
+            # If a certified interval crosses the current cut, coarsen the BSP locally
+            # and restart the collection for the merged leaf.
+            match = _ensure_leaf!(bsp, interval)
+            merged_leaf = IntervalTrees.Interval(first(match), last(match))
+            return entries, leaf_size, merged_leaf, false
+        end
+    end
+
+    return entries, leaf_size, leaf, true
+end
+
+function _left_right_split_points(entries::Vector{BSPLeafEntry}, leaf; ε::Float64 = 1e-4)
+    isempty(entries) && return ()
+
+    # We deliberately use only one sampled certified interval here to keep the split
+    # proposal step at O(1) sampled entries, even if the geometry becomes unbalanced.
+    # The deterministic split policy is:
+    # 1. try a cut just left of the sampled interval;
+    # 2. if possible, then try a cut just right of that interval.
+    interval = entries[1].interval
+    left_gap = first(interval) - first(leaf)
+    right_gap = last(leaf) - last(interval)
+    left_split = left_gap > ε ? (first(interval) - ε) : nothing
+    right_split = right_gap > ε ? (last(interval) + ε) : nothing
+
+    if isnothing(left_split)
+        return isnothing(right_split) ? () : (right_split,)
+    elseif isnothing(right_split)
+        return (left_split,)
+    else
+        return (left_split, right_split)
+    end
+end
+
+"""
+    _random_split_point(entries, leaf; ε = 1e-4)
+
+Return one random admissible split point outside the sampled certified interval.
+If the sampled interval leaves no room for a safe split, return `nothing`.
+"""
+function _random_split_point(entries::Vector{BSPLeafEntry}, leaf; ε::Float64 = 1e-4)
+    isempty(entries) && return nothing
+
+    interval = entries[1].interval
+
+    # Sample only from the admissible part of the leaf that lies at least `ε` away
+    # from the sampled interval.
+    left_lo = first(leaf)
+    left_hi = first(interval) - ε
+    right_lo = last(interval) + ε
+    right_hi = last(leaf)
+    left_width = max(0.0, left_hi - left_lo)
+    right_width = max(0.0, right_hi - right_lo)
+    total_width = left_width + right_width
+    if total_width > 0
+        t = rand() * total_width
+        return if t < left_width
+            left_lo + t
+        else
+            right_lo + (t - left_width)
+        end
+    end
+    nothing
+end
+
+function verify_split!(
+    bsp::BSPPartition,
+    leaf,
+    split_point,
+    iter::ResultIterator,
+    cache::IteratorCertificationCache;
+    threading::Bool = Threads.nthreads() > 1,
+    certify_solution_kwargs...,
+)
+    # Check one proposed split against every certified interval in the current leaf.
+    # If the split is valid, also return the left/right partition so recursion can reuse it.
+    # So one successful verification both proves correctness of the cut and computes
+    # the child membership that later recursive calls will reuse.
+    left_entries = BSPLeafEntry[]
+    right_entries = BSPLeafEntry[]
+    left_count = 0
+    right_count = 0
+    idx = 0
+    register_iterator_pass!(cache.progress, "Leaf split", length(iter))
+
+    if threading && Threads.nthreads() > 1 && length(iter) > 1
+        worker_count = min(Threads.nthreads(), length(iter))
+        workers = threaded_certification_data(
+            iter,
+            cache.F,
+            cache.cert_params,
+            cache.certification_cache,
+            worker_count,
+        )
+        progress_lock = ReentrantLock()
+        # Workers certify and classify intervals independently. They only report three
+        # outcomes: left child, right child, or "this split/leaf cannot be used".
+        local_left_entries = [BSPLeafEntry[] for _ in eachindex(workers.systems)]
+        local_right_entries = [BSPLeafEntry[] for _ in eachindex(workers.systems)]
+        crossing_intervals = [nothing for _ in eachindex(workers.systems)]
+        invalid_split = Threads.Atomic{Bool}(false)
+
+        foreach_threaded_result(
+            iter,
+            workers.trackers,
+            cache.result_predicate,
+        ) do tid, idx, selected, path_success, sol
+            Threads.atomic_add!(cache.npaths, 1)
+            @lock progress_lock begin
+                advance_iterator_progress!(cache.progress; npaths = cache.npaths[])
+            end
+            selected || return
+            path_success || return
+
+            cert = certify_solution(
+                workers.systems[tid],
+                sol,
+                workers.params[tid],
+                workers.caches[tid],
+                idx;
+                max_precision = cache.max_precision,
+                refine_solution = cache.refine_solution,
+                extended_certificate = cache.extended_certificate,
+                certify_solution_kwargs...,
+            )
+            is_certified(cert) || return
+
+            interval = _convert_to_interval(cert; coordinate = cache.coordinate)
+            if last(interval) < first(leaf) || last(leaf) < first(interval)
+                return
+            elseif !(first(leaf) <= first(interval) && last(interval) <= last(leaf))
+                if isnothing(crossing_intervals[tid])
+                    crossing_intervals[tid] = interval
+                end
+            elseif last(interval) < split_point
+                push!(local_left_entries[tid], BSPLeafEntry(idx, interval))
+            elseif split_point < first(interval)
+                push!(local_right_entries[tid], BSPLeafEntry(idx, interval))
+            else
+                invalid_split[] = true
+            end
+        end
+
+        first_crossing = findfirst(!isnothing, crossing_intervals)
+        if !isnothing(first_crossing)
+            interval = crossing_intervals[first_crossing]
+            match = _ensure_leaf!(bsp, interval)
+            merged_leaf = IntervalTrees.Interval(first(match), last(match))
+            return (
+                valid = false,
+                left_entries = BSPLeafEntry[],
+                right_entries = BSPLeafEntry[],
+                left_count = 0,
+                right_count = 0,
+                leaf = merged_leaf,
+                stable = false,
+            )
+        elseif invalid_split[]
+            return (
+                valid = false,
+                left_entries = BSPLeafEntry[],
+                right_entries = BSPLeafEntry[],
+                left_count = 0,
+                right_count = 0,
+                leaf = leaf,
+                stable = true,
+            )
+        end
+
+        left_entries = sort!(
+            reduce(vcat, local_left_entries; init = BSPLeafEntry[]);
+            by = entry -> entry.index,
+        )
+        right_entries = sort!(
+            reduce(vcat, local_right_entries; init = BSPLeafEntry[]);
+            by = entry -> entry.index,
+        )
+        # Sorting restores iterator order before constructing child leaf iterators.
+        # This keeps threaded and serial leaf membership equivalent.
+        # Accepting a split is itself the separation certificate: every candidate in the parent leaf has been certified once with an interval lying strictly on one side of `split_point`, so true solutions assigned to different children cannot coincide even if a later recertification gives a wider interval.
+        return (
+            valid = !isempty(left_entries) && !isempty(right_entries),
+            left_entries = left_entries,
+            right_entries = right_entries,
+            left_count = length(left_entries),
+            right_count = length(right_entries),
+            leaf = leaf,
+            stable = true,
+        )
+    end
+
+    for result in iter
+        idx += 1
+        Threads.atomic_add!(cache.npaths, 1)
+        advance_iterator_progress!(cache.progress; npaths = cache.npaths[])
+        cache.result_predicate(result) || continue
+        is_success(result) || continue
+
+        cert = certify_solution(
+            cache.F,
+            solution(result),
+            cache.cert_params,
+            cache.certification_cache,
+            idx;
+            max_precision = cache.max_precision,
+            refine_solution = cache.refine_solution,
+            extended_certificate = cache.extended_certificate,
+            certify_solution_kwargs...,
+        )
+        is_certified(cert) || continue
+
+        interval = _convert_to_interval(cert; coordinate = cache.coordinate)
+        # Ignore intervals outside the leaf. This is usually redundant for a leaf
+        # iterator, but keeping it here makes the routine safe for broader iterators too.
+        if last(interval) < first(leaf) || last(leaf) < first(interval)
+            continue
+        elseif !(first(leaf) <= first(interval) && last(interval) <= last(leaf))
+            # The current BSP leaf is stale: the interval crosses an existing cut, so
+            # the caller must merge locally and restart from the larger leaf.
+            match = _ensure_leaf!(bsp, interval)
+            merged_leaf = IntervalTrees.Interval(first(match), last(match))
+            return (
+                valid = false,
+                left_entries = BSPLeafEntry[],
+                right_entries = BSPLeafEntry[],
+                left_count = 0,
+                right_count = 0,
+                leaf = merged_leaf,
+                stable = false,
+            )
+        elseif last(interval) < split_point
+            # This certified interval lies entirely in the left child.
+            left_count += 1
+            push!(left_entries, BSPLeafEntry(idx, interval))
+        elseif split_point < first(interval)
+            # This certified interval lies entirely in the right child.
+            right_count += 1
+            push!(right_entries, BSPLeafEntry(idx, interval))
+        else
+            # The proposed split cuts through a certified interval or touches one of
+            # its projected endpoints, so it is unsafe. Rejecting endpoint-touching
+            # splits keeps neighboring closed BSP leaves from sharing certified
+            # point intervals at the split boundary.
+            return (
+                valid = false,
+                left_entries = BSPLeafEntry[],
+                right_entries = BSPLeafEntry[],
+                left_count = 0,
+                right_count = 0,
+                leaf = leaf,
+                stable = true,
+            )
+        end
+    end
+    # A split with an empty child is safe but not useful, so it is reported as invalid.
+    # If it is useful, accepting the split is itself the separation certificate: every candidate in the parent leaf has been certified once with an interval lying strictly on one side of `split_point`, so true solutions assigned to different children cannot coincide even if a later recertification gives a wider interval.
+    return (
+        valid = left_count > 0 && right_count > 0,
+        left_entries = left_entries,
+        right_entries = right_entries,
+        left_count = left_count,
+        right_count = right_count,
+        leaf = leaf,
+        stable = true,
+    )
+end
+
+function stable_leaf_entries!(
+    bsp::BSPPartition,
+    leaf,
+    iter,
+    cache::IteratorCertificationCache;
+    threading::Bool = Threads.nthreads() > 1,
+    max_entries::Union{Nothing,Int} = nothing,
+    certify_solution_kwargs...,
+)
+    # Recollect one leaf until every certified interval seen in `iter` is either fully
+    # inside that leaf or outside it. If an interval crosses a current BSP cut, the leaf
+    # is merged and we immediately retry on the merged interval.
+    # This is the normalization step that turns "candidate leaf + iterator" into a
+    # locally stable leaf before we split or certify it.
+    current_leaf = leaf
+    while true
+        entries, leaf_size, updated_leaf, stable = collect_leaf_entries!(
+            bsp,
+            current_leaf,
+            iter,
+            cache;
+            threading = threading,
+            max_entries = max_entries,
+            certify_solution_kwargs...,
+        )
+        current_leaf = updated_leaf
+        stable && return entries, leaf_size, current_leaf
+    end
+end
+
+function split_leaf!(bsp::BSPPartition, leaf, split_point)
+    # Split a single leaf in place and initialize the child counts to zero.
+    left_leaf = IntervalTrees.Interval(first(leaf), split_point)
+    right_leaf = IntervalTrees.Interval(split_point, last(leaf))
+    i = findfirst(==(leaf), bsp.leaves)
+    isnothing(i) && error("Internal BSP error: leaf $leaf not found during split.")
+
+    delete!(bsp.tree, leaf)
+    delete!(bsp.unsplittable, _leaf_id(leaf))
+    bsp.tree[left_leaf] = 0
+    bsp.tree[right_leaf] = 0
+
+    bsp.leaves[i] = left_leaf
+    insert!(bsp.leaves, i + 1, right_leaf)
+    return left_leaf, right_leaf
+end
+
+function _count_distinct_certificates!(d)
+    # `d` is reused leaf-by-leaf, so this helper just summarizes the certificates
+    # currently stored for the one terminal leaf processed most recently.
+    ndistinct = 0
+    nreal = 0
+    ncomplex = 0
+    for bucket in IntervalTrees.values(d.distinct_solution_certificates.distinct_tree)
+        for cert in bucket
+            ndistinct += 1
+            nreal += Int(is_real(cert))
+            ncomplex += Int(is_complex(cert))
+        end
+    end
+    return ndistinct, nreal, ncomplex
+end
+
+function _set_leaf_count!(bsp::BSPPartition, leaf, count::Int)
+    # Once a leaf is terminal, we keep only its final count in the persistent BSP.
+    bsp.tree[leaf] = count
+    count
+end
+
+function _leaf_stats(bsp::BSPPartition, leaf_size_bound::Integer)
+    # Summarize the final BSP leaves for reporting after the full iterator pass and all
+    # local refinements have finished.
+    max_leaf_size = 0
+    oversized_leaves = 0
+    for leaf in bsp.leaves
+        count = _leaf_count(bsp, leaf)
+        max_leaf_size = max(max_leaf_size, count)
+        oversized_leaves += Int(count > leaf_size_bound)
+    end
+    return max_leaf_size, oversized_leaves
+end
+
+function certify_terminal_leaf!(
+    leaf_iter::ResultIterator,
+    cache::IteratorCertificationCache;
+    threading::Bool = Threads.nthreads() > 1,
+    certify_solution_kwargs...,
+)
+    d = cache.distinct_solutions
+    empty!(d)
+    register_iterator_pass!(cache.progress, "Certify terminal leaf", length(leaf_iter))
+
+    if threading && Threads.nthreads() > 1 && length(leaf_iter) > 1
+        worker_count = min(Threads.nthreads(), length(leaf_iter))
+        workers = threaded_certification_data(
+            leaf_iter,
+            cache.F,
+            cache.cert_params,
+            cache.certification_cache,
+            worker_count,
+        )
+        progress_lock = ReentrantLock()
+        # Certification of individual candidates is independent and can be threaded.
+        # Insertion into the distinct-certificate set is done serially, because it compares certificates against each other.
+        local_certs = [AbstractSolutionCertificate[] for _ in eachindex(workers.systems)]
+        local_target_iterator_length = Threads.Atomic{Int}(0)
+
+        foreach_threaded_result(
+            leaf_iter,
+            workers.trackers,
+            Returns(true),
+        ) do tid, idx, selected, path_success, sol
+            Threads.atomic_add!(cache.npaths, 1)
+            @lock progress_lock begin
+                advance_iterator_progress!(cache.progress; npaths = cache.npaths[])
+            end
+            selected || return
+            path_success || return
+
+            Threads.atomic_add!(local_target_iterator_length, 1)
+            cert = certify_solution(
+                workers.systems[tid],
+                sol,
+                workers.params[tid],
+                workers.caches[tid],
+                idx;
+                max_precision = cache.max_precision,
+                refine_solution = cache.refine_solution,
+                extended_certificate = cache.extended_certificate,
+                certify_solution_kwargs...,
+            )
+            push!(local_certs[tid], cert)
+        end
+
+        certs = sort!(
+            reduce(vcat, local_certs; init = AbstractSolutionCertificate[]);
+            by = cert -> something(certificate_index(cert), 0),
+        )
+        for cert in certs
+            is_certified(cert) || continue
+            # Distinctness is the non-threaded part of the terminal leaf pass.
+            added, _ = add_certificate!(d.distinct_solution_certificates, cert)
+            record_add_solution_result!(d, added ? :certified_distinct : :duplicate)
+        end
+        return local_target_iterator_length[]
+    end
+
+    local_target_iterator_length = 0
+    for result in leaf_iter
+        Threads.atomic_add!(cache.npaths, 1)
+        advance_iterator_progress!(cache.progress; npaths = cache.npaths[])
+        if is_success(result)
+            local_target_iterator_length += 1
+            add_solution!(
+                d,
+                solution(result),
+                local_target_iterator_length,
+                1;
+                max_precision = cache.max_precision,
+                refine_solution = cache.refine_solution,
+                extended_certificate = cache.extended_certificate,
+                certify_solution_kwargs...,
+            )
+        end
+    end
+    return local_target_iterator_length
+end
+
+"""
+    handle_split_verification!(
+        verification, leaf_iter, split_point, bsp, current_leaf, iter,
+        cache; kwargs...
+    )
+
+Handle the result of verifying one proposed BSP split.
+
+Returns a named tuple with one of three statuses:
+* `status = :invalid`: the split was rejected and refinement should try another cut.
+* `status = :restart`: certification found that `current_leaf` must be merged with neighboring BSP leaves; the returned `entries`, `leaf_size`, and `current_leaf` are the stable data for the merged leaf.
+* `status = :done`: the split was accepted, both child leaves were processed recursively, and `counts` contains the aggregate distinct-solution counts.
+"""
+function handle_split_verification!(
+    verification,
+    leaf_iter::ResultIterator,
+    split_point,
+    bsp::BSPPartition,
+    current_leaf,
+    iter::ResultIterator,
+    cache::IteratorCertificationCache;
+    threading::Bool = Threads.nthreads() > 1,
+    depth::Int = 0,
+    certify_solution_kwargs...,
+)
+    if !verification.stable
+        entries, leaf_size, current_leaf = stable_leaf_entries!(
+            bsp,
+            verification.leaf,
+            iter,
+            cache;
+            threading = threading,
+            max_entries = nothing,
+            certify_solution_kwargs...,
+        )
+        return (
+            status = :restart,
+            entries = entries,
+            leaf_size = leaf_size,
+            current_leaf = current_leaf,
+        )
+    elseif verification.valid
+        # Reuse the partition computed during verification. Each child gets its own
+        # leaf iterator, so recursion never has to rediscover which entries belong
+        # to the left/right subtree.
+        # The verification output is still indexed relative to `leaf_iter`, so we
+        # reindex it before passing it to the child recursion.
+        left_leaf, right_leaf = split_leaf!(bsp, current_leaf, split_point)
+        live_splits = Threads.atomic_add!(cache.nleaf_splits, 1) + 1
+        update_iterator_progress!(
+            cache.progress;
+            nleaf_splits = live_splits,
+            total_leaves = length(bsp.leaves),
+        )
+        left_iter = _leaf_iterator(leaf_iter, verification.left_entries)
+        right_iter = _leaf_iterator(leaf_iter, verification.right_entries)
+        left_entries = reindex_leaf_entries(verification.left_entries)
+        right_entries = reindex_leaf_entries(verification.right_entries)
+        left_counts = process_leaf!(
+            bsp,
+            left_leaf,
+            left_iter,
+            cache;
+            threading = threading,
+            depth = depth + 1,
+            initial_entries = left_entries,
+            certify_solution_kwargs...,
+        )
+        right_counts = process_leaf!(
+            bsp,
+            right_leaf,
+            right_iter,
+            cache;
+            threading = threading,
+            depth = depth + 1,
+            initial_entries = right_entries,
+            certify_solution_kwargs...,
+        )
+        return (
+            status = :done,
+            counts = (
+                distinct_certified = left_counts.distinct_certified +
+                                     right_counts.distinct_certified,
+                distinct_real = left_counts.distinct_real + right_counts.distinct_real,
+                distinct_complex = left_counts.distinct_complex +
+                                   right_counts.distinct_complex,
+                nleaf_splits = left_counts.nleaf_splits + right_counts.nleaf_splits + 1,
+                rightmost_leaf = right_counts.rightmost_leaf,
+            ),
+        )
+    end
+    return (status = :invalid,)
+end
+
+"""
+    process_leaf!(
+        bsp, leaf, iter, cache; initial_entries = nothing, kwargs...
+    )
+
+Process one BSP leaf using an iterator that is local to that leaf.
+
+The routine tries to split oversized leaves using certified intervals in the chosen coordinate. Each child is processed recursively with its own leaf iterator. If the leaf is terminal, the routine certifies only that leaf and performs the distinct-solution check.
+
+Returns a named tuple with distinct-solution counts for this leaf subtree, the number of refinement steps, and the rightmost BSP leaf processed.
+"""
+function process_leaf!(
+    bsp::BSPPartition,
+    leaf,
+    iter::ResultIterator,
+    cache::IteratorCertificationCache;
+    threading::Bool = Threads.nthreads() > 1,
+    depth::Int = 0,
+    initial_entries::Union{Nothing,Vector{BSPLeafEntry}} = nothing,
+    certify_solution_kwargs...,
+)
+    if !isnothing(cache.progress)
+        update_iterator_progress!(
+            cache.progress;
+            total_leaves = length(bsp.leaves),
+            depth = max(cache.progress.depth, depth),
+        )
+    end
+    # Process one leaf subtree depth-first so only the current branch lives in memory.
+    # Step 1: stabilize the current leaf with a tiny sample so we can cheaply decide
+    # whether this subtree needs further refinement at all.
+    if isnothing(initial_entries)
+        entries, leaf_size, current_leaf = stable_leaf_entries!(
+            bsp,
+            leaf,
+            iter,
+            cache;
+            threading = threading,
+            max_entries = 1,
+            certify_solution_kwargs...,
+        )
+    else
+        entries = initial_entries
+        leaf_size = length(entries)
+        current_leaf = leaf
+    end
+    update_iterator_progress!(cache.progress; total_leaves = length(bsp.leaves))
+
+    if leaf_size > cache.leaf_size_bound && depth < cache.max_depth
+        # Step 2: this leaf is oversized, so recollect the full local leaf and work
+        # only with the corresponding leaf iterator from here on.
+        if isnothing(initial_entries)
+            entries, leaf_size, current_leaf = stable_leaf_entries!(
+                bsp,
+                current_leaf,
+                iter,
+                cache;
+                threading = threading,
+                max_entries = nothing,
+                certify_solution_kwargs...,
+            )
+        end
+        split_attempts = 0
+        while split_attempts < 8
+            split_attempts += 1
+
+            # Restrict all split checks to the current leaf instead of rescanning the
+            # parent iterator. Entry indices remain relative to `leaf_iter`.
+            # This is the key optimization: once we know the current leaf membership,
+            # all later work happens on a sparse subiterator for that leaf only.
+            leaf_iter = _leaf_iterator(iter, entries)
+            deterministic_points =
+                _left_right_split_points(entries, current_leaf; ε = cache.ε)
+            restart_from_merged_leaf = false
+            for split_point in deterministic_points
+                # Try the deterministic split candidates first.
+                verification = verify_split!(
+                    bsp,
+                    current_leaf,
+                    split_point,
+                    leaf_iter,
+                    cache;
+                    threading = threading,
+                    certify_solution_kwargs...,
+                )
+
+                split_result = handle_split_verification!(
+                    verification,
+                    leaf_iter,
+                    split_point,
+                    bsp,
+                    current_leaf,
+                    iter,
+                    cache;
+                    threading = threading,
+                    depth = depth,
+                    certify_solution_kwargs...,
+                )
+                if split_result.status === :restart
+                    entries = split_result.entries
+                    leaf_size = split_result.leaf_size
+                    current_leaf = split_result.current_leaf
+                    restart_from_merged_leaf = true
+                    break
+                elseif split_result.status === :done
+                    return split_result.counts
+                end
+            end
+
+            restart_from_merged_leaf && continue
+            if isempty(deterministic_points)
+                # If the sampled interval leaves no deterministic gap, try one random cut
+                # in the remaining admissible region before giving up on splitting.
+                random_split = _random_split_point(entries, current_leaf; ε = cache.ε)
+                isnothing(random_split) && break
+                verification = verify_split!(
+                    bsp,
+                    current_leaf,
+                    random_split,
+                    leaf_iter,
+                    cache;
+                    threading = threading,
+                    certify_solution_kwargs...,
+                )
+
+                split_result = handle_split_verification!(
+                    verification,
+                    leaf_iter,
+                    random_split,
+                    bsp,
+                    current_leaf,
+                    iter,
+                    cache;
+                    threading = threading,
+                    depth = depth,
+                    certify_solution_kwargs...,
+                )
+                if split_result.status === :restart
+                    entries = split_result.entries
+                    leaf_size = split_result.leaf_size
+                    current_leaf = split_result.current_leaf
+                    continue
+                elseif split_result.status === :done
+                    return split_result.counts
+                end
+            end
+
+            leaf_size ≤ cache.leaf_size_bound && break
+            if !isempty(deterministic_points)
+                # Only after both deterministic tries fail do we spend one extra pass on
+                # a random admissible cut.
+                random_split = _random_split_point(entries, current_leaf; ε = cache.ε)
+                if !isnothing(random_split)
+                    verification = verify_split!(
+                        bsp,
+                        current_leaf,
+                        random_split,
+                        leaf_iter,
+                        cache;
+                        threading = threading,
+                        certify_solution_kwargs...,
+                    )
+
+                    split_result = handle_split_verification!(
+                        verification,
+                        leaf_iter,
+                        random_split,
+                        bsp,
+                        current_leaf,
+                        iter,
+                        cache;
+                        threading = threading,
+                        depth = depth,
+                        certify_solution_kwargs...,
+                    )
+                    if split_result.status === :restart
+                        entries = split_result.entries
+                        leaf_size = split_result.leaf_size
+                        current_leaf = split_result.current_leaf
+                        continue
+                    elseif split_result.status === :done
+                        return split_result.counts
+                    end
+                end
+            end
+            break
+        end
+        # No safe gap exists in the chosen projection, so this leaf becomes terminal.
+        # We remember that explicitly so the final result can distinguish "oversized
+        # because unsplittable in this projection" from "oversized because unchecked".
+        leaf_size > cache.leaf_size_bound && push!(bsp.unsplittable, _leaf_id(current_leaf))
+    end
+
+    # From here on we treat the leaf as terminal, either because it is small enough or
+    # because refinement stopped without finding a useful split.
+    _set_leaf_count!(bsp, current_leaf, leaf_size)
+    if isempty(entries)
+        processed = Threads.atomic_add!(cache.processed_leaves, 1) + 1
+        update_iterator_progress!(
+            cache.progress;
+            processed_leaves = processed,
+            total_leaves = length(bsp.leaves),
+        )
+        return (
+            distinct_certified = 0,
+            distinct_real = 0,
+            distinct_complex = 0,
+            nleaf_splits = 0,
+            rightmost_leaf = current_leaf,
+        )
+    end
+
+    # Optionally leave oversized terminal leaves uncertified while still recording
+    # their size in the final BSP summary.
+    if leaf_size > cache.leaf_size_bound && !cache.certify_oversized_leaves
+        processed = Threads.atomic_add!(cache.processed_leaves, 1) + 1
+        update_iterator_progress!(
+            cache.progress;
+            processed_leaves = processed,
+            total_leaves = length(bsp.leaves),
+        )
+        return (
+            distinct_certified = 0,
+            distinct_real = 0,
+            distinct_complex = 0,
+            nleaf_splits = 0,
+            rightmost_leaf = current_leaf,
+        )
+    end
+
+    # Before final joint certification, recollect the full terminal leaf. The
+    # one-entry sample above is only for proposing memory-bounded splits.
+    if !isempty(entries) && isnothing(initial_entries)
+        entries, leaf_size, current_leaf = stable_leaf_entries!(
+            bsp,
+            current_leaf,
+            iter,
+            cache;
+            threading = threading,
+            max_entries = nothing,
+            certify_solution_kwargs...,
+        )
+    end
+
+    # Step 4: the leaf is terminal. Revisit only the current leaf and add its
+    # certified solutions to `d`; the distinct check itself stays serial.
+    leaf_iter = _leaf_iterator(iter, entries)
+    local_target_iterator_length = certify_terminal_leaf!(
+        leaf_iter,
+        cache;
+        threading = threading,
+        certify_solution_kwargs...,
+    )
+    local_target_iterator_length == length(entries) || error(
+        "Re-tracking a BSP leaf produced a target iterator of length $local_target_iterator_length for " *
+        "$(length(entries)) expected entries.",
+    )
+
+    # Distinct counts can be summed across terminal leaves because different leaves
+    # are disjoint in the chosen projected coordinate.
+    ndistinct, nreal, ncomplex = _count_distinct_certificates!(cache.distinct_solutions)
+    processed = Threads.atomic_add!(cache.processed_leaves, 1) + 1
+    update_iterator_progress!(
+        cache.progress;
+        processed_leaves = processed,
+        total_leaves = length(bsp.leaves),
+    )
+    return (
+        distinct_certified = ndistinct,
+        distinct_real = nreal,
+        distinct_complex = ncomplex,
+        nleaf_splits = 0,
+        rightmost_leaf = current_leaf,
+    )
+end
+
+function _leaf_indices(iter::ResultIterator, entries::Vector{BSPLeafEntry})
+    # We sort the live leaf vector in place here and rely on the same order later in
+    # the terminal certification step when pairing recollected solutions back with their
+    # leaf entries.
+    sort!(entries; by = entry -> entry.index)
+    current_indices = indices(iter)
+    current_bitmask = bitmask(iter)
+    # The leaf indices live in the output index space of `iter`.
+    # For an unfiltered iterator this is just `1:length(iter)`. For filtered iterators
+    # we map those output indices back to the underlying start indices without
+    # allocating a dense mask of length `length(iter)`.
+    selected = Int[]
+    sizehint!(selected, length(entries))
+
+    if !isnothing(current_indices)
+        for entry in entries
+            push!(selected, current_indices[entry.index])
+        end
+        return selected
+    elseif isnothing(current_bitmask)
+        for entry in entries
+            push!(selected, entry.index)
+        end
+        return selected
+    end
+
+    target = 1
+    yielded_index = 0
+    for start_index in eachindex(current_bitmask)
+        current_bitmask[start_index] || continue
+        yielded_index += 1
+        # Compose the leaf selection with the current bitmask by walking through the
+        # indices that the filtered iterator would actually yield.
+        if target > length(entries)
+            break
+        elseif yielded_index == entries[target].index
+            push!(selected, start_index)
+            target += 1
+        end
+    end
+    return selected
+end
+
+function _leaf_iterator(iter::ResultIterator, entries::Vector{BSPLeafEntry})
+    # Build a sparse subiterator so recollecting one BSP leaf only retracks the
+    # selected paths instead of rescanning the full iterator.
+    # This is what makes the refinement phase scale with the current leaf size rather
+    # than the size of the original iterator.
+    ResultIterator(
+        start_solutions(iter),
+        solver(iter);
+        indices = _leaf_indices(iter, entries),
+    )
+end
+
+"""
+    certify(F, iter::ResultIterator, [p, cache]; options)
+
+Certify a `ResultIterator` without materializing all solutions at once by using a binary spatial partition of the real line. Returns a [`IteratorCertificationResult`](@ref).
+
+The algorithm works in two phases:
+1. stream through the iterator, certify each successful result, and place the certified
+   interval into a BSP leaf using the real part of the chosen coordinate;
+2. iteratively refine heavy leaves until every splittable leaf contains at most `leaf_size_bound`
+   entries, then revisit the iterator leaf-by-leaf and certify only the solutions
+   belonging to that leaf jointly.
+For more details of the implementation see [^BBK26].
+## Options
+
+* `show_progress = true`: If `true` shows a progress meter for the BSP certification.
+* `threading = true`: If `true`, independent iterator certification passes are threaded. Leafwise distinct-solution checks are always performed serially.
+* `max_precision = 256`: The maximal accuracy (in bits) that is used in the certification process.
+* `compile = false`: See the [`solve`](@ref) documentation.
+* `leaf_size_bound = 50.000`: the algorithm tries to split the real line into leaves each containing at most `leaf_size_bound` solutions.
+* `certify_oversized_leaves = false`: if a leaf contains more than `leaf_size_bound` solutions, only certify it when `certify_oversized_leaves` is true.
+* `ε = 1e-4`: when proposing a split from one sampled certified interval, place the split at distance `ε` from that interval.
+* `coordinate = 1`: the coordinate of the solutions we project to to compute the binary spatial partition tree.
+* `boundaries = -100:0.1:100`: the initial boundaries of the spatial partition.
+* `max_depth = 100`: the maximal depth the tree is allowed to have when we split leaves to get all leaves containing at most `leaf_size_bound` solutions.
+
+[^BBK26]: Breiding, P., Brysiewicz, T. and Johnson, D. K. "Low-Memory Numerical Certification." arXiv:2604.16623.
+"""
+
+function _certify_iterator_bsp(
+    iter::ResultIterator,
+    F::AbstractSystem,
+    cert_params,
+    certification_cache::CertificationCache;
+    show_progress::Bool = true,
+    leaf_size_bound::Integer = 50000,
+    certify_oversized_leaves::Bool = false,
+    threading::Bool = Threads.nthreads() > 1,
+    ε::Float64 = 1e-4,
+    coordinate::Int = 1,
+    boundaries = -100:0.1:100,
+    max_depth::Int = 500,
+    check_oversized_leaves::Bool = true,
+    max_precision::Int = 256,
+    refine_solution::Bool = true,
+    extended_certificate::Bool = false,
+    result_predicate::Function = Returns(true),
+    certify_solution_kwargs...,
+)
+    check_iterator_certify_options(
+        F;
+        ε = ε,
+        coordinate = coordinate,
+        leaf_size_bound = leaf_size_bound,
+        boundaries = boundaries,
+        max_depth = max_depth,
+    )
+    bsp = _build_partition(boundaries)
+    start_iter_length = length(start_solutions(iter))
+    iter_length = length(iter)
+    progress = show_progress ? make_iterator_certification_progress() : nothing
+    update_iterator_progress!(
+        progress;
+        start_iterator_length = start_iter_length,
+        max_depth = max_depth,
+        force = true,
+    )
+    # First pass over the full iterator: assign certified intervals to the coarse BSP.
+    assignment_stats, leaf_entries_by_id = assign_initial_leaves!(
+        bsp,
+        iter,
+        F,
+        cert_params,
+        certification_cache;
+        progress = progress,
+        threading = threading,
+        coordinate = coordinate,
+        max_precision = max_precision,
+        refine_solution = refine_solution,
+        extended_certificate = extended_certificate,
+        result_predicate = result_predicate,
+        certify_solution_kwargs...,
+    )
+
+    distinct_certified = 0
+    distinct_real = 0
+    distinct_complex = 0
+    params = isnothing(cert_params) ? nothing : complexF64_params(cert_params)
+    d = DistinctCertifiedSolutions(F, params; extended_certificate = extended_certificate)
+    cache = IteratorCertificationCache(;
+        F = F,
+        cert_params = cert_params,
+        certification_cache = certification_cache,
+        distinct_solutions = d,
+        progress = progress,
+        leaf_size_bound = Int(leaf_size_bound),
+        certify_oversized_leaves = certify_oversized_leaves,
+        ε = ε,
+        coordinate = coordinate,
+        max_depth = max_depth,
+        max_precision = max_precision,
+        refine_solution = refine_solution,
+        extended_certificate = extended_certificate,
+        result_predicate = result_predicate,
+        npaths = Threads.Atomic{Int}(assignment_stats.assignment_npaths),
+        nleaf_splits = Threads.Atomic{Int}(0),
+        processed_leaves = Threads.Atomic{Int}(0),
+    )
+
+    nleaf_splits = 0
+    i = 1
+    while i <= length(bsp.leaves)
+        update_iterator_progress!(
+            progress;
+            phase = :refinement,
+            npaths = cache.npaths[],
+            target_iterator_length = assignment_stats.target_iterator_length,
+            certified = assignment_stats.certified,
+            certified_real = assignment_stats.certified_real,
+            certified_complex = assignment_stats.certified_complex,
+            not_certified = assignment_stats.not_certified,
+            processed_leaves = cache.processed_leaves[],
+            total_leaves = length(bsp.leaves),
+            distinct_certified = distinct_certified,
+            distinct_real = distinct_real,
+            distinct_complex = distinct_complex,
+            nleaf_splits = nleaf_splits,
+        )
+        # Walk the current leaf partition from left to right. Processing one leaf may
+        # split it into a whole local subtree, so we resume after the rightmost child.
+        leaf = bsp.leaves[i]
+        # `leaf_entries_by_id` stores the root-level membership found during the first pass.
+        # We immediately turn that into a leaf-local iterator and recurse only inside
+        # that sparse iterator from here on.
+        leaf_entries = get(leaf_entries_by_id, _leaf_id(leaf), BSPLeafEntry[])
+        if isempty(leaf_entries)
+            processed = Threads.atomic_add!(cache.processed_leaves, 1) + 1
+            update_iterator_progress!(
+                progress;
+                processed_leaves = processed,
+                total_leaves = length(bsp.leaves),
+            )
+            i += 1
+            continue
+        end
+        leaf_iter = _leaf_iterator(iter, leaf_entries)
+        local_entries = reindex_leaf_entries(leaf_entries)
+        counts = process_leaf!(
+            bsp,
+            leaf,
+            leaf_iter,
+            cache;
+            threading = threading,
+            initial_entries = local_entries,
+            certify_solution_kwargs...,
+        )
+        distinct_certified += counts.distinct_certified
+        distinct_real += counts.distinct_real
+        distinct_complex += counts.distinct_complex
+        nleaf_splits += counts.nleaf_splits
+        rightmost_index = findfirst(==(counts.rightmost_leaf), bsp.leaves)
+        isnothing(rightmost_index) && error(
+            "Internal BSP error: processed leaf $(counts.rightmost_leaf) disappeared.",
+        )
+        i = rightmost_index + 1
+    end
+
+    max_leaf_size, oversized_leaves = _leaf_stats(bsp, leaf_size_bound)
+    if oversized_leaves > 0 && !check_oversized_leaves
+        oversized_leaves = 0
+    end
+
+    res = IteratorCertificationResult(;
+        bsp = bsp,
+        start_iterator_length = start_iter_length,
+        npaths = cache.npaths[],
+        target_iterator_length = assignment_stats.target_iterator_length,
+        certified = assignment_stats.certified,
+        certified_real = assignment_stats.certified_real,
+        certified_complex = assignment_stats.certified_complex,
+        not_certified = assignment_stats.not_certified,
+        distinct_certified = distinct_certified,
+        distinct_real = distinct_real,
+        distinct_complex = distinct_complex,
+        nleaves = length(bsp.leaves),
+        max_leaf_size = max_leaf_size,
+        oversized_leaves = oversized_leaves,
+        unsplittable_leaves = length(bsp.unsplittable),
+        nleaf_splits = nleaf_splits,
+    )
+
+    update_iterator_progress!(
+        progress;
+        phase = :finished,
+        npaths = cache.npaths[],
+        target_iterator_length = assignment_stats.target_iterator_length,
+        certified = assignment_stats.certified,
+        certified_real = assignment_stats.certified_real,
+        certified_complex = assignment_stats.certified_complex,
+        not_certified = assignment_stats.not_certified,
+        processed_leaves = cache.processed_leaves[],
+        total_leaves = length(bsp.leaves),
+        distinct_certified = distinct_certified,
+        distinct_real = distinct_real,
+        distinct_complex = distinct_complex,
+        nleaf_splits = nleaf_splits,
+        finish = true,
+    )
+
+    return res
+end
+
+function certify(
+    F::System,
+    iter::ResultIterator,
+    args...;
+    compile::Union{Bool,Symbol} = false,
+    kwargs...,
+)
+    certify(fixed(F; compile = compile), iter, args...; kwargs...)
+end
+
+_as_result_iterator(iter::ResultIterator) = (iter = iter, result_predicate = Returns(true))
+function _as_result_iterator(iter::Base.Iterators.Filter)
+    base = _as_result_iterator(iter.itr)
+    return (
+        iter = base.iter,
+        result_predicate = result -> base.result_predicate(result) && iter.flt(result),
+    )
+end
+_as_result_iterator(iter) = throw(
+    ArgumentError(
+        "`certify` only supports filtered iterators that are ultimately built from a `ResultIterator`; got $(typeof(iter)).",
+    ),
+)
+
+function certify(
+    F::System,
+    iter::Base.Iterators.Filter,
+    args...;
+    compile::Union{Bool,Symbol} = false,
+    kwargs...,
+)
+    base = _as_result_iterator(iter)
+    certify(
+        fixed(F; compile = compile),
+        base.iter,
+        args...;
+        result_predicate = base.result_predicate,
+        kwargs...,
+    )
+end
+
+function certify(F::AbstractSystem, iter::Base.Iterators.Filter, args...; kwargs...)
+    base = _as_result_iterator(iter)
+    certify(F, base.iter, args...; result_predicate = base.result_predicate, kwargs...)
+end
+
+function certify(
+    F::AbstractSystem,
+    iter::ResultIterator,
+    p::Union{Nothing,AbstractArray} = nothing,
+    cache::CertificationCache = CertificationCache(F);
+    target_parameters = nothing,
+    max_precision::Int = 256,
+    kwargs...,
+)
+    cert_params =
+        certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
+    _certify_iterator_bsp(
+        iter,
+        F,
+        cert_params,
+        cache;
+        max_precision = max_precision,
+        kwargs...,
+    )
 end

@@ -27,26 +27,16 @@
         N = nid(F; threading = false, show_progress = false)
         @test isa(N, NumericalIrreducibleDecomposition)
 
-        # seed
-        s = 0x42c9d504
-        N = nid(F; seed = s, show_progress = false)
-        @test seed(N) == s
-
-        N = nid(F; seed = nothing, show_progress = false)
-        @test isnothing(seed(N))
-
         # bad seed
-        N = nid(F; seed = 0xc770fa47, show_progress = false)
+        s = UInt32(62)
+        N = nid(F; seed = s, show_progress = false)
         degs = degrees(N)
+        @test seed(N) == s
         @test degs[2] == [2]
         @test degs[1] == [4, 4]
 
-
-        N = nid(F; show_monodromy_progress = true, show_progress = false)
-        @test isa(N, NumericalIrreducibleDecomposition)
-
-        N = nid(F; warning = false, show_progress = false)
-        @test isa(N, NumericalIrreducibleDecomposition)
+        N = nid(F; seed = nothing, show_progress = false)
+        @test isnothing(seed(N))
 
         # options
         N_fails = nid(
@@ -58,29 +48,32 @@
 
         N2 = nid(
             F;
-            tracker_options = TrackerOptions(; extended_precision = false),
+            monodromy_options = MonodromyOptions(; trace_test_tol = 1e-5),
             show_progress = false,
         )
         @test isa(N2, NumericalIrreducibleDecomposition)
 
-        N3 = nid(
-            F;
-            monodromy_options = MonodromyOptions(; trace_test_tol = 1e-5),
-            show_progress = false,
-        )
-        @test isa(N3, NumericalIrreducibleDecomposition)
+        N = nid(F; show_monodromy_progress = true, show_progress = false)
+        @test isa(N, NumericalIrreducibleDecomposition)
+
+        N = nid(F; warning = false, show_progress = false)
+        @test isa(N, NumericalIrreducibleDecomposition)
 
         # number of components
-        @test ncomponents(N3) == 11
-        @test ncomponents(N3, dims = [1, 2]) == 3
-        @test ncomponents(N3, 1) == 2
-        @test n_components(N3) == 11
-        @test n_components(N3, dims = [1, 2]) == 3
-        @test n_components(N3, 1) == 2
+        @test ncomponents(N2) == 11
+        @test ncomponents(N2, dims = [1, 2]) == 3
+        @test ncomponents(N2, 1) == 2
+        @test n_components(N2) == 11
+        @test n_components(N2, dims = [1, 2]) == 3
+        @test n_components(N2, 1) == 2
+    end
 
-        # max_codim = 1
-        N4 = nid(F; max_codim = 1, show_progress = false)
-        @test isa(N4, NumericalIrreducibleDecomposition)
+    @testset "randomization" begin
+        @var x y
+        f = System([(x - 1)^2; x - 1], variables = [x, y])
+        N = nid(f; sorted = :randomized, show_progress = false)
+        degs = degrees(N)
+        @test degs[1] == [1]
     end
 
     @testset "rational systems" begin
@@ -119,6 +112,23 @@
         N_Curve = nid(Curve, show_progress = false)
         @test degrees(N_Curve) == Dict(1 => [6])
         @test ncomponents(N_Curve) == 1
+    end
+
+    @testset "Homogeneous systems" begin
+        @var x[1:4]
+
+        a = x[1]^2 + x[2]^2 + x[3]^2 + x[4]^2
+        b = x[1]^3 + x[2]^3 + 2x[3]^3 + 3x[4]^3
+        c = x[1]^4 + 2x[2]^4 + 4x[3]^4 - x[4]^4
+        G = System([a * c; b * c]; variables = x)
+        N = nid(G; show_progress = false)
+        @test degrees(N) == Dict(2 => [4], 1 => [6])
+        @test ncomponents(N) == 2
+
+        Ws = witness_sets(N)
+        W1, W2 = Ws[1][1], Ws[2][1]
+        @test all(W -> W.projective, [W1; W2])
+        @test all(W -> is_linear(linear_subspace(W)), [W1; W2])
     end
 
     @testset "Overdetermined Test" begin

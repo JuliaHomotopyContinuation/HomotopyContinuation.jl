@@ -8,14 +8,22 @@
 
     # Arity 1
     OP_CB # a ^ 3 TODO
+    OP_ACOS # cos^-1(a)
+    OP_ASIN # sin^-1(a)
     OP_COS # cos(a)
+    OP_COSH # cosh(a)
+    OP_EXP # e^a
     OP_INV # 1 / a
     OP_INV_NOT_ZERO # a ≂̸ 0 ? 1 / a : a
     OP_INVSQR # 1 / a^2
+    OP_LOG # log(a)
     OP_NEG # -a
     OP_SIN # sin(a)
+    OP_SINH # sinh(a)
     OP_SQR # a ^ 2
-    OP_SQRT # √(a) TODO
+    OP_SQRT # √(a)
+    OP_TAN # tan(a)
+    OP_TANH # tanh(a)
     OP_IDENTITY # a
 
     # Arity 2
@@ -25,18 +33,18 @@
     OP_SUB # a - b
 
     OP_POW_INT # a ^ p where p isa Integer
-    # OP_POW # a ^ b where b isa Number
+    OP_POW # a ^ b where b isa Number
 
     # Arity 3
     OP_ADD3 # a + b + c
-    OP_MUL3 # a * b * c TODO
+    OP_MUL3 # a * b * c
     OP_MULADD # a * b + c
     OP_MULSUB # a * b - c
     OP_SUBMUL # c - a * b
 
     # Arity 4
     OP_ADD4 # a + b + c + d
-    OP_MUL4 # a * b * c * d TODO
+    OP_MUL4 # a * b * c * d
     OP_MULMULADD # a * b + c * d
     OP_MULMULSUB # a * b - c * d
 end
@@ -44,23 +52,31 @@ end
 function arity(op_type::OpType)
     if op_type === OP_STOP
         0
-    elseif op_type == OP_CB ||
+    elseif op_type == OP_ACOS ||
+           op_type == OP_ASIN ||
+           op_type == OP_CB ||
            op_type == OP_COS ||
+           op_type == OP_COSH ||
+           op_type == OP_EXP ||
            op_type == OP_IDENTITY ||
            op_type == OP_INV ||
            op_type == OP_INV_NOT_ZERO ||
            op_type == OP_INVSQR ||
+           op_type == OP_LOG ||
            op_type == OP_NEG ||
            op_type == OP_SIN ||
+           op_type == OP_SINH ||
            op_type == OP_SQR ||
-           op_type == OP_SQRT
+           op_type == OP_SQRT ||
+           op_type == OP_TAN ||
+           op_type == OP_TANH
         1
     elseif op_type == OP_ADD ||
            op_type == OP_DIV ||
            op_type == OP_MUL ||
            op_type == OP_SUB ||
-           op_type == OP_POW_INT
-        # || op_type == OP_POW
+           op_type == OP_POW_INT ||
+           op_type == OP_POW
         2
     elseif op_type == OP_ADD3 ||
            op_type == OP_MUL3 ||
@@ -84,10 +100,18 @@ function op_call(op_type::OpType)
         :op_stop
 
         # Arity 1
+    elseif op_type == OP_ACOS
+        :op_acos
+    elseif op_type == OP_ASIN
+        :op_asin
     elseif op_type == OP_CB
         :op_cb
     elseif op_type == OP_COS
         :op_cos
+    elseif op_type == OP_COSH
+        :op_cosh
+    elseif op_type == OP_EXP
+        :op_exp
     elseif op_type == OP_IDENTITY
         :op_identity
     elseif op_type == OP_INV
@@ -96,14 +120,22 @@ function op_call(op_type::OpType)
         :op_inv_not_zero
     elseif op_type == OP_INVSQR
         :op_invsqr
+    elseif op_type == OP_LOG
+        :op_log
     elseif op_type == OP_NEG
         :op_neg
     elseif op_type == OP_SIN
         :op_sin
+    elseif op_type == OP_SINH
+        :op_sinh
     elseif op_type == OP_SQR
         :op_sqr
     elseif op_type == OP_SQRT
         :op_sqrt
+    elseif op_type == OP_TAN
+        :op_tan
+    elseif op_type == OP_TANH
+        :op_tanh
 
 
         # Arity 2
@@ -118,8 +150,8 @@ function op_call(op_type::OpType)
 
     elseif op_type == OP_POW_INT
         :op_pow_int
-        # elseif op_type == OP_POW
-        #     :op_pow
+    elseif op_type == OP_POW
+        :op_pow
 
         # Arity 3
     elseif op_type == OP_ADD3
@@ -155,6 +187,8 @@ end
 # arity 0
 op_stop() = nothing
 # arity 1
+op_acos(x) = acos(x)
+op_asin(x) = asin(x)
 
 # Generic fallback: 2 complex multiplications (8 real muls)
 op_cb(x) = x * x * x
@@ -171,6 +205,8 @@ end
     Complex((x + y) * (x - y), (x + x) * y)
 end
 op_cos(x) = cos(x)
+op_cosh(x) = cosh(x)
+op_exp(x) = exp(x)
 op_identity(x) = identity(x)
 op_inv(x) = inv(x)
 op_inv(x::Complex) = Base.FastMath.inv_fast(x)
@@ -181,10 +217,14 @@ Invert x unless it is 0, then return 0.
 """
 op_inv_not_zero(x) = ifelse(is_zero(x), x, op_inv(x))
 op_invsqr(x) = op_sqr(op_inv(x))
+op_log(x) = log(x)
 op_neg(x) = -x
 op_sin(x) = sin(x)
+op_sinh(x) = sinh(x)
 op_sqr(x) = x * x
 op_sqrt(x) = sqrt(x)
+op_tan(x) = tan(x)
+op_tanh(x) = tanh(x)
 
 # arity 2
 op_add(a, b) = a + b
