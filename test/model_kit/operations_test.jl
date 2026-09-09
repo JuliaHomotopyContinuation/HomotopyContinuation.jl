@@ -57,3 +57,18 @@
     end
 
 end
+
+@testset "Integer Taylor powers with zero constant coefficient" begin
+    for pow in (ModelKit.taylor_op_pow_int, ModelKit.taylor_op_pow)
+        for r in (0, 1, 2, 5, 8)
+            expected = ntuple(k -> k == r + 1 ? 1.0 : 0.0, 6)
+            @test Tuple(pow(Val(5), (0.0, 1.0), r)) == expected
+        end
+        # (2ε + 3ε²)^3 = 8ε³ + 36ε⁴ + 54ε⁵ + 27ε⁶
+        @test Tuple(pow(Val(6), (0.0, 2.0, 3.0), 3)) ==
+              (0.0, 0.0, 0.0, 8.0, 36.0, 54.0, 27.0)
+        @test Tuple(pow(Val(2), (0.0im, 1.0im), 2)) == (0.0, 0.0, -1.0)
+        @test Tuple(pow(Val(0), (0.0, 1.0), 0)) == (1.0,)
+        @test Tuple(pow(Val(2), (0.0,), 2)) == (0.0, 0.0, 0.0)
+    end
+end

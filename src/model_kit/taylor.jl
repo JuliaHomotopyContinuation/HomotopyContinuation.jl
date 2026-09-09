@@ -767,6 +767,22 @@ end
 #
 # OP_POW_INT # a ^ p where p isa Integer
 
+# Multiplication avoids division by x₀ for nonnegative integer powers.
+function taylor_op_pow_zero_constant(V::Val{K}, x, r::Integer) where {K}
+    result = taylor_op_identity(V, one(x[0]))
+    base = taylor_op_identity(V, x)
+    while r > 0
+        if isodd(r)
+            result = taylor_op_mul(V, result, base)
+        end
+        r = div(r, 2)
+        if r > 0
+            base = taylor_op_sqr(V, base)
+        end
+    end
+    result
+end
+
 function taylor_op_pow_impl(K, dx, op)
     D = DiffMap()
     list = IntermediateRepresentation()
@@ -796,7 +812,12 @@ function taylor_op_pow_impl(K, dx, op)
     quote
         Base.@_inline_meta
         $(untuple(:x, dx))
-        iszero(x0) && return $(taylor_tuple([nothing for _ = 0:K]))
+        if iszero(x0)
+            if r isa Integer && r >= 0
+                return taylor_op_pow_zero_constant(Val($K), x, r)
+            end
+            return $(taylor_tuple([nothing for _ = 0:K]))
+        end
         w₀ = $op(x0, r)
         $((K > 0 ? (:(u₀_inv = op_inv(x0)),) : ())...)
         $(to_julia_expr(list))
