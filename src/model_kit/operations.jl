@@ -16,6 +16,7 @@
     OP_INV # 1 / a
     OP_INV_NOT_ZERO # a ≂̸ 0 ? 1 / a : a
     OP_INVSQR # 1 / a^2
+    OP_LOG # log(a)
     OP_NEG # -a
     OP_SIN # sin(a)
     OP_SINH # sinh(a)
@@ -61,6 +62,7 @@ function arity(op_type::OpType)
            op_type == OP_INV ||
            op_type == OP_INV_NOT_ZERO ||
            op_type == OP_INVSQR ||
+           op_type == OP_LOG ||
            op_type == OP_NEG ||
            op_type == OP_SIN ||
            op_type == OP_SINH ||
@@ -118,6 +120,8 @@ function op_call(op_type::OpType)
         :op_inv_not_zero
     elseif op_type == OP_INVSQR
         :op_invsqr
+    elseif op_type == OP_LOG
+        :op_log
     elseif op_type == OP_NEG
         :op_neg
     elseif op_type == OP_SIN
@@ -213,6 +217,7 @@ Invert x unless it is 0, then return 0.
 """
 op_inv_not_zero(x) = ifelse(is_zero(x), x, op_inv(x))
 op_invsqr(x) = op_sqr(op_inv(x))
+op_log(x) = log(x)
 op_neg(x) = -x
 op_sin(x) = sin(x)
 op_sinh(x) = sinh(x)

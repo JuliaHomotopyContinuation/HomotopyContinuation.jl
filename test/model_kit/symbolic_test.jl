@@ -368,13 +368,25 @@
         @test Q == -1 + y
     end
 
-    @testset "trigonometric functions" begin
+    @testset "transcendental functions" begin
         @var x
-        F = [sin(x); cos(x); exp(x); tan(x); asin(x); acos(x); sinh(x); cosh(x); tanh(x)]
+        F = [
+            sin(x)
+            cos(x)
+            exp(x)
+            log(x)
+            tan(x)
+            asin(x)
+            acos(x)
+            sinh(x)
+            cosh(x)
+            tanh(x)
+        ]
         dF_symbolic = [
             cos(x)
             -sin(x)
             exp(x)
+            1 / x
             1 + tan(x)^2
             1 / sqrt(1 - x^2)
             -1 / sqrt(1 - x^2)
@@ -383,7 +395,7 @@
             1 - tanh(x)^2
         ]
         dF = differentiate(F, x)
-        @test expand.(dF - dF_symbolic) == Vector{Expression}(zeros(Int, 9))
+        @test expand.(dF - dF_symbolic) == Vector{Expression}(zeros(Int, 10))
 
         x0 = 0.1
         F0 = evaluate.(F, x => x0)
@@ -391,6 +403,7 @@
             sin(x0)
             cos(x0)
             exp(x0)
+            log(x0)
             tan(x0)
             asin(x0)
             acos(x0)
