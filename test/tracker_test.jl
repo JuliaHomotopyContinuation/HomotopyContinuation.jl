@@ -62,7 +62,7 @@
             tracker = Tracker(ParameterHomotopy(F, [p_start], [p_target]))
             result = track(tracker, [y_start], 1, 0)
             @test is_success(result)
-            @test norm(solution(result) - y_target) < 1e-10
+            @test norm(solution(result) - [y_target]) < 1e-10
         end
     end
 
