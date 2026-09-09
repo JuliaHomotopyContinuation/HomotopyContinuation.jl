@@ -270,8 +270,7 @@ function update!(
         τ = tx_norm[3] / tx_norm[4]
     end
     if !isfinite(τ)
-        # No derivative-based estimate is available. Avoid a fallback that
-        # shrinks with the distance to the origin and prevents zero crossings.
+        # No derivative-based estimate is available. Use constant value as fallback.
         τ = 1.0
     end
 
