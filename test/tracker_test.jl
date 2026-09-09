@@ -46,6 +46,41 @@
         @test affine_chart(PVector(solution(res))) ≈ [sqrt(2), -sqrt(2)] rtol = 1e-12 / x₀
     end
 
+    @testset "Paths through zero" begin
+        @var y p
+        cases = (
+            (y * (p - y), 1 + im, 5, 0, 0),
+            ((y - 50) * (p - y), -1, -2, 50, 50),
+            (y - p, 1, -2, 1, -2),
+            (y - p^3, 1, -2, 1, -8),
+            # At the start, the first three derivatives vanish, but the path
+            # is not constant.
+            (y - p^4, 0, 1, 0, 1),
+        )
+        for (f, p_start, p_target, y_start, y_target) in cases
+            F = System([f], [y], [p])
+            tracker = Tracker(ParameterHomotopy(F, [p_start], [p_target]))
+            result = track(tracker, [y_start], 1, 0)
+            @test is_success(result)
+            @test norm(solution(result) - y_target) < 1e-10
+        end
+    end
+
+    @testset "Parameter solve with a zero solution" begin
+        @var y p
+        F = System([y * (p - y)], [y], [p])
+        S1 = solve(F; target_parameters = [1 + im], show_progress = false)
+        S2 = solve(
+            F,
+            S1;
+            start_parameters = [1 + im],
+            target_parameters = [5.0],
+            show_progress = false,
+        )
+        @test nsolutions(S2) == 2
+        @test all(is_success, S2)
+    end
+
     @testset "iterator" begin
         @var x a y b
         F = System([x^2 - a, x * y - a + b], [x, y], [a, b])
