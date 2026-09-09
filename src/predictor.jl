@@ -270,7 +270,8 @@ function update!(
         τ = tx_norm[3] / tx_norm[4]
     end
     if !isfinite(τ)
-        τ = tx_norm[1] / maximum(tx_norm)
+        # No derivative-based estimate is available. Use constant value as fallback.
+        τ = 1.0
     end
 
     predictor.method = PredictionMethod.Pade21
