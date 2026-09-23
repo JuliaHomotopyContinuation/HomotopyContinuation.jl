@@ -264,7 +264,8 @@ end
 function factorize!(WS::MatrixWorkspace)
     m, n = size(WS)
     if m == n
-        if n ≥ LU_STDLIB_BREAKPOINT
+        if n ≥ LU_STDLIB_BREAKPOINT &&
+           hasmethod(LA.LAPACK.getrf!, Tuple{Matrix{ComplexF64},Vector{Int}})
             LA.LAPACK.getrf!(WS.lu.factors, WS.lu.ipiv; check = true)
             WS.upper_singular[] = false
         else
@@ -455,13 +456,15 @@ function LA.ldiv!(x::AbstractVector, WS::MatrixWorkspace, b::AbstractVector)
     if m == n
         if WS.scaled[]
             x .= WS.row_scaling .* b
-            if n ≥ LU_STDLIB_BREAKPOINT
+            if n ≥ LU_STDLIB_BREAKPOINT &&
+               hasmethod(LA.LAPACK.getrf!, Tuple{Matrix{ComplexF64},Vector{Int}})
                 lu_ldiv!(x, WS.lu, x)
             else
                 lu_ldiv_stdlib_upper!(x, WS.lu, x, WS.upper_singular[])
             end
         else
-            if n ≥ LU_STDLIB_BREAKPOINT
+            if n ≥ LU_STDLIB_BREAKPOINT &&
+               hasmethod(LA.LAPACK.getrf!, Tuple{Matrix{ComplexF64},Vector{Int}})
                 lu_ldiv!(x, WS.lu, b)
             else
                 lu_ldiv_stdlib_upper!(x, WS.lu, b, WS.upper_singular[])
