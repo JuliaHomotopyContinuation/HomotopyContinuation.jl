@@ -10,16 +10,21 @@ map_subscripts(index) = join(SUBSCRIPT_MAP[c] for c in string(index))
 
 function sort_key(v::Variable)
     name = string(ModelKit.name(v))
-    sub_start = findnext(c -> c in ModelKit.SUBSCRIPTS, name, 1)
-    if isnothing(sub_start)
+    # Subscript letters can belong to a base name. Only a trailing numeric
+    # subscript, optionally separated into indices by ₋, denotes an index.
+    indexed_name = match(r"^(.*?)([₀-₉]+(?:₋[₀-₉]+)*)$", name)
+    if isnothing(indexed_name)
         return name, Int[]
     end
-    var_base = name[1:prevind(name, sub_start)]
-    str_indices = split(name[sub_start:end], "₋")
+    var_base = String(something(indexed_name[1]))
+    index_suffix = something(indexed_name[2])
+    str_indices = split(index_suffix, "₋")
     indices = map(str_indices) do str_index
-        digits = map(s -> ModelKit.SUBSCRIPT_TO_INT_MAP[s], collect(str_index))
-        n = length(digits)
-        sum([digits[n-k+1] * 10^(k - 1) for k = 1:n])
+        index = 0
+        for digit in str_index
+            index = 10 * index + ModelKit.SUBSCRIPT_TO_INT_MAP[digit]
+        end
+        index
     end
     var_base, reverse(indices)
 end

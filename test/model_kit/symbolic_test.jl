@@ -63,6 +63,18 @@
         g = x[1]
         @test variables([f, g]) == [a, b, x[1]]
         @test nvariables([f, g]) == 3
+
+        @var a₁ᵣ a₁ᵢ c₀ₛ c₀ₒ
+        named = [a₁ᵣ, a₁ᵢ, c₀ₛ, c₀ₒ]
+        @test sort(named) == sort(named; by = string)
+        unicode_system = System([a₁ᵣ + a₁ᵢ, c₀ₛ - c₀ₒ])
+        @test Set(variables(unicode_system)) == Set(named)
+        explicit_system = System([a₁ᵣ + a₁ᵢ, c₀ₛ - c₀ₒ]; variables = named)
+        @test variables(explicit_system) == named
+        @test explicit_system([1, 2, 3, 4]) == [3, -1]
+
+        indexed = [Variable("a₁ᵢ", 11), Variable("a₁ᵢ", 2), Variable("a₁ᵢ", 9)]
+        @test sort(indexed) == indexed[[2, 3, 1]]
     end
 
     @testset "Subs" begin
