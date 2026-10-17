@@ -439,7 +439,7 @@ function hnf!(A::AbstractMatrix{BigInt}, U::AbstractMatrix{BigInt})
 end
 
 cdiv_q!(x::BigInt, a::BigInt, b::BigInt) =
-    (ccall((:__gmpz_cdiv_q, :libgmp), Cvoid, (MPZ.mpz_t, MPZ.mpz_t, MPZ.mpz_t), x, a, b);
+    (ccall((:__gmpz_cdiv_q, Base.GMP.libgmp), Cvoid, (MPZ.mpz_t, MPZ.mpz_t, MPZ.mpz_t), x, a, b);
     x)
 
 function reduce_off_diagonal!(
