@@ -1437,6 +1437,13 @@ function system_with_coefficents_as_params(
     variables = MP.variables(F),
     variable_groups = nothing,
 )
+    # Expand in monomials before replacing numeric coefficients with parameters.
+    # MP 0.5's AbstractPolynomial already uses the monomial basis.
+    @static if isdefined(MP, :convert_basis)
+        F = map(F) do f
+            MP.convert_basis(MP.FullBasis{MP.Monomial}(MP.variables(f)), f)
+        end
+    end
     vars = map(variables) do v
         name, ind = MP.name_base_indices(v)
         Variable(name, ind...)

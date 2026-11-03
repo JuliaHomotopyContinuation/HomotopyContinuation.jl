@@ -138,9 +138,6 @@ Base.promote_rule(::Type{Expression}, ::Type{Variable}) = Expression
 Base.promote_rule(::Type{Expression}, ::Type{ExpressionRef}) = Expression
 Base.promote_rule(::Type{Variable}, ::Type{ExpressionRef}) = Expression
 
-# Keep coefficients symbolic when a polynomial basis introduces floating-point scaling.
-Base.float(::Type{<:Basic}) = Expression
-
 function to_string(x::Basic)
     b = ExpressionRef(x)
     if b.ptr == C_NULL

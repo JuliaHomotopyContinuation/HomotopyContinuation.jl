@@ -5,9 +5,6 @@ import MultivariateBases as MB
 
 @testset "MultivariatePolynomials conversion" begin
     @polyvar x y a
-    for T in (Expression, Variable, HomotopyContinuation.ModelKit.ExpressionRef)
-        @test float(T) === Expression
-    end
     F = System([x^2 - y, y^2 - a]; variables = [x, y], parameters = [a])
     @test F([2, 4], [16]) == [0, 0]
 
@@ -42,7 +39,31 @@ import MultivariateBases as MB
             @test System([q])(values) ≈ [expected]
             G, c = HomotopyContinuation.ModelKit.system_with_coefficents_as_params([q])
             @test G(values, c) ≈ [expected]
-            @test c == MP.coefficients(q)
+            @test c ≈ MP.coefficients(p)
+        end
+
+        @testset "Numeric basis conversion before parameterization" begin
+            for (B, mono, weight, values, expected_coeffs, expected_value) in (
+                (MB.Chebyshev, x^2, 1, [2], [-1 // 1, 2 // 1], 7),
+                (MB.Chebyshev, x^2, 1 // 3, [2], [-1 // 3, 2 // 3], 7 // 3),
+                (MB.ScaledMonomial, x * y, 1, [2, 3], [sqrt(2)], 6sqrt(2)),
+                (MB.ScaledMonomial, x * y, 1 // 3, [2, 3], [sqrt(2) / 3], 2sqrt(2)),
+            )
+                q = MB.algebra_element([weight], MB.SubBasis{B}([mono]))
+                G, c = HomotopyContinuation.ModelKit.system_with_coefficents_as_params([
+                    zero(q),
+                    q,
+                ],)
+                @test eltype(c) === eltype(expected_coeffs)
+                @test c ≈ expected_coeffs
+                @test G(values, c) ≈ [0, expected_value]
+            end
+
+            # T₀ + T₂ = 2x²: the cancelled constant is not a homotopy parameter.
+            q = MB.algebra_element([1, 1], MB.SubBasis{MB.Chebyshev}([one(x), x^2]))
+            G, c = HomotopyContinuation.ModelKit.system_with_coefficents_as_params([q])
+            @test c == [2 // 1]
+            @test G([2], [3]) == [12]
         end
     end
 
