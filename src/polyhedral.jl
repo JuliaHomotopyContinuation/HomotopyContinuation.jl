@@ -374,9 +374,8 @@ function polyhedral_coefficients(coefficients::AbstractVector, kind::AbstractStr
     for (i, coefficients_i) in enumerate(coefficients)
         converted_i = ComplexF64[]
         for (j, c) in enumerate(coefficients_i)
-            isfinite(c) || throw(
-                ArgumentError("$kind coefficient $j of equation $i must be finite."),
-            )
+            isfinite(c) ||
+                throw(ArgumentError("$kind coefficient $j of equation $i must be finite."))
             z = ComplexF64(c)
             if !isfinite(z) || (!iszero(c) && iszero(z))
                 throw(
