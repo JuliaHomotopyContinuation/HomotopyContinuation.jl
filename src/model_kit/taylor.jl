@@ -569,6 +569,42 @@ end
     taylor_acos_impl(K, M)
 end
 
+# OP_ATAN: (1 + x²)y′ = x′, where y = atan(x).
+function taylor_atan_impl(K, M)
+    D = DiffMap()
+    list = IntermediateRepresentation()
+    for k = 0:(M-1)
+        D[:x, k] = Symbol(:x, k)
+    end
+    g = Any[]
+    for k = 0:(K-1)
+        gk = k == 0 ? 1 : nothing
+        for j = 0:k
+            gk = muladd!(list, D[:x, j], D[:x, k-j], gk)
+        end
+        push!(g, gk)
+    end
+    ids = Any[:at₀]
+    for k = 1:K
+        value = mul!(list, k, D[:x, k])
+        for j = 1:(k-1)
+            term = mul!(list, g[j+1], mul!(list, k - j, ids[k-j+1]))
+            value = sub!(list, value, term)
+        end
+        push!(ids, div!(list, value, mul!(list, k, g[1])))
+    end
+    quote
+        Base.@_inline_meta
+        $(untuple(:x, M - 1))
+        at₀ = atan(x0)
+        $(to_julia_expr(list))
+        $(taylor_tuple(ids))
+    end
+end
+@generated function taylor_op_atan(::Val{K}, x::TruncatedTaylorSeries{M}) where {K,M}
+    taylor_atan_impl(K, M)
+end
+
 # OP_EXP
 function taylor_exp_helper!(list, D, k)
     k == 0 && return :e₀

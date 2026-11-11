@@ -378,6 +378,7 @@
             tan(x)
             asin(x)
             acos(x)
+            atan(x)
             sinh(x)
             cosh(x)
             tanh(x)
@@ -390,12 +391,13 @@
             1 + tan(x)^2
             1 / sqrt(1 - x^2)
             -1 / sqrt(1 - x^2)
+            1 / (1 + x^2)
             cosh(x)
             sinh(x)
             1 - tanh(x)^2
         ]
         dF = differentiate(F, x)
-        @test expand.(dF - dF_symbolic) == Vector{Expression}(zeros(Int, 10))
+        @test expand.(dF - dF_symbolic) == Vector{Expression}(zeros(Int, length(F)))
 
         x0 = 0.1
         F0 = evaluate.(F, x => x0)
@@ -407,6 +409,7 @@
             tan(x0)
             asin(x0)
             acos(x0)
+            atan(x0)
             sinh(x0)
             cosh(x0)
             tanh(x0)

@@ -517,6 +517,9 @@ function expr_to_ir_statements!(
     elseif t == :ACos
         x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
         return add_op!(ir, OP_ACOS, x)
+    elseif t == :ATan
+        x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
+        return add_op!(ir, OP_ATAN, x)
     elseif t == :Exp || t == :exp
         x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
         return add_op!(ir, OP_EXP, x)

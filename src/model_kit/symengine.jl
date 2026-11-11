@@ -399,6 +399,12 @@ function Base.acos(b::Basic)
     return a
 end
 
+function Base.atan(b::Basic)
+    a = Expression()
+    ccall((:basic_atan, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)
+    return a
+end
+
 function Base.sinh(b::Basic)
     a = Expression()
     ccall((:basic_sinh, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)

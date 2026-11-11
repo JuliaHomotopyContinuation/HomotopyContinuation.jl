@@ -1,5 +1,25 @@
 include("../test_systems.jl")
 
+@testset "atan" begin
+    @var x
+    system = System([atan(x)])
+    for mode in (InterpretedSystem, CompiledSystem)
+        F = mode(system)
+        u, U = zeros(ComplexF64, 1), zeros(ComplexF64, 1, 1)
+        z = 0.2 + 0.3im
+        evaluate_and_jacobian!(u, U, F, [z])
+        @test u[1] ≈ atan(z)
+        @test U[1] ≈ inv(1 + z^2)
+        tx = TaylorVector{2}(reshape([0.0, 1.0], 2, 1))
+        tu = TaylorVector{5}(Float64, 1)
+        taylor!(tu, Val(4), F, tx)
+        @test tu.data[:, 1] ≈ [0, 1, 0, -1 / 3, 0]
+    end
+    u = Arblib.AcbRefVector(1)
+    evaluate!(u, InterpretedSystem(system), Arblib.AcbRefVector([0.25]))
+    @test ComplexF64(u[1]) ≈ atan(0.25)
+end
+
 @testset "interpreter: $name" for (name, system) in TEST_SYSTEM_COLLECTION
     @testset "interpreter symbolic" begin
         # skip bacillus since it has fp constants
