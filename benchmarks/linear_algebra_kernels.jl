@@ -52,8 +52,12 @@ function benchmark_triangular_solves()
                 times[i] = min(times[i], kernel_time(f, A, rhs, x, 20_000))
             end
         end
-        @printf("%-11s %3d   %9.1f / %9.1f   %9.1f / %9.1f\n",
-            split ? "StructArray" : "Matrix", n, times...)
+        @printf(
+            "%-11s %3d   %9.1f / %9.1f   %9.1f / %9.1f\n",
+            split ? "StructArray" : "Matrix",
+            n,
+            times...
+        )
     end
 end
 

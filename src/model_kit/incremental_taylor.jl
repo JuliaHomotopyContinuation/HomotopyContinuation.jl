@@ -15,7 +15,8 @@ function IncrementalTaylorInterpreter(::Type{T}, I::Interpreter) where {T}
         instr.op == OP_STOP && break
         args = ntuple(4) do j
             a = instr.input[j]
-            j > arity(instr.op) || should_use_index_not_reference(instr.op, j) ? a : slots[a]
+            j > arity(instr.op) || should_use_index_not_reference(instr.op, j) ? a :
+            slots[a]
         end
         n += 1
         slots[instr.output] = n
@@ -25,11 +26,27 @@ function IncrementalTaylorInterpreter(::Type{T}, I::Interpreter) where {T}
     assignments = [(i, Int(slots[k])) for (i, k) in s.assignments]
     ua = [(i, Int(slots[k])) for (i, k) in s.u_assignments]
     ja = [(i, Int(slots[k])) for (i, k) in s.U_assignments]
-    seq = InstructionSequence(instructions, s.constants, s.constants_range,
-        s.parameters_range, s.variables_range, s.continuation_parameter_index,
-        assignments, s.output_dim, n, ua, ja, s.all_u_assigned, s.all_U_assigned)
-    tape = interpreter(Vector{TruncatedTaylorSeries{4,T}}, seq;
-        variables = I.variables, parameters = I.parameters)
+    seq = InstructionSequence(
+        instructions,
+        s.constants,
+        s.constants_range,
+        s.parameters_range,
+        s.variables_range,
+        s.continuation_parameter_index,
+        assignments,
+        s.output_dim,
+        n,
+        ua,
+        ja,
+        s.all_u_assigned,
+        s.all_U_assigned,
+    )
+    tape = interpreter(
+        Vector{TruncatedTaylorSeries{4,T}},
+        seq;
+        variables = I.variables,
+        parameters = I.parameters,
+    )
     IncrementalTaylorInterpreter{T}(tape, 0)
 end
 
@@ -39,7 +56,10 @@ function partial_taylor_stores(ex, K, L)
     ex isa Expr || return ex
     if ex.head == :(=) && ex.args[1] == :(tape[i])
         result = gensym(:series)
-        values = [k < L ? :(tape[i][$k]) : k <= K ? :($result[$k]) : :(zero($result[0])) for k = 0:3]
+        values = [
+            k < L ? :(tape[i][$k]) : k <= K ? :($result[$k]) : :(zero($result[0])) for
+            k = 0:3
+        ]
         return quote
             $result = $(ex.args[2])
             tape[i] = TruncatedTaylorSeries(($(values...),))
@@ -48,11 +68,26 @@ function partial_taylor_stores(ex, K, L)
     Expr(ex.head, map(a -> partial_taylor_stores(a, K, L), ex.args)...)
 end
 
-@generated function execute_incremental_taylor!(::Val{K}, ::Val{L}, x, p, tape, sequence) where {K,L}
+@generated function execute_incremental_taylor!(
+    ::Val{K},
+    ::Val{L},
+    x,
+    p,
+    tape,
+    sequence,
+) where {K,L}
     partial_taylor_stores(execute_taylor_instructions!_impl(K), K, L)
 end
 
-function predictor_taylor!(u, ::Val{K}, cache::IncrementalTaylorInterpreter, x, t, p, incremental) where {K}
+function predictor_taylor!(
+    u,
+    ::Val{K},
+    cache::IncrementalTaylorInterpreter,
+    x,
+    t,
+    p,
+    incremental,
+) where {K}
     1 <= K <= 3 || throw(ArgumentError("predictor Taylor order must be 1, 2, or 3"))
     I = cache.interpreter
     s, tape = I.sequence, I.tape
@@ -69,7 +104,7 @@ function predictor_taylor!(u, ::Val{K}, cache::IncrementalTaylorInterpreter, x, 
         tape[s.continuation_parameter_index] = t
     end
     if incremental && K > 1 && cache.order == K - 1
-        execute_incremental_taylor!(Val(K), Val(K-1), x, p, tape, s)
+        execute_incremental_taylor!(Val(K), Val(K - 1), x, p, tape, s)
     else
         execute_incremental_taylor!(Val(K), Val(0), x, p, tape, s)
     end

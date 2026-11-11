@@ -39,8 +39,13 @@ struct ExtendedNewtonWorkspace
     correction::Vector{ComplexDF64}
     pivots::Vector{Int}
 end
-ExtendedNewtonWorkspace(n) = ExtendedNewtonWorkspace(zeros(ComplexDF64,n,n),
-    zeros(ComplexDF64,n,n), zeros(ComplexDF64,n), zeros(ComplexDF64,n), zeros(Int,n))
+ExtendedNewtonWorkspace(n) = ExtendedNewtonWorkspace(
+    zeros(ComplexDF64, n, n),
+    zeros(ComplexDF64, n, n),
+    zeros(ComplexDF64, n),
+    zeros(ComplexDF64, n),
+    zeros(Int, n),
+)
 
 struct NewtonCorrector
     a::Float64
@@ -60,14 +65,22 @@ function NewtonCorrector(a::Float64, x::AbstractVector{ComplexF64}, m::Int)
     r = zeros(ComplexF64, m)
     r̄ = zero(r)
     x_extended = ComplexDF64.(x)
-    NewtonCorrector(a, h_a, Δx, r, r̄, x_extended,
-        Ref{Union{Nothing,ExtendedNewtonWorkspace}}(nothing))
+    NewtonCorrector(
+        a,
+        h_a,
+        Δx,
+        r,
+        r̄,
+        x_extended,
+        Ref{Union{Nothing,ExtendedNewtonWorkspace}}(nothing),
+    )
 end
 
 # Escalate the Jacobian and factorization only when residual-only refinement
 # stagnates. User-defined systems keep their existing evaluation contract.
 extended_jacobian_supported(::AbstractHomotopy) = false
-extended_jacobian_supported(::Union{CompiledHomotopy,InterpretedHomotopy,MixedHomotopy}) = true
+extended_jacobian_supported(::Union{CompiledHomotopy,InterpretedHomotopy,MixedHomotopy}) =
+    true
 extended_jacobian_supported(H::ParameterHomotopy) =
     H.F isa Union{CompiledSystem,InterpretedSystem,MixedSystem}
 extended_jacobian_supported(H::FixedParameterHomotopy) =
@@ -77,7 +90,7 @@ extended_jacobian_supported(H::AffineChartHomotopy) =
 
 function extended_newton_correction!(NC, H, x, t)
     n = length(x)
-    size(H) == (n,n) && extended_jacobian_supported(H) || return false
+    size(H) == (n, n) && extended_jacobian_supported(H) || return false
     W = NC.extended_workspace[]
     if W === nothing
         W = ExtendedNewtonWorkspace(n)
@@ -93,12 +106,12 @@ function extended_newton_correction!(NC, H, x, t)
         W.correction[k], W.correction[p] = W.correction[p], W.correction[k]
     end
     @inbounds for k = 1:n, i = k+1:n
-        W.correction[i] -= W.factors[i,k]*W.correction[k]
+        W.correction[i] -= W.factors[i, k] * W.correction[k]
     end
     @inbounds for k = n:-1:1
-        W.correction[k] /= W.factors[k,k]
+        W.correction[k] /= W.factors[k, k]
         for i = 1:k-1
-            W.correction[i] -= W.factors[i,k]*W.correction[k]
+            W.correction[i] -= W.factors[i, k] * W.correction[k]
         end
     end
     all(isfinite, W.correction) || return false
@@ -108,18 +121,18 @@ function extended_newton_correction!(NC, H, x, t)
         residual = -W.residual[i]
         scale = abs(W.residual[i])
         for j = 1:n
-            term = W.A[i,j]*W.correction[j]
+            term = W.A[i, j] * W.correction[j]
             residual += term
             scale += abs(term)
         end
-        abs(residual) <= 1e-25*scale || return false
+        abs(residual) <= 1e-25 * scale || return false
     end
     NC.Δx .= W.correction
     true
 end
 
 function refine_newton_correction!(NC, H, x, t, J, norm; tol)
-    result = iterative_refinement!(NC.Δx, J, NC.r, norm; tol, max_iters=3)
+    result = iterative_refinement!(NC.Δx, J, NC.r, norm; tol, max_iters = 3)
     if (result.diverged || !isfinite(result.accuracy) || result.accuracy > tol) &&
        (!all(iszero, NC.r) || !all(isfinite, NC.Δx))
         if extended_newton_correction!(NC, H, x, t)

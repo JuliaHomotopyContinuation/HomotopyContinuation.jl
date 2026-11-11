@@ -6,10 +6,8 @@
             A[i, i] += 2
         end
         rhs = randn(rng, T, n)
-        for (solve!, triangular) in (
-            (HC.ldiv_unit_lower!, UnitLowerTriangular),
-            (HC.ldiv_upper!, UpperTriangular),
-        )
+        for (solve!, triangular) in
+            ((HC.ldiv_unit_lower!, UnitLowerTriangular), (HC.ldiv_upper!, UpperTriangular))
             expected = triangular(A) \ rhs
             for separate_output in (false, true), strided in (false, true)
                 storage = zeros(T, 2n)

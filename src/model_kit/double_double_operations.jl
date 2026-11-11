@@ -3,7 +3,9 @@
 # The error is O(eps(Float64)^2) times the sum of term magnitudes, including in
 # cancellation; this is not a relative-error bound on the final result.
 @inline function _dd_product_sum(
-    a::NTuple{N,DoubleF64}, b::NTuple{N,DoubleF64}, c::Union{Nothing,DoubleF64} = nothing,
+    a::NTuple{N,DoubleF64},
+    b::NTuple{N,DoubleF64},
+    c::Union{Nothing,DoubleF64} = nothing,
 ) where {N}
     s, e = two_prod(a[1].hi, b[1].hi)
     e += muladd(a[1].hi, b[1].lo, a[1].lo * b[1].hi)
@@ -33,7 +35,12 @@ end
 @inline op_mulsub(x::ComplexDF64, y::ComplexDF64, z::ComplexDF64) = op_muladd(x, y, -z)
 @inline op_submul(x::ComplexDF64, y::ComplexDF64, z::ComplexDF64) = op_muladd(-x, y, z)
 
-@inline function op_mulmuladd(x::ComplexDF64, y::ComplexDF64, z::ComplexDF64, w::ComplexDF64)
+@inline function op_mulmuladd(
+    x::ComplexDF64,
+    y::ComplexDF64,
+    z::ComplexDF64,
+    w::ComplexDF64,
+)
     a, b = reim(x)
     c, d = reim(y)
     e, f = reim(z)

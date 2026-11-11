@@ -7,8 +7,13 @@ using HomotopyContinuation.DoubleDouble: ComplexDF64
 const MK = HomotopyContinuation.ModelKit
 
 if "--unfused" in ARGS
-    for (f, n) in ((MK.op_muladd, 3), (MK.op_mulsub, 3), (MK.op_submul, 3),
-                   (MK.op_mulmuladd, 4), (MK.op_mulmulsub, 4))
+    for (f, n) in (
+        (MK.op_muladd, 3),
+        (MK.op_mulsub, 3),
+        (MK.op_submul, 3),
+        (MK.op_mulmuladd, 4),
+        (MK.op_mulmulsub, 4),
+    )
         Base.delete_method(which(f, Tuple{ntuple(_ -> ComplexDF64, n)...}))
     end
 end

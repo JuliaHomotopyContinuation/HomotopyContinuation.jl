@@ -136,7 +136,7 @@ function lu!(
         n == 3 && return lu_small!(A, ipiv, Val(3))
         n == 4 && return lu_small!(A, ipiv, Val(4))
     end
-    min(m,n) >= 16 && return lu_rank2!(A, ipiv)
+    min(m, n) >= 16 && return lu_rank2!(A, ipiv)
     lu_rank1!(A, ipiv)
 end
 
@@ -198,7 +198,7 @@ end
     for k = 1:N
         push!(body.args, :(lu_pivot!(A, ipiv, $k, $N, $N)))
         for j = k+1:N, i = k+1:N
-            push!(body.args, :(A[$i,$j] -= A[$i,$k]*A[$k,$j]))
+            push!(body.args, :(A[$i, $j] -= A[$i, $k] * A[$k, $j]))
         end
     end
     quote
@@ -212,9 +212,9 @@ end
 @inline function lu_pivot!(A, ipiv, k, m, n)
     @inbounds begin
         kp = k
-        amax = abs2(A[k,k])
+        amax = abs2(A[k, k])
         for i = k+1:m
-            a = abs2(A[i,k])
+            a = abs2(A[i, k])
             if a > amax
                 kp, amax = i, a
             end
@@ -222,10 +222,10 @@ end
         # Squared magnitudes are cheap in the usual exponent range. Fall back
         # to scaled magnitudes if they cannot distinguish the pivot candidates.
         if iszero(amax) || !isfinite(amax)
-            amax = abs(A[k,k])
+            amax = abs(A[k, k])
             kp = k
             for i = k+1:m
-                a = abs(A[i,k])
+                a = abs(A[i, k])
                 if a > amax
                     kp, amax = i, a
                 end
@@ -235,18 +235,18 @@ end
         iszero(amax) && return false
         if kp != k
             for j = 1:n
-                A[k,j], A[kp,j] = A[kp,j], A[k,j]
+                A[k, j], A[kp, j] = A[kp, j], A[k, j]
             end
         end
-        pivot = A[k,k]
+        pivot = A[k, k]
         reciprocal = inv(pivot)
         if isfinite(reciprocal)
             for i = k+1:m
-                A[i,k] *= reciprocal
+                A[i, k] *= reciprocal
             end
         else
             for i = k+1:m
-                A[i,k] /= pivot
+                A[i, k] /= pivot
             end
         end
     end
@@ -255,26 +255,26 @@ end
 
 function lu_rank2!(A, ipiv)
     m, n = size(A)
-    @inbounds for k = 1:2:min(m,n)
+    @inbounds for k = 1:2:min(m, n)
         lu_pivot!(A, ipiv, k, m, n)
-        if k == min(m,n)
+        if k == min(m, n)
             for j = k+1:n, i = k+1:m
-                A[i,j] -= A[i,k] * A[k,j]
+                A[i, j] -= A[i, k] * A[k, j]
             end
             break
         end
         # Only the next column is needed to choose the second pivot. Swapping
         # its rows also swaps the first column's multipliers.
         for i = k+1:m
-            A[i,k+1] -= A[i,k] * A[k,k+1]
+            A[i, k+1] -= A[i, k] * A[k, k+1]
         end
-        lu_pivot!(A, ipiv, k+1, m, n)
+        lu_pivot!(A, ipiv, k + 1, m, n)
         for j = k+2:n
-            a = A[k,j]
-            b = A[k+1,j] - A[k+1,k] * a
-            A[k+1,j] = b
+            a = A[k, j]
+            b = A[k+1, j] - A[k+1, k] * a
+            A[k+1, j] = b
             for i = k+2:m
-                A[i,j] = (A[i,j] - A[i,k]*a) - A[i,k+1]*b
+                A[i, j] = (A[i, j] - A[i, k] * a) - A[i, k+1] * b
             end
         end
     end

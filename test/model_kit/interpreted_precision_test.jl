@@ -5,7 +5,7 @@
     @var x p t
     F = InterpretedSystem(System([(x - 1)^2]; variables = [x]))
     u, J = zeros(C, 1), zeros(C, 1, 1)
-    z = C[1 + δ]
+    z = C[1+δ]
     @test isnothing(F.jac_ComplexDF64)
     evaluate_and_jacobian!(u, J, F, z)
     @test u[1] == δ^2
@@ -22,7 +22,7 @@
     evaluate_and_jacobian!(uf, Jf, F, z)
     @test uf[1] == Float64(δ)^2
     @test Jf[1] == 2Float64(δ)
-    tx = TaylorVector{2}(reshape(C[1 + δ, 1], 2, 1))
+    tx = TaylorVector{2}(reshape(C[1+δ, 1], 2, 1))
     taylor!(u, Val(1), F, tx)
     @test u[1] == 2δ
     taylor!(u, Val(2), F, tx)
@@ -30,7 +30,7 @@
 
     # Parameters alone can require double-double, with ordinary Float64 x.
     G = InterpretedSystem(System([(p - 1) * x]; variables = [x], parameters = [p]))
-    for params in (C[1 + δ], D[1 + δ])
+    for params in (C[1+δ], D[1+δ])
         evaluate!(u, G, [2.0], params)
         @test u[1] == 2δ
         evaluate_and_jacobian!(u, J, G, [2.0], params)

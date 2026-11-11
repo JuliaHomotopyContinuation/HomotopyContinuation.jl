@@ -470,8 +470,12 @@ function solve(
     path_repair::Bool = false,
     kwargs...,
 )
-    path_repair && iterator_only && throw(ArgumentError("path_repair requires a complete batch"))
-    path_repair && stop_early_cb !== always_false && throw(ArgumentError("path_repair cannot be combined with stop_early_cb"))
+    path_repair &&
+        iterator_only &&
+        throw(ArgumentError("path_repair requires a complete batch"))
+    path_repair &&
+        stop_early_cb !== always_false &&
+        throw(ArgumentError("path_repair cannot be combined with stop_early_cb"))
     many_parameters = false
     if target_subspaces !== nothing
         many_parameters = true
@@ -559,7 +563,13 @@ function solve(
         path_repair && throw(ArgumentError("path_repair requires a complete batch"))
         return ResultIterator(starts, S; bitmask = bitmask)
     else
-        return solve(S, collect(starts); threading = threading, path_repair = path_repair, kwargs...)
+        return solve(
+            S,
+            collect(starts);
+            threading = threading,
+            path_repair = path_repair,
+            kwargs...,
+        )
     end
 end
 
@@ -573,7 +583,8 @@ function solve(
     path_repair::Bool = false,
 )
     if path_repair
-        stop_early_cb === always_false || throw(ArgumentError("path_repair cannot be combined with stop_early_cb"))
+        stop_early_cb === always_false ||
+            throw(ArgumentError("path_repair cannot be combined with stop_early_cb"))
         return repair_solve(S, starts; threading, show_progress, catch_interrupt)
     end
     n = length(starts)
@@ -858,7 +869,14 @@ function many_solve(
     q = first(many_target_parameters)
     target_parameters!(solver, transform_parameters(q))
     if path_repair
-        res = solve(solver, collect(starts); threading, path_repair=true, show_progress=false, catch_interrupt=false)
+        res = solve(
+            solver,
+            collect(starts);
+            threading,
+            path_repair = true,
+            show_progress = false,
+            catch_interrupt = false,
+        )
     elseif threading
         res = threaded_solve(solver, collect(starts); catch_interrupt = false)
     else
@@ -882,7 +900,14 @@ function many_solve(
         for q in Iterators.drop(many_target_parameters, 1)
             target_parameters!(solver, transform_parameters(q))
             if path_repair
-                res = solve(solver, collect(starts); threading, path_repair=true, show_progress=false, catch_interrupt=false)
+                res = solve(
+                    solver,
+                    collect(starts);
+                    threading,
+                    path_repair = true,
+                    show_progress = false,
+                    catch_interrupt = false,
+                )
             elseif threading
                 res = threaded_solve(solver, collect(starts); catch_interrupt = false)
             else
@@ -919,7 +944,8 @@ end
 _repair_trackers(T::EndgameTracker) = (T.tracker,)
 _repair_trackers(T::PolyhedralTracker) = (T.toric_tracker, T.generic_tracker.tracker)
 _repair_trackers(T::OverdeterminedTracker) = _repair_trackers(T.tracker)
-_repair_trackers(T::AbstractPathTracker) = throw(ArgumentError("path_repair is not supported by $(typeof(T))"))
+_repair_trackers(T::AbstractPathTracker) =
+    throw(ArgumentError("path_repair is not supported by $(typeof(T))"))
 
 function repair_parameters!(S::Solver, stage)
     for T in S.trackers, t in _repair_trackers(T)
@@ -942,7 +968,7 @@ function endpoint_conflict_pairs(records)
     weights = [1.0 / (j + sqrt(2.0)) for j = 1:n]
     weights ./= sum(weights)
     scale = [max(1.0, maximum(abs, solution(records[i]))) for i in ids]
-    radius = [max(32eps(), 8accuracy(records[i])) * scale[k] for (k,i) in enumerate(ids)]
+    radius = [max(32eps(), 8accuracy(records[i])) * scale[k] for (k, i) in enumerate(ids)]
     # An uncertain endpoint is retried separately, not allowed to make the
     # projection window infinite for every other point.
     radius .= map(r -> isfinite(r) ? r : 0.0, radius)
@@ -956,7 +982,7 @@ function endpoint_conflict_pairs(records)
             j = order[b]
             projection[j] - projection[i] > radius[i] + rmax && break
             xi, xj = solution(records[ids[i]]), solution(records[ids[j]])
-            maximum(abs(xi[k]-xj[k]) for k = 1:n) <= radius[i] + radius[j] || continue
+            maximum(abs(xi[k] - xj[k]) for k = 1:n) <= radius[i] + radius[j] || continue
             push!(pairs, (ids[i], ids[j]))
         end
     end
@@ -979,12 +1005,15 @@ function repair_candidates(records, tracker)
         # Close but genuinely distinct roots must not be classified by a fixed
         # distance threshold. Reuse HC's certification to settle these cases.
         F, p = target
-        C = certify(F, [solution(records[i]) for i in ids], p; show_progress=false)
+        C = certify(F, [solution(records[i]) for i in ids], p; show_progress = false)
         ndistinct_certified(C) == length(ids) && empty!(pairs)
     end
     selected = Set(i for pair in pairs for i in pair)
-    for (i,r) in enumerate(records)
-        (is_failed(r) || (is_nonsingular(r) && (!isfinite(accuracy(r)) || accuracy(r) > 1e-8))) && push!(selected, i)
+    for (i, r) in enumerate(records)
+        (
+            is_failed(r) ||
+            (is_nonsingular(r) && (!isfinite(accuracy(r)) || accuracy(r) > 1e-8))
+        ) && push!(selected, i)
     end
     sort!(collect(selected)), pairs
 end
@@ -992,7 +1021,7 @@ end
 function reverse_repair_check(T::EndgameTracker, r, start)
     start isa AbstractVector{<:Number} || return true
     is_nonsingular(r) || return true
-    back = Tracker(deepcopy(T.tracker.homotopy); options=deepcopy(T.tracker.options))
+    back = Tracker(deepcopy(T.tracker.homotopy); options = deepcopy(T.tracker.options))
     check = track(back, solution(r), 0.0, 1.0)
     is_success(check) || return false
     distance(solution(check), start, InfNorm()) <= 1e-7 * max(1.0, norm(start, Inf))
@@ -1014,7 +1043,8 @@ function repair_solve(S::Solver, starts; threading, show_progress, catch_interru
             ids, _ = repair_candidates(records, first(S.trackers))
             isempty(ids) && break
             retry = repair_parameters!(deepcopy(S), stage)
-            repaired = solve(retry, starts[ids]; threading, show_progress=false, catch_interrupt)
+            repaired =
+                solve(retry, starts[ids]; threading, show_progress = false, catch_interrupt)
             for r in path_results(repaired)
                 k = ids[path_number(r)]
                 previous = records[k]
@@ -1036,7 +1066,7 @@ function repair_solve(S::Solver, starts; threading, show_progress, catch_interru
         # return codes, so the result does not depend on pair traversal order.
         parent = collect(eachindex(records))
         root(i) = parent[i] == i ? i : (parent[i] = root(parent[i]))
-        for (i,j) in pairs
+        for (i, j) in pairs
             a, b = root(i), root(j)
             a == b && continue
             if accuracy(records[a]) <= accuracy(records[b])
@@ -1059,6 +1089,5 @@ function repair_solve(S::Solver, starts; threading, show_progress, catch_interru
     end
     init!(S.stats)
     foreach(r -> update!(S.stats, r), records)
-    Result(records; seed=S.seed, start_system=S.start_system)
+    Result(records; seed = S.seed, start_system = S.start_system)
 end
-

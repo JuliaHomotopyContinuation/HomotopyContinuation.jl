@@ -96,7 +96,14 @@ function _predictor_taylor_interpreter!(obj, ::Type{T}) where {T}
 end
 
 predictor_taylor!(u, v, F::AbstractSystem, x, p, incremental::Bool) = taylor!(u, v, F, x, p)
-function predictor_taylor!(u, v::Val{K}, F::InterpretedSystem, x, p, incremental::Bool) where {K}
+function predictor_taylor!(
+    u,
+    v::Val{K},
+    F::InterpretedSystem,
+    x,
+    p,
+    incremental::Bool,
+) where {K}
     K > 3 && return taylor!(u, v, F, x, p)
     I = _predictor_taylor_interpreter!(F, _interpreter_precision(x, p))
     predictor_taylor!(u, v, I, x, nothing, p, incremental)
@@ -129,7 +136,9 @@ end
 # @generated so that field access (order_1..order_4) and the TruncatedTaylorSeries
 # arity (M+1) are resolved at compile time, giving a type-stable return value.
 @generated function _get_or_create_taylor_interpreter!(
-    obj, ::Val{M}, ::Type{T} = ComplexF64,
+    obj,
+    ::Val{M},
+    ::Type{T} = ComplexF64,
 ) where {M,T}
     1 <= M <= 4 || error("Taylor order M must be between 1 and 4, got $M")
     field = [:order_1, :order_2, :order_3, :order_4][M]

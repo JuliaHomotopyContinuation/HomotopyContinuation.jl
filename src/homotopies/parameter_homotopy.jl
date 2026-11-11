@@ -43,8 +43,17 @@ function ParameterHomotopy(F::AbstractSystem, p::AbstractVector, q::AbstractVect
     taylor_pt = TaylorVector{2}(ComplexF64, length(q))
     pt = copy(p̂)
 
-    ParameterHomotopy(F, p̂, q̂, Ref(complex(NaN)), pt, taylor_pt,
-        Ref(ComplexDF64(NaN)), ComplexDF64.(p̂), TaylorVector{2}(ComplexDF64, length(q)))
+    ParameterHomotopy(
+        F,
+        p̂,
+        q̂,
+        Ref(complex(NaN)),
+        pt,
+        taylor_pt,
+        Ref(ComplexDF64(NaN)),
+        ComplexDF64.(p̂),
+        TaylorVector{2}(ComplexDF64, length(q)),
+    )
 end
 
 Base.size(H::ParameterHomotopy) = size(H.F)
@@ -106,12 +115,18 @@ function ModelKit.evaluate_and_jacobian!(u, U, H::ParameterHomotopy, x, t)
 end
 
 function ModelKit.taylor!(u, v::Val, H::ParameterHomotopy, tx, t)
-    T = promote_type(ModelKit._interpreter_precision(tx), ModelKit._interpreter_precision(t))
+    T = promote_type(
+        ModelKit._interpreter_precision(tx),
+        ModelKit._interpreter_precision(t),
+    )
     taylor!(u, v, H.F, tx, tp!(H, t, T))
     u
 end
 function ModelKit.taylor!(u, v::Val, H::ParameterHomotopy, tx, t, incremental::Bool)
-    T = promote_type(ModelKit._interpreter_precision(tx), ModelKit._interpreter_precision(t))
+    T = promote_type(
+        ModelKit._interpreter_precision(tx),
+        ModelKit._interpreter_precision(t),
+    )
     ModelKit.predictor_taylor!(u, v, H.F, tx, tp!(H, t, T), incremental)
 end
 
@@ -119,11 +134,11 @@ tp!(H::ParameterHomotopy, t, ::Type{ComplexF64}) = tp!(H, ComplexF64(t))
 function tp!(H::ParameterHomotopy, t, ::Type{ComplexDF64})
     τ = ComplexDF64(t)
     τ == H.t_cache_extended[] && return H.taylor_pt_extended
-    from_target = abs2(ComplexF64(t)) <= abs2(ComplexF64(t)-1)
+    from_target = abs2(ComplexF64(t)) <= abs2(ComplexF64(t) - 1)
     @inbounds for i in eachindex(H.p)
         p, q = ComplexDF64(H.p[i]), ComplexDF64(H.q[i])
         d = p - q
-        value = from_target ? q + τ*d : p + (τ-1)*d
+        value = from_target ? q + τ * d : p + (τ - 1) * d
         H.pt_extended[i] = value
         H.taylor_pt_extended[i] = (value, d)
     end
