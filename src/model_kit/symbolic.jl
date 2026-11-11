@@ -10,16 +10,21 @@ map_subscripts(index) = join(SUBSCRIPT_MAP[c] for c in string(index))
 
 function sort_key(v::Variable)
     name = string(ModelKit.name(v))
-    sub_start = findnext(c -> c in ModelKit.SUBSCRIPTS, name, 1)
-    if isnothing(sub_start)
+    # Subscript letters can belong to a base name. Only a trailing numeric
+    # subscript, optionally separated into indices by ₋, denotes an index.
+    indexed_name = match(r"^(.*?)([₀-₉]+(?:₋[₀-₉]+)*)$", name)
+    if isnothing(indexed_name)
         return name, Int[]
     end
-    var_base = name[1:prevind(name, sub_start)]
-    str_indices = split(name[sub_start:end], "₋")
+    var_base = String(something(indexed_name[1]))
+    index_suffix = something(indexed_name[2])
+    str_indices = split(index_suffix, "₋")
     indices = map(str_indices) do str_index
-        digits = map(s -> ModelKit.SUBSCRIPT_TO_INT_MAP[s], collect(str_index))
-        n = length(digits)
-        sum([digits[n-k+1] * 10^(k - 1) for k = 1:n])
+        index = 0
+        for digit in str_index
+            index = 10 * index + ModelKit.SUBSCRIPT_TO_INT_MAP[digit]
+        end
+        index
     end
     var_base, reverse(indices)
 end
@@ -1107,7 +1112,7 @@ function System(
     if variable_groups === nothing
         var_groups = nothing
     else
-        var_groups = map(var_groups) do group
+        var_groups = map(variable_groups) do group
             map(group) do v
                 name, ind = MP.name_base_indices(v)
                 Variable(name, ind...)
@@ -1117,10 +1122,7 @@ function System(
     variables_parameters = [variables; parameters]
     vars_params = [vars; params]
     G = map(F) do f
-        sum(MP.terms(f)) do t
-            c = MP.coefficient(t)
-            c * prod(w^MP.degree(t, v) for (v, w) in zip(variables_parameters, vars_params))
-        end
+        f(variables_parameters => vars_params)
     end
     System(G, variables = vars, parameters = params, variable_groups = var_groups)
 end
@@ -1440,6 +1442,13 @@ function system_with_coefficents_as_params(
     variables = MP.variables(F),
     variable_groups = nothing,
 )
+    # Expand in monomials before replacing numeric coefficients with parameters.
+    # MP 0.5's AbstractPolynomial already uses the monomial basis.
+    @static if isdefined(MP, :convert_basis)
+        F = map(F) do f
+            MP.convert_basis(MP.FullBasis{MP.Monomial}(MP.variables(f)), f)
+        end
+    end
     vars = map(variables) do v
         name, ind = MP.name_base_indices(v)
         Variable(name, ind...)
@@ -1447,7 +1456,7 @@ function system_with_coefficents_as_params(
     if variable_groups === nothing
         var_groups = nothing
     else
-        var_groups = map(var_groups) do group
+        var_groups = map(variable_groups) do group
             map(group) do v
                 name, ind = MP.name_base_indices(v)
                 Variable(name, ind...)
@@ -1459,13 +1468,14 @@ function system_with_coefficents_as_params(
     params = Variable[]
     target_params = MP.coefficient_type(F)[]
     G = map(F) do f
-        sum(MP.terms(f)) do t
+        g = MP.map_coefficients(f) do coefficient
             c = Variable(param_name, k)
             k += 1
             push!(params, c)
-            push!(target_params, MP.coefficient(t))
-            c * prod(w^MP.degree(t, v) for (v, w) in zip(variables, vars))
+            push!(target_params, coefficient)
+            Expression(c)
         end
+        g(variables => vars)
     end
     sys = System(G, variables = vars, parameters = params, variable_groups = var_groups)
     sys, target_params
