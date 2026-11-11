@@ -283,12 +283,21 @@ end
 
 @inline function ldiv_upper!(A::AbstractMatrix, b::AbstractVector, x::AbstractVector = b)
     n = size(A, 2)
-    @inbounds for j = n:-1:1
-        # singular_exception && iszero(A[j, j]) && throw(LA.SingularException(j))
+    # Eliminate two columns per pass over the right-hand side. Keep the update
+    # order within each entry, including when b and x are distinct buffers.
+    j = n
+    @inbounds while j > 1
         xj = x[j] = (@fastmath A[j, j] \ b[j])
-        for i = 1:(j-1)
-            b[i] -= A[i, j] * xj
+        b[j-1] -= A[j-1, j] * xj
+        xprev = x[j-1] = (@fastmath A[j-1, j-1] \ b[j-1])
+        for i = 1:j-2
+            bi = b[i] - A[i, j] * xj
+            b[i] = bi - A[i, j-1] * xprev
         end
+        j -= 2
+    end
+    if j == 1
+        @inbounds x[1] = (@fastmath A[1, 1] \ b[1])
     end
     b
 end
@@ -298,11 +307,19 @@ end
     x::AbstractVector = b,
 )
     n = size(A, 2)
-    @inbounds for j = 1:n
+    j = 1
+    @inbounds while j < n
         xj = x[j] = b[j]
-        for i = j+1:n
-            b[i] -= A[i, j] * xj
+        b[j+1] -= A[j+1, j] * xj
+        xnext = x[j+1] = b[j+1]
+        for i = j+2:n
+            bi = b[i] - A[i, j] * xj
+            b[i] = bi - A[i, j+1] * xnext
         end
+        j += 2
+    end
+    if j == n
+        @inbounds x[n] = b[n]
     end
     x
 end
