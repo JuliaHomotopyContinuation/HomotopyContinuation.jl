@@ -221,6 +221,9 @@ of ``F_i``. See also [^LW96].
 
 Set `show_progress = false` to suppress progress output while computing mixed cells.
 
+Coefficients are converted to `ComplexF64`. Nonfinite coefficients and
+coefficients that overflow or underflow to zero during conversion are rejected.
+
     function polyhedral(
         support::AbstractVector{<:AbstractMatrix},
         coefficientss::AbstractVector{<:AbstractVector{<:Number}};
@@ -366,6 +369,31 @@ rand_approx_unit(n) = map(_ -> (0.9 + 0.2 * rand()) * cis2pi(rand()), 1:n)
 
 cis2pi(x) = complex(cospi(2x), sinpi(2x))
 
+function polyhedral_coefficients(coefficients::AbstractVector, kind::AbstractString)
+    converted = Vector{ComplexF64}[]
+    for (i, coefficients_i) in enumerate(coefficients)
+        converted_i = ComplexF64[]
+        for (j, c) in enumerate(coefficients_i)
+            isfinite(c) || throw(
+                ArgumentError("$kind coefficient $j of equation $i must be finite."),
+            )
+            z = ComplexF64(c)
+            if !isfinite(z) || (!iszero(c) && iszero(z))
+                throw(
+                    ArgumentError(
+                        "$kind coefficient $j of equation $i overflows or underflows " *
+                        "when converted to ComplexF64. Rescale the equation in the " *
+                        "original coefficient precision before solving.",
+                    ),
+                )
+            end
+            push!(converted_i, z)
+        end
+        push!(converted, converted_i)
+    end
+    converted
+end
+
 function polyhedral(
     support::AbstractVector{<:AbstractMatrix},
     start_coeffs::AbstractVector,
@@ -381,6 +409,8 @@ function polyhedral(
     unsupported_kwargs(kwargs)
     size.(support, 2) == length.(start_coeffs) == length.(target_coeffs) ||
         throw(ArgumentError("Number of terms do not coincide."))
+    target_coeffs = polyhedral_coefficients(target_coeffs, "Target")
+    start_coeffs = polyhedral_coefficients(start_coeffs, "Start")
     if only_non_zero
         min_vecs = minimum.(support, dims = 2)
         support = map((A, v) -> A .- v, support, min_vecs)

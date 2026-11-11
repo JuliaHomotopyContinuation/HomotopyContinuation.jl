@@ -1,4 +1,22 @@
 @testset "Polyhedral" begin
+    @testset "Coefficient conversion" begin
+        @var x
+        F = System([big"2.0" * x^2 - big"8.0"])
+        result = solve(
+            F;
+            start_system = :polyhedral,
+            compile = false,
+            show_progress = false,
+            seed = UInt32(528),
+        )
+        @test sort(only.(real_solutions(result))) ≈ [-2.0, 2.0]
+
+        support = [reshape(Int32[0, 2], 1, 2)]
+        for bad in (big"1e400", big"1e-400", BigFloat(Inf), BigFloat(NaN))
+            @test_throws ArgumentError polyhedral(support, [[bad, BigFloat(1)]])
+        end
+    end
+
     @testset "affine + torus solutions" begin
         @var x y
         f = System([2y + 3 * y^2 - x * y^3, x + 4 * x^2 - 2 * x^3 * y])
