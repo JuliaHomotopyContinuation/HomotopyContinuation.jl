@@ -1107,7 +1107,7 @@ function System(
     if variable_groups === nothing
         var_groups = nothing
     else
-        var_groups = map(var_groups) do group
+        var_groups = map(variable_groups) do group
             map(group) do v
                 name, ind = MP.name_base_indices(v)
                 Variable(name, ind...)
@@ -1117,10 +1117,7 @@ function System(
     variables_parameters = [variables; parameters]
     vars_params = [vars; params]
     G = map(F) do f
-        sum(MP.terms(f)) do t
-            c = MP.coefficient(t)
-            c * prod(w^MP.degree(t, v) for (v, w) in zip(variables_parameters, vars_params))
-        end
+        f(variables_parameters => vars_params)
     end
     System(G, variables = vars, parameters = params, variable_groups = var_groups)
 end
@@ -1440,6 +1437,13 @@ function system_with_coefficents_as_params(
     variables = MP.variables(F),
     variable_groups = nothing,
 )
+    # Expand in monomials before replacing numeric coefficients with parameters.
+    # MP 0.5's AbstractPolynomial already uses the monomial basis.
+    @static if isdefined(MP, :convert_basis)
+        F = map(F) do f
+            MP.convert_basis(MP.FullBasis{MP.Monomial}(MP.variables(f)), f)
+        end
+    end
     vars = map(variables) do v
         name, ind = MP.name_base_indices(v)
         Variable(name, ind...)
@@ -1447,7 +1451,7 @@ function system_with_coefficents_as_params(
     if variable_groups === nothing
         var_groups = nothing
     else
-        var_groups = map(var_groups) do group
+        var_groups = map(variable_groups) do group
             map(group) do v
                 name, ind = MP.name_base_indices(v)
                 Variable(name, ind...)
@@ -1459,13 +1463,14 @@ function system_with_coefficents_as_params(
     params = Variable[]
     target_params = MP.coefficient_type(F)[]
     G = map(F) do f
-        sum(MP.terms(f)) do t
+        g = MP.map_coefficients(f) do coefficient
             c = Variable(param_name, k)
             k += 1
             push!(params, c)
-            push!(target_params, MP.coefficient(t))
-            c * prod(w^MP.degree(t, v) for (v, w) in zip(variables, vars))
+            push!(target_params, coefficient)
+            Expression(c)
         end
+        g(variables => vars)
     end
     sys = System(G, variables = vars, parameters = params, variable_groups = var_groups)
     sys, target_params
