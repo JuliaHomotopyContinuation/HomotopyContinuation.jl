@@ -132,6 +132,16 @@ function lu!(
     ipiv::Union{Vector{I},Nothing} = nothing,
 ) where {T,I<:Integer}
     m, n = size(A)
+    if m == n && T === ComplexF64
+        n == 3 && return lu_small!(A, ipiv, Val(3))
+        n == 4 && return lu_small!(A, ipiv, Val(4))
+    end
+    min(m,n) >= 16 && return lu_rank2!(A, ipiv)
+    lu_rank1!(A, ipiv)
+end
+
+function lu_rank1!(A::AbstractMatrix{T}, ipiv = nothing) where {T}
+    m, n = size(A)
     minmn = min(m, n)
     # LU Factorization
     @inbounds begin
@@ -177,6 +187,94 @@ function lu!(
                 for i = k+1:m
                     A[i, j] -= A[i, k] * A_kj
                 end
+            end
+        end
+    end
+    A
+end
+
+@generated function lu_small!(A, ipiv, ::Val{N}) where {N}
+    body = Expr(:block)
+    for k = 1:N
+        push!(body.args, :(lu_pivot!(A, ipiv, $k, $N, $N)))
+        for j = k+1:N, i = k+1:N
+            push!(body.args, :(A[$i,$j] -= A[$i,$k]*A[$k,$j]))
+        end
+    end
+    quote
+        @inbounds $body
+        A
+    end
+end
+
+# Factor two columns before streaming over the trailing matrix. This retains
+# the existing LU storage and pivot convention (including rectangular inputs).
+@inline function lu_pivot!(A, ipiv, k, m, n)
+    @inbounds begin
+        kp = k
+        amax = abs2(A[k,k])
+        for i = k+1:m
+            a = abs2(A[i,k])
+            if a > amax
+                kp, amax = i, a
+            end
+        end
+        # Squared magnitudes are cheap in the usual exponent range. Fall back
+        # to scaled magnitudes if they cannot distinguish the pivot candidates.
+        if iszero(amax) || !isfinite(amax)
+            amax = abs(A[k,k])
+            kp = k
+            for i = k+1:m
+                a = abs(A[i,k])
+                if a > amax
+                    kp, amax = i, a
+                end
+            end
+        end
+        ipiv === nothing || (ipiv[k] = kp)
+        iszero(amax) && return false
+        if kp != k
+            for j = 1:n
+                A[k,j], A[kp,j] = A[kp,j], A[k,j]
+            end
+        end
+        pivot = A[k,k]
+        reciprocal = inv(pivot)
+        if isfinite(reciprocal)
+            for i = k+1:m
+                A[i,k] *= reciprocal
+            end
+        else
+            for i = k+1:m
+                A[i,k] /= pivot
+            end
+        end
+    end
+    true
+end
+
+function lu_rank2!(A, ipiv)
+    m, n = size(A)
+    @inbounds for k = 1:2:min(m,n)
+        lu_pivot!(A, ipiv, k, m, n)
+        if k == min(m,n)
+            for j = k+1:n, i = k+1:m
+                A[i,j] -= A[i,k] * A[k,j]
+            end
+            break
+        end
+        # Only the next column is needed to choose the second pivot. Swapping
+        # its rows also swaps the first column's multipliers.
+        for i = k+1:m
+            A[i,k+1] -= A[i,k] * A[k,k+1]
+        end
+        lu_pivot!(A, ipiv, k+1, m, n)
+        for j = k+2:n
+            a = A[k,j]
+            b = A[k+1,j] - A[k+1,k] * a
+            A[k+1,j] = b
+            for i = k+2:m
+                A[i,j] = (A[i,j] - A[i,k]*a) - A[i,k+1]*b
             end
         end
     end
@@ -888,6 +986,7 @@ function iterative_refinement!(
 )
     J.ldivs[] += 1
     δ = mixed_precision_iterative_refinement!(x, workspace(J), b, norm)
+    δ < tol && return (accuracy = δ, diverged = false)
     for i = 2:max_iters
         J.ldivs[] += 1
         δ′ = mixed_precision_iterative_refinement!(x, workspace(J), b, norm)

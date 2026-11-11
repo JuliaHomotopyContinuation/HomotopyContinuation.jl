@@ -5,9 +5,10 @@ mutable struct TaylorInterpreters{T}
     order_2::Union{Nothing,Interpreter{Vector{TruncatedTaylorSeries{3,T}}}}
     order_3::Union{Nothing,Interpreter{Vector{TruncatedTaylorSeries{4,T}}}}
     order_4::Union{Nothing,Interpreter{Vector{TruncatedTaylorSeries{5,T}}}}
+    predictor::Union{Nothing,IncrementalTaylorInterpreter{T}}
 end
 TaylorInterpreters{T}() where {T} =
-    TaylorInterpreters{T}(nothing, nothing, nothing, nothing)
+    TaylorInterpreters{T}(nothing, nothing, nothing, nothing, nothing)
 
 """
     InterpretedSystem <: AbstractSystem
@@ -82,6 +83,24 @@ _interpreter_precision(x, p) =
 
 _evaluation_interpreter(obj, ::Type{ComplexF64}) = obj.eval_ComplexF64
 _evaluation_interpreter(obj, ::Type{ComplexDF64}) = obj.eval_ComplexDF64
+_taylor_interpreters(obj, ::Type{ComplexF64}) = obj.taylor_ComplexF64
+_taylor_interpreters(obj, ::Type{ComplexDF64}) = obj.taylor_ComplexDF64
+function _predictor_taylor_interpreter!(obj, ::Type{T}) where {T}
+    caches = _taylor_interpreters(obj, T)
+    I = caches.predictor
+    if I === nothing
+        I = IncrementalTaylorInterpreter(T, _evaluation_interpreter(obj, T))
+        caches.predictor = I
+    end
+    I
+end
+
+predictor_taylor!(u, v, F::AbstractSystem, x, p, incremental::Bool) = taylor!(u, v, F, x, p)
+function predictor_taylor!(u, v::Val{K}, F::InterpretedSystem, x, p, incremental::Bool) where {K}
+    K > 3 && return taylor!(u, v, F, x, p)
+    I = _predictor_taylor_interpreter!(F, _interpreter_precision(x, p))
+    predictor_taylor!(u, v, I, x, nothing, p, incremental)
+end
 _jacobian_interpreter!(obj, ::Type{ComplexF64}) = obj.jac_ComplexF64
 function _jacobian_interpreter!(obj, ::Type{ComplexDF64})
     I = obj.jac_ComplexDF64

@@ -206,7 +206,7 @@ function update!(
     end
 
     # Compute ẋ always using AD
-    taylor!(u, Val(1), H, x, t)
+    taylor!(u, Val(1), H, x, t, false)
     u .= .-u
     LA.ldiv!(xtemp, J, u)
     # Check error made in the linear algebra
@@ -294,10 +294,11 @@ function predict!(x̂, pred::Predictor, method::PredictionMethod.methods, H, x, 
         λ³ = λ^3
         tol = 1e-12
         for (i, (x, x¹, x², x³)) in enumerate(pred.tx³)
-            c, c¹, c², c³ = fast_abs.((x, x¹, x², x³))
             # check if only taylor series is used
-            τ = tol * √(c^2 + (c¹ * λ)^2 + (c² * λ²)^2 + (c³ * λ³)^2)
-            if c³ * λ³ ≤ τ || c² * λ² ≤ τ
+            c² = abs2(x² * λ²)
+            c³ = abs2(x³ * λ³)
+            τ² = tol^2 * (abs2(x) + abs2(x¹ * λ) + c² + c³)
+            if c³ ≤ τ² || c² ≤ τ²
                 x̂[i] = x + Δt * (x¹ + Δt * x²)
             else
                 δᵢ = 1 - Δt * x³ / x²

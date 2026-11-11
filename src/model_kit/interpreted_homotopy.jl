@@ -100,6 +100,15 @@ function taylor!(
 end
 
 # Acb
+function taylor!(u, v::Val{K}, H::InterpretedHomotopy, x, t, p, incremental::Bool) where {K}
+    K > 3 && return taylor!(u, v, H, x, t, p)
+    T = promote_type(_interpreter_precision(x, p), _interpreter_precision(t))
+    I = _predictor_taylor_interpreter!(H, T)
+    predictor_taylor!(u, v, I, x, (t, 1), p, incremental)
+end
+taylor!(u, v::Val, H::InterpretedHomotopy, x, t, incremental::Bool) =
+    taylor!(u, v, H, x, t, nothing, incremental)
+
 function evaluate!(
     u::AbstractArray{<:Union{Acb,AcbRef}},
     H::InterpretedHomotopy,

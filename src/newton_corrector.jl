@@ -32,6 +32,16 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", r::NewtonCorrectorResult)
 Base.show(io::IO, result::NewtonCorrectorResult) = print_fieldnames(io, result)
 is_converged(R::NewtonCorrectorResult) = R.return_code == NEWT_CONVERGED
 
+struct ExtendedNewtonWorkspace
+    A::Matrix{ComplexDF64}
+    factors::Matrix{ComplexDF64}
+    residual::Vector{ComplexDF64}
+    correction::Vector{ComplexDF64}
+    pivots::Vector{Int}
+end
+ExtendedNewtonWorkspace(n) = ExtendedNewtonWorkspace(zeros(ComplexDF64,n,n),
+    zeros(ComplexDF64,n,n), zeros(ComplexDF64,n), zeros(ComplexDF64,n), zeros(Int,n))
+
 struct NewtonCorrector
     a::Float64
     # derived
@@ -40,6 +50,7 @@ struct NewtonCorrector
     r::Vector{ComplexF64}
     r̄::Vector{ComplexF64}
     x_extended::Vector{ComplexDF64}
+    extended_workspace::Base.RefValue{Union{Nothing,ExtendedNewtonWorkspace}}
 end
 
 function NewtonCorrector(a::Float64, x::AbstractVector{ComplexF64}, m::Int)
@@ -49,7 +60,74 @@ function NewtonCorrector(a::Float64, x::AbstractVector{ComplexF64}, m::Int)
     r = zeros(ComplexF64, m)
     r̄ = zero(r)
     x_extended = ComplexDF64.(x)
-    NewtonCorrector(a, h_a, Δx, r, r̄, x_extended)
+    NewtonCorrector(a, h_a, Δx, r, r̄, x_extended,
+        Ref{Union{Nothing,ExtendedNewtonWorkspace}}(nothing))
+end
+
+# Escalate the Jacobian and factorization only when residual-only refinement
+# stagnates. User-defined systems keep their existing evaluation contract.
+extended_jacobian_supported(::AbstractHomotopy) = false
+extended_jacobian_supported(::Union{CompiledHomotopy,InterpretedHomotopy,MixedHomotopy}) = true
+extended_jacobian_supported(H::ParameterHomotopy) =
+    H.F isa Union{CompiledSystem,InterpretedSystem,MixedSystem}
+extended_jacobian_supported(H::FixedParameterHomotopy) =
+    extended_jacobian_supported(H.homotopy)
+extended_jacobian_supported(H::AffineChartHomotopy) =
+    extended_jacobian_supported(H.homotopy)
+
+function extended_newton_correction!(NC, H, x, t)
+    n = length(x)
+    size(H) == (n,n) && extended_jacobian_supported(H) || return false
+    W = NC.extended_workspace[]
+    if W === nothing
+        W = ExtendedNewtonWorkspace(n)
+        NC.extended_workspace[] = W
+    end
+    NC.x_extended .= x
+    evaluate_and_jacobian!(W.residual, W.A, H, NC.x_extended, t)
+    copyto!(W.factors, W.A)
+    lu_rank2!(W.factors, W.pivots)
+    copyto!(W.correction, W.residual)
+    @inbounds for k = 1:n
+        p = W.pivots[k]
+        W.correction[k], W.correction[p] = W.correction[p], W.correction[k]
+    end
+    @inbounds for k = 1:n, i = k+1:n
+        W.correction[i] -= W.factors[i,k]*W.correction[k]
+    end
+    @inbounds for k = n:-1:1
+        W.correction[k] /= W.factors[k,k]
+        for i = 1:k-1
+            W.correction[i] -= W.factors[i,k]*W.correction[k]
+        end
+    end
+    all(isfinite, W.correction) || return false
+    # Check the solve before replacing the ordinary correction. The bound is
+    # relative to the terms, so cancellation in the residual is allowed.
+    @inbounds for i = 1:n
+        residual = -W.residual[i]
+        scale = abs(W.residual[i])
+        for j = 1:n
+            term = W.A[i,j]*W.correction[j]
+            residual += term
+            scale += abs(term)
+        end
+        abs(residual) <= 1e-25*scale || return false
+    end
+    NC.Δx .= W.correction
+    true
+end
+
+function refine_newton_correction!(NC, H, x, t, J, norm; tol)
+    result = iterative_refinement!(NC.Δx, J, NC.r, norm; tol, max_iters=3)
+    if (result.diverged || !isfinite(result.accuracy) || result.accuracy > tol) &&
+       (!all(iszero, NC.r) || !all(isfinite, NC.Δx))
+        if extended_newton_correction!(NC, H, x, t)
+            J.factorizations[] += 1
+            J.ldivs[] += 1
+        end
+    end
+    nothing
 end
 
 function extended_prec_refinement_step!(
@@ -67,12 +145,14 @@ function extended_prec_refinement_step!(
     x_extended .= x
     evaluate!(r, H, x_extended, t)
     LA.ldiv!(Δx, updated!(J), r, norm)
-    iterative_refinement!(Δx, J, r, norm; tol = 1e-8, max_iters = 3)
+    refine_newton_correction!(NC, H, x, t, J, norm; tol = 1e-8)
     x̄ .= x .- Δx
     if simple_newton_step
         x_extended .= x̄
         evaluate!(r, H, x_extended, t)
         LA.ldiv!(Δx, J, r, norm)
+        NC.extended_workspace[] === nothing ||
+            refine_newton_correction!(NC, H, x̄, t, J, norm; tol = 1e-8)
     end
     norm(Δx)
 end
@@ -106,7 +186,7 @@ function newton!(
         end
         LA.ldiv!(Δxᵢ, updated!(J), r, norm)
         if extended_precision
-            iterative_refinement!(Δxᵢ, J, r, norm; tol = ā^2, max_iters = 3)
+            refine_newton_correction!(NC, H, xᵢ, t, J, norm; tol = ā^2)
         end
         norm_Δxᵢ = norm(Δxᵢ)
 
@@ -145,12 +225,13 @@ function newton!(
             if extended_precision
                 LA.ldiv!(Δxᵢ, J, r)
                 μ_low = norm(Δxᵢ)
+                isfinite(μ_low) || (μ_low = Inf)
                 x_extended .= xᵢ
                 evaluate!(r, H, x_extended, t)
             end
             LA.ldiv!(Δxᵢ, J, r)
             if extended_precision
-                iterative_refinement!(Δxᵢ, J, r, norm; tol = ā^2, max_iters = 3)
+                refine_newton_correction!(NC, H, xᵢ, t, J, norm; tol = ā^2)
             end
             xᵢ₊₂ .= xᵢ₊₁ .- Δxᵢ
             norm_Δxᵢ₊₁ = norm(Δxᵢ)
@@ -175,6 +256,7 @@ function newton!(
                 x_extended .= xᵢ
                 evaluate!(r, H, x_extended, t)
                 LA.ldiv!(Δxᵢ, J, r)
+                refine_newton_correction!(NC, H, xᵢ, t, J, norm; tol = ā^2)
                 norm_Δxᵢ = norm_Δxᵢ₊₁
                 μ = norm_Δxᵢ₊₁ = norm(Δxᵢ)
             elseif norm_Δxᵢ₊₁ > 2μ || accurate_μ
