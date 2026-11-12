@@ -198,6 +198,7 @@ function update!(
     norm::AbstractNorm,
     x̂ = nothing; # the predicted value
     extended_precision::Bool = true,
+    full_extended_precision::Bool = false,
 )
     # The general strategy is as follows:
     #
@@ -241,30 +242,44 @@ function update!(
         y⁰ .= x
     end
 
-    # Compute ẋ always using AD
-    taylor!(u, Val(1), H, x, t, false)
-    u .= .-u
-    LA.ldiv!(xtemp, J, u)
-    # Check error made in the linear algebra
-    δ = fixed_precision_iterative_refinement!(xtemp, workspace(J), u, norm)
-    predictor.cond_H_ẋ = cond_H_ẋ = δ / eps()
-    tol_δ₁ = 1e-10
+    extended = extended_precision && full_extended_precision
+    δ = 0.0
+    if extended
+        if extended_predictor!(predictor, H, x, t, m > 1 ? 1 : 3)
+            predictor.used_extended_precision = true
+            J.factorizations[] += 1
+            J.ldivs[] += m > 1 ? 1 : 3
+            xtemp .= x¹
+        else
+            fill!(xtemp, NaN)
+            fill!(x², NaN)
+            fill!(x³, NaN)
+        end
+    else
+        # Compute ẋ always using AD
+        taylor!(u, Val(1), H, x, t, false)
+        u .= .-u
+        LA.ldiv!(xtemp, J, u)
+        # Check error made in the linear algebra
+        δ = fixed_precision_iterative_refinement!(xtemp, workspace(J), u, norm)
+        predictor.cond_H_ẋ = cond_H_ẋ = δ / eps()
+        tol_δ₁ = 1e-10
 
-    extended = false
-    if δ > tol_δ₁ || !all(isfinite, xtemp)
-        refinement =
-            iterative_refinement!(xtemp, J, u, InfNorm(); tol = tol_δ₁, max_iters = 5)
-        if extended_precision && (
-            refinement.diverged ||
-            !isfinite(refinement.accuracy) ||
-            refinement.accuracy > tol_δ₁
-        )
-            extended = extended_predictor!(predictor, H, x, t, m > 1 ? 1 : 3)
-            if extended
-                predictor.used_extended_precision = true
-                J.factorizations[] += 1
-                J.ldivs[] += m > 1 ? 1 : 3
-                xtemp .= x¹
+        if δ > tol_δ₁ || !all(isfinite, xtemp)
+            refinement =
+                iterative_refinement!(xtemp, J, u, InfNorm(); tol = tol_δ₁, max_iters = 5)
+            if extended_precision && (
+                refinement.diverged ||
+                !isfinite(refinement.accuracy) ||
+                refinement.accuracy > tol_δ₁
+            )
+                extended = extended_predictor!(predictor, H, x, t, m > 1 ? 1 : 3)
+                if extended
+                    predictor.used_extended_precision = true
+                    J.factorizations[] += 1
+                    J.ldivs[] += m > 1 ? 1 : 3
+                    xtemp .= x¹
+                end
             end
         end
     end

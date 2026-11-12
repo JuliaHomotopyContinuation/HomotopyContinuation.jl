@@ -2,15 +2,21 @@ struct CorrectorCountingHomotopy{H} <: HC.AbstractHomotopy
     homotopy::H
     evaluations::Base.RefValue{Int}
     jacobians::Base.RefValue{Int}
+    extended_jacobians::Base.RefValue{Int}
 end
-CorrectorCountingHomotopy(H) = CorrectorCountingHomotopy(H, Ref(0), Ref(0))
+CorrectorCountingHomotopy(H) = CorrectorCountingHomotopy(H, Ref(0), Ref(0), Ref(0))
 Base.size(H::CorrectorCountingHomotopy) = size(H.homotopy)
+HC.ModelKit.taylor!(u, v::Val, H::CorrectorCountingHomotopy, x, t, incremental::Bool) =
+    taylor!(u, v, H.homotopy, x, t, incremental)
+HC.extended_jacobian_supported(H::CorrectorCountingHomotopy) =
+    HC.extended_jacobian_supported(H.homotopy)
 function HC.ModelKit.evaluate!(u, H::CorrectorCountingHomotopy, x, t)
     H.evaluations[] += 1
     evaluate!(u, H.homotopy, x, t)
 end
 function HC.ModelKit.evaluate_and_jacobian!(u, U, H::CorrectorCountingHomotopy, x, t)
     H.jacobians[] += 1
+    H.extended_jacobians[] += eltype(x) === HC.DoubleDouble.ComplexDF64
     evaluate_and_jacobian!(u, U, H.homotopy, x, t)
 end
 
@@ -356,6 +362,61 @@ end
                 ω = 1.0,
             )
             @test !HC.is_converged(r)
+        end
+    end
+
+    @testset "Persistent path precision" begin
+        @var x y p q
+        F = System(
+            [x + y - 1, x + y - 1 + p * ((1 + q) * y - 1)];
+            variables = [x, y],
+            parameters = [p, q],
+        )
+        for compile in (false, true, :mixed)
+            H = CorrectorCountingHomotopy(
+                ParameterHomotopy(F, [2.0^-60, 1], [2.0^-60, 0]; compile),
+            )
+            T = Tracker(H)
+            @test HC.init!(T, [0.5, 0.5])
+            @test T.corrector.full_extended_precision[]
+            @test T.predictor.used_extended_precision
+            low = H.jacobians[] - H.extended_jacobians[]
+            high = H.extended_jacobians[]
+            @test HC.step!(T)
+            @test H.extended_jacobians[] > high
+            @test H.jacobians[] - H.extended_jacobians[] == low
+            @test T.corrector.full_extended_precision[]
+            @test T.state.used_extended_prec
+            HC.init!(T, 0.0)
+            @test T.corrector.full_extended_precision[]
+            W = T.corrector.extended_workspace[]
+            P = T.predictor.extended_workspace
+
+            # Supplying initial estimates bypasses Newton initialization, so
+            # here the predictor discovers the need for escalation first.
+            T2 = Tracker(H)
+            @test HC.init!(T2, [0.5, 0.5]; ω = 1.0, μ = eps())
+            @test T2.predictor.used_extended_precision
+            @test T2.corrector.full_extended_precision[]
+            @test T2.corrector.extended_workspace[] === nothing
+            low = H.jacobians[] - H.extended_jacobians[]
+            @test HC.step!(T2)
+            @test H.jacobians[] - H.extended_jacobians[] == low
+            @test T2.corrector.extended_workspace[] !== nothing
+
+            HC.parameters!(H.homotopy, [1, 1], [1, 0])
+            @test HC.init!(T, [0.5, 0.5])
+            @test !T.corrector.full_extended_precision[]
+            @test !T.predictor.used_extended_precision
+            @test T.corrector.extended_workspace[] === W
+            @test T.predictor.extended_workspace === P
+
+            HC.parameters!(H.homotopy, [2.0^-60, 1], [2.0^-60, 0])
+            T.options.extended_precision = false
+            high = H.extended_jacobians[]
+            @test !HC.init!(T, [0.5, 0.5])
+            @test !T.corrector.full_extended_precision[]
+            @test H.extended_jacobians[] == high
         end
     end
 

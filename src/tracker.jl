@@ -629,7 +629,12 @@ function update_predictor!(tracker::Tracker, x̂ = nothing, Δs = nothing, t_pre
         state.norm,
         x̂;
         extended_precision = tracker.options.extended_precision,
+        full_extended_precision = tracker.corrector.full_extended_precision[],
     )
+    if tracker.options.extended_precision && predictor.used_extended_precision
+        tracker.corrector.full_extended_precision[] = true
+        state.extended_prec = true
+    end
     state.used_extended_prec |= predictor.used_extended_precision
     predictor
 end
@@ -663,6 +668,8 @@ function init!(
     @unpack x, x̄, norm, jacobian = state
 
     # intialize state
+    corrector.full_extended_precision[] = false
+    extended_precision &= options.extended_precision
     set_solution!(x, homotopy, x₁, t₁)
     init!(state.segment_stepper, t₁, t₀)
     state.Δs_prev = 0.0
@@ -694,7 +701,7 @@ function init!(
             a = a,
             extended_precision = extended_precision,
         )
-        if !valid && !extended_precision
+        if !valid && !extended_precision && options.extended_precision
             extended_precision = true
             valid, ω, μ = init_newton!(
                 x̄,
@@ -782,6 +789,11 @@ function update_precision!(tracker::Tracker, μ_low)
     @unpack a = options.parameters
 
     options.extended_precision || return false
+
+    if corrector.full_extended_precision[]
+        state.extended_prec = state.used_extended_prec = true
+        return true
+    end
 
     if state.extended_prec && !state.keep_extended_prec && !isnan(μ_low) && μ_low > μ
         # check if we can go low again
@@ -888,7 +900,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         norm;
         ω = state.ω,
         μ = state.μ,
-        extended_precision = state.extended_prec,
+        extended_precision = options.extended_precision && state.extended_prec,
         first_correction = state.accepted_steps == 0,
     )
 
