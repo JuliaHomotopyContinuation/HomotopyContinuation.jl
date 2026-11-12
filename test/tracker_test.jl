@@ -1,3 +1,19 @@
+struct CorrectorCountingHomotopy{H} <: HC.AbstractHomotopy
+    homotopy::H
+    evaluations::Base.RefValue{Int}
+    jacobians::Base.RefValue{Int}
+end
+CorrectorCountingHomotopy(H) = CorrectorCountingHomotopy(H, Ref(0), Ref(0))
+Base.size(H::CorrectorCountingHomotopy) = size(H.homotopy)
+function HC.ModelKit.evaluate!(u, H::CorrectorCountingHomotopy, x, t)
+    H.evaluations[] += 1
+    evaluate!(u, H.homotopy, x, t)
+end
+function HC.ModelKit.evaluate_and_jacobian!(u, U, H::CorrectorCountingHomotopy, x, t)
+    H.jacobians[] += 1
+    evaluate_and_jacobian!(u, U, H.homotopy, x, t)
+end
+
 @testset "Tracker" begin
     @testset "tracking $mode - AD: $AD" for mode in [InterpretedSystem, CompiledSystem],
         AD = 0:3
@@ -251,6 +267,96 @@
         result = track(tracker, startsolutions0, 1, 0)
         @test is_invalid_startvalue(result)
         @test result.return_code == :terminated_invalid_startvalue_singular_jacobian
+    end
+
+    @testset "Newton correction at an unchanged point" begin
+        @var x y t
+        symbolic = Homotopy([x - 1 - t, 2 * (y - 1)], [x, y], t)
+        for mode in (InterpretedHomotopy, CompiledHomotopy, MixedHomotopy),
+            extended in (false, true),
+            weighted in (false, true),
+            δ in (0.0, 2.0^-60)
+
+            H = CorrectorCountingHomotopy(mode(symbolic))
+            start = ComplexF64[1, 1]
+            out = similar(start)
+            nc = HC.NewtonCorrector(0.125, start, 2)
+            J = HC.Jacobian(zeros(ComplexF64, 2, 2))
+            norm = weighted ? WeightedNorm(ones(2), InfNorm()) : InfNorm()
+            r = HC.newton!(
+                out,
+                nc,
+                H,
+                start,
+                δ,
+                J,
+                norm;
+                μ = eps(),
+                ω = 1.0,
+                extended_precision = extended,
+                first_correction = true,
+            )
+            @test HC.is_converged(r)
+            @test out == start
+            @test r.accuracy ≈ δ
+            @test r.iters == 2
+            @test H.jacobians[] == 1
+            @test J.factorizations[] == 1
+            @test H.evaluations[] == Int(extended)
+            extended && @test r.μ_low ≈ δ
+        end
+    end
+
+    @testset "Newton correction with changing iterates" begin
+        @var x y t
+        symbolic = Homotopy([x^2 - 2, y^2 - 3], [x, y], t)
+        for extended in (false, true), accurate in (false, true)
+            H = CorrectorCountingHomotopy(InterpretedHomotopy(symbolic))
+            start = ComplexF64[1.42, 1.74]
+            out = similar(start)
+            nc = HC.NewtonCorrector(0.125, start, 2)
+            J = HC.Jacobian(zeros(ComplexF64, 2, 2))
+            r = HC.newton!(
+                out,
+                nc,
+                H,
+                start,
+                0.0,
+                J,
+                InfNorm();
+                μ = eps(),
+                ω = 1.0,
+                extended_precision = extended,
+                accurate_μ = accurate,
+                first_correction = true,
+            )
+            @test HC.is_converged(r)
+            @test out ≈ [sqrt(2), sqrt(3)] atol = 1e-14
+            @test r.accuracy <= 1e-14
+            @test H.jacobians[] >= 2
+            @test all(isfinite, HC.matrix(J))
+        end
+
+        # Rejection and singularity must not become successful stagnation exits.
+        for H in (
+            InterpretedHomotopy(Homotopy([x^2 + 1, y^2 + 1], [x, y], t)),
+            InterpretedHomotopy(Homotopy([x + y - 1, x + y - 1], [x, y], t)),
+        )
+            start = ComplexF64[0.1, 0.1]
+            nc = HC.NewtonCorrector(0.125, start, 2)
+            r = HC.newton!(
+                similar(start),
+                nc,
+                H,
+                start,
+                0.0,
+                HC.Jacobian(zeros(ComplexF64, 2, 2)),
+                InfNorm();
+                μ = eps(),
+                ω = 1.0,
+            )
+            @test !HC.is_converged(r)
+        end
     end
 
     include("test_cases/steiner_higher_prec.jl")

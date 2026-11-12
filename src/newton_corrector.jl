@@ -140,6 +140,7 @@ function newton!(
     for i = 0:10
         evaluate_and_jacobian!(r, matrix(J), H, xᵢ, t)
         if extended_precision
+            copyto!(r̄, r)
             x_extended .= xᵢ
             evaluate!(r, H, x_extended, t)
         end
@@ -162,7 +163,16 @@ function newton!(
             )
         end
 
-        xᵢ₊₁ .= xᵢ .- Δxᵢ
+        # Detect a correction lost to rounding while applying it. If the point
+        # is unchanged, its residual and Jacobian remain valid for the final
+        # accuracy check; no new evaluation or factorization is necessary.
+        unchanged = true
+        @inbounds for k in eachindex(xᵢ, Δxᵢ)
+            old = xᵢ[k]
+            new = old - Δxᵢ[k]
+            unchanged &= isequal(old, new)
+            xᵢ₊₁[k] = new
+        end
 
         i == 0 && (norm_Δx₀ = norm_Δxᵢ)
         i == 1 && (ω = 2 * norm_Δxᵢ / norm_Δxᵢ₋₁^2)
@@ -179,14 +189,18 @@ function newton!(
                 norm_Δx₀,
             )
         elseif ω * norm_Δxᵢ^2 < 2 * μ * sqrt(1 - 2 * h_a)
-            evaluate_and_jacobian!(r, matrix(J), H, xᵢ, t)
-            updated!(J)
+            if !unchanged
+                evaluate_and_jacobian!(r, matrix(J), H, xᵢ, t)
+                updated!(J)
+            end
             if extended_precision
-                LA.ldiv!(Δxᵢ, J, r)
+                LA.ldiv!(Δxᵢ, J, unchanged ? r̄ : r)
                 μ_low = norm(Δxᵢ)
                 isfinite(μ_low) || (μ_low = Inf)
-                x_extended .= xᵢ
-                evaluate!(r, H, x_extended, t)
+                if !unchanged
+                    x_extended .= xᵢ
+                    evaluate!(r, H, x_extended, t)
+                end
             end
             LA.ldiv!(Δxᵢ, J, r)
             if extended_precision
