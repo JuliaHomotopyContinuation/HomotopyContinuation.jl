@@ -584,23 +584,31 @@ function taylor_atan_impl(K, M)
         end
         push!(g, gk)
     end
-    # powers of g₀: pw[n+1] = g₀^n
-    pw = Any[1, g[1]]
+    # pw[n] = g₀^n
+    pw = Any[g[1]]
     for n = 2:K
-        push!(pw, mul!(list, pw[n], g[1]))
+        push!(pw, mul!(list, pw[n-1], g[1]))
     end
 
-    # Ms[k+1] = M_k = k * g₀^k * y_k  (no divisions inside)
-    Ms = Any[nothing]
+    # Q[k][n] = quotient-free numerator of the 1/g₀^n part of k*y_k
+    Q = Vector{Any}[]
     ids = Any[:at₀]
     for k = 1:K
-        Mk = mul!(list, k, mul!(list, D[:x, k], pw[k]))          # k·x_k·g₀^(k-1)
-        for j = 1:(k-1)
-            term = mul!(list, g[j+1], mul!(list, Ms[k-j+1], pw[j]))  # g_j·M_(k-j)·g₀^(j-1)
-            Mk = sub!(list, Mk, term)
+        Qk = Any[mul!(list, k, D[:x, k])]
+        for n = 1:(k-1)
+            acc = nothing
+            for j = 1:(k-n)          # need Q[k-j] to have an index n
+                acc = muladd!(list, g[j+1], Q[k-j][n], acc)
+            end
+            push!(Qk, mul!(list, -1, acc))
         end
-        push!(Ms, Mk)
-        push!(ids, div!(list, div!(list, Mk, pw[k+1]), k))       # y_k = M_k / g₀^k / k
+        push!(Q, Qk)
+        total = nothing
+        for n = 1:k
+            term = div!(list, div!(list, Qk[n], pw[n]), k)
+            total = total === nothing ? term : muladd!(list, term, 1, total)
+        end
+        push!(ids, total)
     end
     quote
         Base.@_inline_meta
