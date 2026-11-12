@@ -584,14 +584,23 @@ function taylor_atan_impl(K, M)
         end
         push!(g, gk)
     end
+    # powers of g₀: pw[n+1] = g₀^n
+    pw = Any[1, g[1]]
+    for n = 2:K
+        push!(pw, mul!(list, pw[n], g[1]))
+    end
+
+    # Ms[k+1] = M_k = k * g₀^k * y_k  (no divisions inside)
+    Ms = Any[nothing]
     ids = Any[:at₀]
     for k = 1:K
-        value = mul!(list, k, D[:x, k])
+        Mk = mul!(list, k, mul!(list, D[:x, k], pw[k]))          # k·x_k·g₀^(k-1)
         for j = 1:(k-1)
-            term = mul!(list, g[j+1], mul!(list, k - j, ids[k-j+1]))
-            value = sub!(list, value, term)
+            term = mul!(list, g[j+1], mul!(list, Ms[k-j+1], pw[j]))  # g_j·M_(k-j)·g₀^(j-1)
+            Mk = sub!(list, Mk, term)
         end
-        push!(ids, div!(list, div!(list, value, g[1]), k))
+        push!(Ms, Mk)
+        push!(ids, div!(list, div!(list, Mk, pw[k+1]), k))       # y_k = M_k / g₀^k / k
     end
     quote
         Base.@_inline_meta
