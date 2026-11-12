@@ -591,7 +591,7 @@ function taylor_atan_impl(K, M)
             term = mul!(list, g[j+1], mul!(list, k - j, ids[k-j+1]))
             value = sub!(list, value, term)
         end
-        push!(ids, div!(list, value, mul!(list, k, g[1])))
+        push!(ids, div!(list, div!(list, value, g[1]), k))
     end
     quote
         Base.@_inline_meta
