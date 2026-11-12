@@ -636,6 +636,12 @@ function update_predictor!(tracker::Tracker, x̂ = nothing, Δs = nothing, t_pre
         state.extended_prec = true
     end
     state.used_extended_prec |= predictor.used_extended_precision
+    if !is_done(state.segment_stepper) && !(
+        predictor.winding_number > 1 ? all(isfinite, predictor.xtemp) :
+        all(isfinite, predictor.tx³.data)
+    )
+        state.code = TrackerCode.terminated_ill_conditioned
+    end
     predictor
 end
 
@@ -761,6 +767,7 @@ function init!(
     updated!(jacobian)
     init!(tracker.predictor)
     update_predictor!(tracker)
+    is_tracking(state.code) || return false
     state.τ = trust_region(predictor)
     # compute initial step size
     Δs = initial_step_size(state, predictor, tracker.options)
@@ -940,6 +947,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         state.last_steps_failed += 1
     end
     state.norm_Δx₀ = result.norm_Δx₀
+    is_tracking(state.code) || return !state.last_step_failed
     update_stepsize!(state, result, options, predictor; ad_for_error_estimate = false)
 
     check_terminated!(state, options)

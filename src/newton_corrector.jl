@@ -65,6 +65,8 @@ function NewtonCorrector(a::Float64, x::AbstractVector{ComplexF64}, m::Int)
 end
 
 function extended_newton_correction!(NC, H, x, t)
+    # Never leave a correction from a failed lower-precision solve available.
+    fill!(NC.Δx, NaN)
     n = length(x)
     size(H) == (n, n) && extended_jacobian_supported(H) || return false
     W = NC.extended_workspace[]
@@ -104,10 +106,7 @@ function refine_newton_correction!(NC, H, x, t, J, norm; tol)
     result = iterative_refinement!(NC.Δx, J, NC.r, norm; tol, max_iters = 3)
     if (result.diverged || !isfinite(result.accuracy) || result.accuracy > tol) &&
        (!all(iszero, NC.r) || !all(isfinite, NC.Δx))
-        if extended_newton_correction!(NC, H, x, t)
-            J.factorizations[] += 1
-            J.ldivs[] += 1
-        end
+        full_precision_correction!(NC, H, x, t, J)
     end
     nothing
 end
@@ -321,12 +320,16 @@ function init_newton!(
     x₂ = x₁ = x̄ # alias to make logic easier
     @unpack a, Δx, r, x_extended = NC
 
-    evaluate_and_jacobian!(r, matrix(J), H, x₀, t)
-    if extended_precision
-        x_extended .= x₀
-        evaluate!(r, H, x_extended, t)
+    if extended_precision && NC.full_extended_precision[]
+        full_precision_correction!(NC, H, x₀, t, J)
+    else
+        evaluate_and_jacobian!(r, matrix(J), H, x₀, t)
+        if extended_precision
+            x_extended .= x₀
+            evaluate!(r, H, x_extended, t)
+        end
+        LA.ldiv!(Δx, updated!(J), r, norm)
     end
-    LA.ldiv!(Δx, updated!(J), r, norm)
     v = norm(Δx) + eps()
     if extended_precision && !isfinite(v)
         refine_newton_correction!(NC, H, x₀, t, J, norm; tol = 1e-8)
@@ -338,12 +341,16 @@ function init_newton!(
     for k = 1:3
         x̄ .= x₀ .+ ε .* weights(norm)
 
-        evaluate_and_jacobian!(r, matrix(J), H, x̄, t)
-        if extended_precision
-            x_extended .= x̄
-            evaluate!(r, H, x_extended, t)
+        if extended_precision && NC.full_extended_precision[]
+            full_precision_correction!(NC, H, x̄, t, J)
+        else
+            evaluate_and_jacobian!(r, matrix(J), H, x̄, t)
+            if extended_precision
+                x_extended .= x̄
+                evaluate!(r, H, x_extended, t)
+            end
+            LA.ldiv!(Δx, updated!(J), r, norm)
         end
-        LA.ldiv!(Δx, updated!(J), r, norm)
 
         if extended_precision && !all(isfinite, Δx)
             refine_newton_correction!(NC, H, x̄, t, J, norm; tol = 1e-8)
@@ -351,13 +358,17 @@ function init_newton!(
 
         x₁ .= x̄ .- Δx
         norm_Δx₀ = norm(Δx)
-        if extended_precision
-            x_extended .= x₁
-            evaluate!(r, H, x_extended, t)
+        if extended_precision && NC.full_extended_precision[]
+            full_precision_correction!(NC, H, x₁, t, J)
         else
-            evaluate!(r, H, x₁, t)
+            if extended_precision
+                x_extended .= x₁
+                evaluate!(r, H, x_extended, t)
+            else
+                evaluate!(r, H, x₁, t)
+            end
+            LA.ldiv!(Δx, J, r, norm)
         end
-        LA.ldiv!(Δx, J, r, norm)
         if extended_precision && !all(isfinite, Δx)
             refine_newton_correction!(NC, H, x₁, t, J, norm; tol = 1e-8)
         end

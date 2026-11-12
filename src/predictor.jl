@@ -245,6 +245,7 @@ function update!(
     extended = extended_precision && full_extended_precision
     δ = 0.0
     if extended
+        predictor.cond_H_ẋ = NaN
         if extended_predictor!(predictor, H, x, t, m > 1 ? 1 : 3)
             predictor.used_extended_precision = true
             J.factorizations[] += 1

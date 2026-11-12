@@ -94,16 +94,27 @@ function predictor_taylor!(
     checkbounds(u, 1:s.output_dim)
     checkbounds(x, 1:length(s.variables_range))
     p === nothing || checkbounds(p, 1:length(s.parameters_range))
+    # Only coefficients below the new order survive incremental execution.
+    # Compare values before overwriting the input slots, including mutations of
+    # an existing TaylorVector; object identity alone cannot establish validity.
+    reuse = incremental && K > 1 && cache.order == K - 1
     @inbounds for (i, k) in enumerate(s.variables_range)
+        previous = tape[k]
         tape[k] = x[i]
+        reuse &= all(j -> isequal(previous[j], tape[k][j]), 0:K-2)
     end
     @inbounds for (i, k) in enumerate(s.parameters_range)
+        previous = tape[k]
         tape[k] = p[i]
+        reuse &= all(j -> isequal(previous[j], tape[k][j]), 0:K-2)
     end
     if s.continuation_parameter_index !== nothing
-        tape[s.continuation_parameter_index] = t
+        k = s.continuation_parameter_index
+        previous = tape[k]
+        tape[k] = t
+        reuse &= all(j -> isequal(previous[j], tape[k][j]), 0:K-2)
     end
-    if incremental && K > 1 && cache.order == K - 1
+    if reuse
         execute_incremental_taylor!(Val(K), Val(K - 1), x, p, tape, s)
     else
         execute_incremental_taylor!(Val(K), Val(0), x, p, tape, s)

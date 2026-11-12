@@ -866,38 +866,10 @@ function many_solve(
     elseif isa(starts, PolyhedralStartSolutionsIterator)
         @error "Solving for many parameters with polyhedral start system is not implemented and also not recommended. Instead, one should use a two-step approach: solve a system with generic parameters, and track its solutions to the desired parameters. See https://www.juliahomotopycontinuation.org/guides/many-systems/."
     end
-    q = first(many_target_parameters)
-    target_parameters!(solver, transform_parameters(q))
-    if path_repair
-        res = solve(
-            solver,
-            collect(starts);
-            threading,
-            path_repair = true,
-            show_progress = false,
-            catch_interrupt = false,
-        )
-    elseif threading
-        res = threaded_solve(solver, collect(starts); catch_interrupt = false)
-    else
-        res = serial_solve(solver, starts; catch_interrupt = false)
-    end
-    if flatten
-        results = transform_result(res, q)
-        if !(results isa AbstractArray)
-            throw(ArgumentError("Cannot flatten arguments of type `$(typeof(results))`"))
-        end
-    else
-        results = [transform_result(res, q)]
-    end
-    k = 1
+    results = nothing
     m = length(starts)
-    update_many_progress!(progress, results, k, m; flatten = flatten)
-
-
-
     try
-        for q in Iterators.drop(many_target_parameters, 1)
+        for (k, q) in enumerate(many_target_parameters)
             target_parameters!(solver, transform_parameters(q))
             if path_repair
                 res = solve(
@@ -914,16 +886,25 @@ function many_solve(
                 res = serial_solve(solver, starts; catch_interrupt = false)
             end
 
-            if flatten
-                append!(results, transform_result(res, q))
+            transformed = transform_result(res, q)
+            if results === nothing
+                if flatten && !(transformed isa AbstractArray)
+                    throw(
+                        ArgumentError(
+                            "Cannot flatten arguments of type `$(typeof(transformed))`",
+                        ),
+                    )
+                end
+                results = flatten ? transformed : [transformed]
+            elseif flatten
+                append!(results, transformed)
             else
-                push!(results, transform_result(res, q))
+                push!(results, transformed)
             end
-            k += 1
             update_many_progress!(progress, results, k, m; flatten = flatten)
         end
     catch e
-        if !(
+        if !catch_interrupt || !(
             isa(e, InterruptException) ||
             (isa(e, TaskFailedException) && isa(e.task.exception, InterruptException))
         )
@@ -931,7 +912,7 @@ function many_solve(
         end
     end
 
-    results
+    results === nothing ? Any[] : results
 end
 
 
@@ -965,14 +946,21 @@ function endpoint_conflict_pairs(records)
     isempty(ids) && return Tuple{Int,Int}[]
     n = length(solution(records[first(ids)]))
     n == 0 && return Tuple{Int,Int}[]
-    weights = [1.0 / (j + sqrt(2.0)) for j = 1:n]
-    weights ./= sum(weights)
     scale = [max(1.0, maximum(abs, solution(records[i]))) for i in ids]
     radius = [max(32eps(), 8accuracy(records[i])) * scale[k] for (k, i) in enumerate(ids)]
     # An uncertain endpoint is retried separately, not allowed to make the
     # projection window infinite for every other point.
     radius .= map(r -> isfinite(r) ? r : 0.0, radius)
-    projection = [sum(weights[j] * real(solution(records[i])[j]) for j = 1:n) for i in ids]
+    # Use the real or imaginary coordinate with the largest spread. A fixed
+    # real projection degenerates on, for example, purely imaginary endpoints.
+    coordinate, component, spread = 1, real, -Inf
+    for j = 1:n, part in (real, imag)
+        lo, hi = extrema(part(solution(records[i])[j]) for i in ids)
+        if hi - lo > spread
+            coordinate, component, spread = j, part, hi - lo
+        end
+    end
+    projection = [component(solution(records[i])[coordinate]) for i in ids]
     order = sortperm(projection)
     pairs = Tuple{Int,Int}[]
     rmax = maximum(radius)
@@ -1018,15 +1006,34 @@ function repair_candidates(records, tracker)
     sort!(collect(selected)), pairs
 end
 
-function reverse_repair_check(T::EndgameTracker, r, start)
-    start isa AbstractVector{<:Number} || return true
-    is_nonsingular(r) || return true
+function reverse_repair_check(T::EndgameTracker, r, start; separation = Inf)
+    start isa AbstractVector{<:Number} || return nothing
+    is_nonsingular(r) || return nothing
     back = Tracker(deepcopy(T.tracker.homotopy); options = deepcopy(T.tracker.options))
     check = track(back, solution(r), 0.0, 1.0)
     is_success(check) || return false
-    distance(solution(check), start, InfNorm()) <= 1e-7 * max(1.0, norm(start, Inf))
+    tolerance = max(32eps(), 8check.accuracy) * max(1.0, norm(start, Inf))
+    isfinite(tolerance) || return false
+    distance(solution(check), start, InfNorm()) <= min(tolerance, separation / 4)
 end
-reverse_repair_check(::AbstractPathTracker, r, start) = true
+reverse_repair_check(::AbstractPathTracker, r, start; separation = Inf) = nothing
+
+# Bound the reverse check by the separation of distinct numeric starts. Equal
+# starts describe the same path and are handled separately below.
+function repair_start_separation(starts, k)
+    start = starts[k]
+    start isa AbstractVector{<:Number} || return Inf
+    separation = Inf
+    for other in starts
+        other isa AbstractVector{<:Number} || continue
+        length(other) == length(start) || continue
+        other == start && continue
+        separation = min(separation, distance(other, start, InfNorm()))
+    end
+    separation
+end
+
+repair_accuracy(r) = isfinite(accuracy(r)) ? accuracy(r) : Inf
 
 function repair_solve(S::Solver, starts; threading, show_progress, catch_interrupt)
     fast = repair_parameters!(deepcopy(S), 0)
@@ -1049,27 +1056,37 @@ function repair_solve(S::Solver, starts; threading, show_progress, catch_interru
                 k = ids[path_number(r)]
                 previous = records[k]
                 r.path_number = path_number(previous)
-                r.accepted_steps += previous.accepted_steps
-                r.rejected_steps += previous.rejected_steps
-                r.steps_eg += previous.steps_eg
-                r.extended_precision_used |= previous.extended_precision_used
-                reverse_repair_check(first(retry.trackers), r, starts[k]) ||
-                    (r.return_code = :terminated_reverse_check)
-                records[k] = r
+                check = reverse_repair_check(
+                    first(retry.trackers),
+                    r,
+                    starts[k];
+                    separation = repair_start_separation(starts, k),
+                )
+                check === false && (r.return_code = :terminated_reverse_check)
+                keep_previous =
+                    is_success(previous) &&
+                    (!is_success(r) || repair_accuracy(previous) < repair_accuracy(r))
+                chosen, discarded = keep_previous ? (previous, r) : (r, previous)
+                chosen.accepted_steps += discarded.accepted_steps
+                chosen.rejected_steps += discarded.rejected_steps
+                chosen.steps_eg += discarded.steps_eg
+                chosen.extended_precision_used |= discarded.extended_precision_used
+                records[k] = chosen
             end
             length(repaired) == length(ids) || break
         end
         unresolved, pairs = repair_candidates(records, first(S.trackers))
-        # Preserve one representative of an unresolved collision; expose the
-        # other paths as failures rather than silently claiming a complete set.
-        # Select representatives for connected components before changing any
-        # return codes, so the result does not depend on pair traversal order.
+        # Proximity alone cannot establish that two paths coincide. Only merge
+        # candidates whose equal numeric starts identify the very same path.
         parent = collect(eachindex(records))
         root(i) = parent[i] == i ? i : (parent[i] = root(parent[i]))
         for (i, j) in pairs
+            starts[i] isa AbstractVector{<:Number} || continue
+            starts[j] isa AbstractVector{<:Number} || continue
+            starts[i] == starts[j] || continue
             a, b = root(i), root(j)
             a == b && continue
-            if accuracy(records[a]) <= accuracy(records[b])
+            if repair_accuracy(records[a]) <= repair_accuracy(records[b])
                 parent[b] = a
             else
                 parent[a] = b

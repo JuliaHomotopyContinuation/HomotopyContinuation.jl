@@ -275,6 +275,54 @@ end
         @test result.return_code == :terminated_invalid_startvalue_singular_jacobian
     end
 
+    @testset "Precision failure handling" begin
+        @var x t
+        H = CorrectorCountingHomotopy(InterpretedHomotopy(Homotopy([x - t], [x], t)))
+        T = Tracker(H)
+        T.corrector.full_extended_precision[] = true
+        z = ComplexF64[1]
+        HC.init_newton!(
+            similar(z),
+            T.corrector,
+            H,
+            z,
+            1.0,
+            T.state.jacobian,
+            T.state.norm;
+            a = 0.125,
+        )
+        @test H.jacobians[] == H.extended_jacobians[]
+
+        # A successful first escalation refreshes the ordinary workspace too.
+        regular = InterpretedHomotopy(Homotopy([x^2 - 1], [x], t))
+        NC = HC.NewtonCorrector(0.125, z, 1)
+        J = HC.Jacobian(zeros(ComplexF64, 1, 1))
+        NC.r .= 3
+        NC.Δx .= 0
+        HC.refine_newton_correction!(NC, regular, [2.0], 0.0, J, InfNorm(); tol = 1e-8)
+        @test NC.full_extended_precision[]
+        @test NC.Δx ≈ [0.75]
+        @test HC.matrix(J) == fill(4.0, 1, 1)
+        @test NC.r == [3.0]
+
+        singular = InterpretedHomotopy(Homotopy([x^2 - t], [x], t))
+        fill!(T.corrector.Δx, 1)
+        @test !HC.extended_newton_correction!(T.corrector, singular, [0.0], 0.0)
+        @test all(isnan, T.corrector.Δx)
+
+        T = Tracker(singular)
+        T.state.x .= 0
+        T.corrector.full_extended_precision[] = true
+        T.predictor.cond_H_ẋ = 123.0
+        HC.update_predictor!(T)
+        @test T.state.code == HC.TrackerCode.terminated_ill_conditioned
+        @test isnan(T.predictor.cond_H_ẋ)
+        @test all(isnan, T.predictor.tx³.data[2:4, :])
+        # A failed call must not contaminate a subsequent, regular expansion.
+        @test HC.extended_predictor!(T.predictor, singular, [1.0], 1.0, 3)
+        @test T.predictor.tx³[1, 2] ≈ 0.5
+    end
+
     @testset "Newton correction at an unchanged point" begin
         @var x y t
         symbolic = Homotopy([x - 1 - t, 2 * (y - 1)], [x, y], t)
