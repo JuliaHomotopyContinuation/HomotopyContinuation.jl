@@ -76,6 +76,8 @@ Base.@kwdef mutable struct Predictor
     trust_region::Float64 = Inf
     local_error::Float64 = Inf
     cond_H_ẋ::Float64 = Inf
+    extended_workspace::Union{Nothing,ExtendedPredictorWorkspace} = nothing
+    used_extended_precision::Bool = false
 
     tx⁰::TaylorVector{1,ComplexF64}
     tx¹::TaylorVector{2,ComplexF64}
@@ -103,6 +105,37 @@ Base.@kwdef mutable struct Predictor
 end
 
 
+# Retain all Taylor coefficients in double-double until the last solve. Reusing
+# one factorization is especially valuable when the Float64 Jacobian is rounded
+# to a singular matrix. Commit coefficients only if every solve passes its check.
+function extended_predictor!(P::Predictor, H, x, t, max_order)
+    n = length(x)
+    size(H) == (n, n) && extended_jacobian_supported(H) || return false
+    W = P.extended_workspace
+    if W === nothing
+        W = ExtendedPredictorWorkspace(n)
+        P.extended_workspace = W
+    end
+    fill!(W.tx.data, 0)
+    base = first(vectors(W.tx))
+    base .= x
+    L = W.linear
+    evaluate_and_jacobian!(L.residual, L.A, H, base, t)
+    extended_factorize!(L)
+    for k = 1:max_order
+        # Each coefficient being solved for is still zero in this series.
+        taylor!(L.residual, Val(k), H, W.tx, t, k > 1)
+        extended_ldiv!(L) || return false
+        for i = 1:n
+            W.tx[i, k+1] = -L.correction[i]
+        end
+    end
+    for k = 1:max_order, i = 1:n
+        P.tx³[i, k+1] = W.tx[i, k+1]
+    end
+    true
+end
+
 function Predictor(H::AbstractHomotopy)
     m, n = size(H)
     tx³ = TaylorVector{4}(ComplexF64, n)
@@ -122,6 +155,7 @@ function Predictor(H::AbstractHomotopy)
 end
 
 function init!(predictor::Predictor)
+    predictor.used_extended_precision = false
     predictor.cond_H_ẋ = 1.0
     predictor.winding_number = 1
 
@@ -162,7 +196,8 @@ function update!(
     t,
     J::Jacobian,
     norm::AbstractNorm,
-    x̂ = nothing, # the predicted value
+    x̂ = nothing; # the predicted value
+    extended_precision::Bool = true,
 )
     # The general strategy is as follows:
     #
@@ -174,6 +209,7 @@ function update!(
     # api.
 
     @unpack u, tx⁰, tx¹, tx², tx³, ty¹, xtemp, tx_norm = predictor
+    predictor.used_extended_precision = false
 
     x⁰, x¹, x², x³ = vectors(tx³)
     y⁰, y¹ = vectors(ty¹)
@@ -214,7 +250,24 @@ function update!(
     predictor.cond_H_ẋ = cond_H_ẋ = δ / eps()
     tol_δ₁ = 1e-10
 
-    δ > tol_δ₁ && iterative_refinement!(xtemp, J, u, InfNorm(); tol = tol_δ₁, max_iters = 5)
+    extended = false
+    if δ > tol_δ₁ || !all(isfinite, xtemp)
+        refinement =
+            iterative_refinement!(xtemp, J, u, InfNorm(); tol = tol_δ₁, max_iters = 5)
+        if extended_precision && (
+            refinement.diverged ||
+            !isfinite(refinement.accuracy) ||
+            refinement.accuracy > tol_δ₁
+        )
+            extended = extended_predictor!(predictor, H, x, t, m > 1 ? 1 : 3)
+            if extended
+                predictor.used_extended_precision = true
+                J.factorizations[] += 1
+                J.ldivs[] += m > 1 ? 1 : 3
+                xtemp .= x¹
+            end
+        end
+    end
     tx_norm[2] = norm(xtemp)
 
     x¹ .= xtemp
@@ -235,21 +288,26 @@ function update!(
         return predictor
     end
 
-    taylor!(u, Val(2), H, tx¹, t, true)
-    u .= .-u
-    LA.ldiv!(xtemp, J, u)
-    tol_δ₂ = 1e-10
-    δ > tol_δ₂ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₂, max_iters = 4)
-    tx_norm[3] = norm(xtemp)
-    x² .= xtemp
+    if !extended
+        taylor!(u, Val(2), H, tx¹, t, true)
+        u .= .-u
+        LA.ldiv!(xtemp, J, u)
+        tol_δ₂ = 1e-10
+        δ > tol_δ₂ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₂, max_iters = 4)
+        tx_norm[3] = norm(xtemp)
+        x² .= xtemp
 
-    taylor!(u, Val(3), H, tx², t, true)
-    u .= .-u
-    LA.ldiv!(xtemp, J, u)
-    tol_δ₃ = 1e-4
-    δ > tol_δ₃ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₃, max_iters = 3)
-    tx_norm[4] = norm(xtemp)
-    x³ .= xtemp
+        taylor!(u, Val(3), H, tx², t, true)
+        u .= .-u
+        LA.ldiv!(xtemp, J, u)
+        tol_δ₃ = 1e-4
+        δ > tol_δ₃ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₃, max_iters = 3)
+        tx_norm[4] = norm(xtemp)
+        x³ .= xtemp
+    else
+        tx_norm[3] = norm(x²)
+        tx_norm[4] = norm(x³)
+    end
 
     τ = Inf
     for (i, (x, x¹, x², x³)) in enumerate(tx³)

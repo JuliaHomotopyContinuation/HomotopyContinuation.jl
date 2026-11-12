@@ -81,7 +81,7 @@ The set of options for a [`Tracker`](@ref).
   be necessary, then the tracking gets terminated.
 * `extended_precision = true`: Whether to allow for the use of extended precision,
   if necessary, in some computations. This can greatly improve the ability to track
-  numerically difficult paths.
+  numerically difficult paths. The path coordinates and returned solutions remain `ComplexF64`.
 * `terminate_cond = 1e13`: If the relative component-wise condition number
   `cond(H_x, ẋ)` is larger than `terminate_cond` then the path is terminated as too
   ill-conditioned.
@@ -620,7 +620,18 @@ end
 
 function update_predictor!(tracker::Tracker, x̂ = nothing, Δs = nothing, t_prev = NaN)
     @unpack predictor, homotopy, state = tracker
-    update!(predictor, homotopy, state.x, state.t, state.jacobian, state.norm, x̂)
+    update!(
+        predictor,
+        homotopy,
+        state.x,
+        state.t,
+        state.jacobian,
+        state.norm,
+        x̂;
+        extended_precision = tracker.options.extended_precision,
+    )
+    state.used_extended_prec |= predictor.used_extended_precision
+    predictor
 end
 
 """
@@ -908,7 +919,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         state.τ = trust_region(predictor)
 
         state.accepted_steps += 1
-        state.ext_accepted_steps += state.extended_prec
+        state.ext_accepted_steps += state.extended_prec || predictor.used_extended_precision
         state.last_steps_failed = 0
     else
         # Step failed, so we have to try with a new (smaller) step size

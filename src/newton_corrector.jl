@@ -32,21 +32,6 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", r::NewtonCorrectorResult)
 Base.show(io::IO, result::NewtonCorrectorResult) = print_fieldnames(io, result)
 is_converged(R::NewtonCorrectorResult) = R.return_code == NEWT_CONVERGED
 
-struct ExtendedNewtonWorkspace
-    A::Matrix{ComplexDF64}
-    factors::Matrix{ComplexDF64}
-    residual::Vector{ComplexDF64}
-    correction::Vector{ComplexDF64}
-    pivots::Vector{Int}
-end
-ExtendedNewtonWorkspace(n) = ExtendedNewtonWorkspace(
-    zeros(ComplexDF64, n, n),
-    zeros(ComplexDF64, n, n),
-    zeros(ComplexDF64, n),
-    zeros(ComplexDF64, n),
-    zeros(Int, n),
-)
-
 struct NewtonCorrector
     a::Float64
     # derived
@@ -55,7 +40,7 @@ struct NewtonCorrector
     r::Vector{ComplexF64}
     r̄::Vector{ComplexF64}
     x_extended::Vector{ComplexDF64}
-    extended_workspace::Base.RefValue{Union{Nothing,ExtendedNewtonWorkspace}}
+    extended_workspace::Base.RefValue{Union{Nothing,ExtendedLinearWorkspace}}
 end
 
 function NewtonCorrector(a::Float64, x::AbstractVector{ComplexF64}, m::Int)
@@ -72,61 +57,22 @@ function NewtonCorrector(a::Float64, x::AbstractVector{ComplexF64}, m::Int)
         r,
         r̄,
         x_extended,
-        Ref{Union{Nothing,ExtendedNewtonWorkspace}}(nothing),
+        Ref{Union{Nothing,ExtendedLinearWorkspace}}(nothing),
     )
 end
-
-# Escalate the Jacobian and factorization only when residual-only refinement
-# stagnates. User-defined systems keep their existing evaluation contract.
-extended_jacobian_supported(::AbstractHomotopy) = false
-extended_jacobian_supported(::Union{CompiledHomotopy,InterpretedHomotopy,MixedHomotopy}) =
-    true
-extended_jacobian_supported(H::ParameterHomotopy) =
-    H.F isa Union{CompiledSystem,InterpretedSystem,MixedSystem}
-extended_jacobian_supported(H::FixedParameterHomotopy) =
-    extended_jacobian_supported(H.homotopy)
-extended_jacobian_supported(H::AffineChartHomotopy) =
-    extended_jacobian_supported(H.homotopy)
 
 function extended_newton_correction!(NC, H, x, t)
     n = length(x)
     size(H) == (n, n) && extended_jacobian_supported(H) || return false
     W = NC.extended_workspace[]
     if W === nothing
-        W = ExtendedNewtonWorkspace(n)
+        W = ExtendedLinearWorkspace(n)
         NC.extended_workspace[] = W
     end
     NC.x_extended .= x
     evaluate_and_jacobian!(W.residual, W.A, H, NC.x_extended, t)
-    copyto!(W.factors, W.A)
-    lu_rank2!(W.factors, W.pivots)
-    copyto!(W.correction, W.residual)
-    @inbounds for k = 1:n
-        p = W.pivots[k]
-        W.correction[k], W.correction[p] = W.correction[p], W.correction[k]
-    end
-    @inbounds for k = 1:n, i = k+1:n
-        W.correction[i] -= W.factors[i, k] * W.correction[k]
-    end
-    @inbounds for k = n:-1:1
-        W.correction[k] /= W.factors[k, k]
-        for i = 1:k-1
-            W.correction[i] -= W.factors[i, k] * W.correction[k]
-        end
-    end
-    all(isfinite, W.correction) || return false
-    # Check the solve before replacing the ordinary correction. The bound is
-    # relative to the terms, so cancellation in the residual is allowed.
-    @inbounds for i = 1:n
-        residual = -W.residual[i]
-        scale = abs(W.residual[i])
-        for j = 1:n
-            term = W.A[i, j] * W.correction[j]
-            residual += term
-            scale += abs(term)
-        end
-        abs(residual) <= 1e-25 * scale || return false
-    end
+    extended_factorize!(W)
+    extended_ldiv!(W) || return false
     NC.Δx .= W.correction
     true
 end
@@ -320,6 +266,10 @@ function init_newton!(
     end
     LA.ldiv!(Δx, updated!(J), r, norm)
     v = norm(Δx) + eps()
+    if extended_precision && !isfinite(v)
+        refine_newton_correction!(NC, H, x₀, t, J, norm; tol = 1e-8)
+        v = norm(Δx) + eps()
+    end
     valid = false
     ω = μ = NaN
     ε = sqrt(v)
@@ -333,6 +283,10 @@ function init_newton!(
         end
         LA.ldiv!(Δx, updated!(J), r, norm)
 
+        if extended_precision && !all(isfinite, Δx)
+            refine_newton_correction!(NC, H, x̄, t, J, norm; tol = 1e-8)
+        end
+
         x₁ .= x̄ .- Δx
         norm_Δx₀ = norm(Δx)
         if extended_precision
@@ -342,6 +296,9 @@ function init_newton!(
             evaluate!(r, H, x₁, t)
         end
         LA.ldiv!(Δx, J, r, norm)
+        if extended_precision && !all(isfinite, Δx)
+            refine_newton_correction!(NC, H, x₁, t, J, norm; tol = 1e-8)
+        end
         x₂ .= x₁ .- Δx
         norm_Δx₁ = norm(Δx) + eps()
         if norm_Δx₁ < a * norm_Δx₀
