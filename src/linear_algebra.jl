@@ -123,102 +123,15 @@ end
 # Factorizations #
 ##################
 
-###########################
-# CUSTOM LU Factorization #
-###########################
-# This is an adoption of LA.generic_lufact!
-# with 3 changes:
-# 1) For choosing the pivot we use abs2 instead of abs
-# 2) Instead of using the robust complex division we
-#    just use the naive division. This shouldn't
-#    lead to problems since numerical diffuculties only
-#    arise for very large or small exponents
-# 3) We fold lu! and ldiv! into one routine
-#    this has the effect that we do not need to allocate
-#    the pivot vector anymore and also avoid the allocations
-#    coming from the LU wrapper
-function lu!(
-    A::AbstractMatrix{T},
-    ipiv::Union{Vector{I},Nothing} = nothing,
-) where {T,I<:Integer}
-    m, n = size(A)
-    if m == n && T === ComplexF64
-        n == 3 && return lu_small!(A, ipiv, Val(3))
-        n == 4 && return lu_small!(A, ipiv, Val(4))
-    end
-    min(m, n) >= 16 && return lu_rank2!(A, ipiv)
-    lu_rank1!(A, ipiv)
-end
+####################################
+# LU Factorization (other eltypes) #
+####################################
+# Used for the double-double Jacobian in `extended_precision.jl`; square ComplexF64
+# workspaces use the split LU below. Pivots are chosen by `abs2`, with a fallback to
+# `abs` outside the usual exponent range.
 
-function lu_rank1!(A::AbstractMatrix{T}, ipiv = nothing) where {T}
-    m, n = size(A)
-    minmn = min(m, n)
-    # LU Factorization
-    @inbounds begin
-        for k = 1:minmn
-            # find index max
-            kp = k
-            if T <: Complex
-                amax = abs2(A[k, k])
-            else
-                amax = abs(A[k, k])
-            end
-            for i = k+1:m
-                if T <: Complex
-                    absi = abs2(A[i, k])
-                else
-                    absi = abs(A[i, k])
-                end
-                kp, amax = ifelse(absi > amax, (i, absi), (kp, amax))
-            end
-            if !(ipiv isa Nothing)
-                ipiv[k] = kp
-            end
-            if !iszero(amax)
-                if k != kp
-                    # Interchange
-                    for i = 1:n
-                        tmp = A[k, i]
-                        A[k, i] = A[kp, i]
-                        A[kp, i] = tmp
-                    end
-                end
-                # Scale first column
-                Akk = A[k, k]
-                for i = k+1:m
-                    # we assume the matrix is decently scaled
-                    # so that the naive division algorithm doesn't overflow
-                    @fastmath A[i, k] = A[i, k] / Akk
-                end
-            end
-            # Update the rest
-            for j = k+1:n
-                A_kj = A[k, j]
-                for i = k+1:m
-                    A[i, j] -= A[i, k] * A_kj
-                end
-            end
-        end
-    end
-    A
-end
-
-@generated function lu_small!(A, ipiv, ::Val{N}) where {N}
-    body = Expr(:block)
-    for k = 1:N
-        push!(body.args, :(lu_pivot!(A, ipiv, $k, $N, $N)))
-        for j = k+1:N, i = k+1:N
-            push!(body.args, :(A[$i, $j] -= A[$i, $k] * A[$k, $j]))
-        end
-    end
-    quote
-        @inbounds $body
-        A
-    end
-end
-
-# Factor two columns before streaming over the trailing matrix. This retains
-# the existing LU storage and pivot convention (including rectangular inputs).
+# Pivot column k: choose and record the pivot, swap rows and scale the multipliers.
+# Returns false for a zero pivot column.
 @inline function lu_pivot!(A, ipiv, k, m, n)
     @inbounds begin
         kp = k
@@ -263,6 +176,8 @@ end
     true
 end
 
+# Factor two columns before streaming over the trailing matrix. This retains
+# the existing LU storage and pivot convention (including rectangular inputs).
 function lu_rank2!(A, ipiv)
     m, n = size(A)
     @inbounds for k = 1:2:min(m, n)

@@ -23,8 +23,9 @@ julia --project=. benchmarks/modelkit_extended.jl --unfused
 - `linear_algebra_kernels.jl` compares the paired-column triangular solves
   `ldiv_upper!` and `ldiv_unit_lower!` with a scalar-column baseline. They are
   used by the condition estimates and the QR solves of overdetermined systems.
-- `lu_factorization.jl` compares `lu!` with the single-column `lu_rank1!`.
-  The package no longer calls `lu!`.
+- `lu_factorization.jl` times the LU factorization and solve of square
+  `MatrixWorkspace`s, which hold the Jacobians during path tracking and store the
+  real and imaginary parts of their factors separately.
 - `double_double_kernels.jl` compares ModelKit's fused double-double operations
 with ordinary complex double-double arithmetic.
 - `modelkit_extended.jl` measures double-double evaluation, Jacobians, and
