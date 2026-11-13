@@ -374,6 +374,8 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
     # check if we can start the endgame
     t = real(tracker.state.t)
     t ≤ options.endgame_start || return state.code
+    # the endgame needs accurate path points
+    tracker.state.conservative_newton = true
 
     if state.steps_eg == 0
         state.ext_steps_eg_start = ext_steps(tracker.state)

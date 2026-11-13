@@ -81,10 +81,21 @@ The set of options for a [`Tracker`](@ref).
   be necessary, then the tracking gets terminated.
 * `extended_precision = true`: Whether to allow for the use of extended precision,
   if necessary, in some computations. This can greatly improve the ability to track
-  numerically difficult paths.
+  numerically difficult paths. The path coordinates and returned solutions remain `ComplexF64`.
 * `terminate_cond = 1e13`: If the relative component-wise condition number
   `cond(H_x, ẋ)` is larger than `terminate_cond` then the path is terminated as too
   ill-conditioned.
+* `newton_convergence = :fast`: When Newton's method in a tracking step is converged.
+  `:conservative` stops once the next update is predicted to be below the accuracy of the
+  previous step, and then performs one more Newton update. `:fast` stops once the error
+  estimated from the observed contraction of the Newton updates is below `newton_tol`, and
+  uses `:conservative` for the rest of a path once extended precision is needed, the
+  endgame starts, or the condition number exceeds `fast_newton_max_cond`.
+* `newton_tol = 1e-8`: The tolerance of `newton_convergence = :fast`, in the weighted norm
+  of the tracker.
+* `fast_newton_max_cond = 1e6`: With `newton_convergence = :fast`, a lower bound of the
+  condition number of the Jacobian above which a path continues with `:conservative`.
+  `Inf` disables this check.
 * `parameters::Union{Symbol,TrackerParameters} = :default` Set the
   [`TrackerParameters`](@ref) to control the performance of the path tracking algorithm.
   The values `:default`, `:conservative` and `:fast` are shorthands for using
@@ -101,6 +112,9 @@ mutable struct TrackerOptions
     min_rel_step_size::Float64
     terminate_cond::Float64
     parameters::TrackerParameters
+    newton_convergence::Symbol
+    newton_tol::Float64
+    fast_newton_max_cond::Float64
 end
 function TrackerOptions(;
     automatic_differentiation::Int = 1,
@@ -112,7 +126,13 @@ function TrackerOptions(;
     min_rel_step_size::Float64 = 0.0,
     terminate_cond::Float64 = 1e13,
     parameters::Union{Symbol,TrackerParameters} = :default,
+    newton_convergence::Symbol = :fast,
+    newton_tol::Float64 = 1e-8,
+    fast_newton_max_cond::Float64 = 1e6,
 )
+    newton_convergence in (:fast, :conservative) || throw(
+        ArgumentError("Unsupported `newton_convergence` value $newton_convergence"),
+    )
 
     if parameters isa Symbol
         if parameters == :default
@@ -136,6 +156,9 @@ function TrackerOptions(;
         min_rel_step_size,
         terminate_cond,
         parameters,
+        newton_convergence,
+        newton_tol,
+        fast_newton_max_cond,
     )
 end
 
@@ -324,6 +347,8 @@ mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
     keep_extended_prec::Bool
     norm::WeightedNorm{InfNorm}
     use_strict_β_τ::Bool
+    # Use `newton_convergence = :conservative` for the rest of the path
+    conservative_newton::Bool
 
     jacobian::Jacobian{M}
     cond_J_ẋ::Float64 # estimate of cond(H(x(t),t), ẋ(t))
@@ -351,6 +376,7 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
     τ = Inf
     norm_Δx₀ = NaN
     use_strict_β_τ = false
+    conservative_newton = false
     used_extended_prec = extended_prec = keep_extended_prec = refined_extended_prec = false
     jacobian = Jacobian(zeros(ComplexF64, size(H)))
     cond_J_ẋ = NaN
@@ -377,6 +403,7 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
         keep_extended_prec,
         norm,
         use_strict_β_τ,
+        conservative_newton,
         jacobian,
         cond_J_ẋ,
         code,
@@ -620,7 +647,29 @@ end
 
 function update_predictor!(tracker::Tracker, x̂ = nothing, Δs = nothing, t_prev = NaN)
     @unpack predictor, homotopy, state = tracker
-    update!(predictor, homotopy, state.x, state.t, state.jacobian, state.norm, x̂)
+    update!(
+        predictor,
+        homotopy,
+        state.x,
+        state.t,
+        state.jacobian,
+        state.norm,
+        x̂;
+        extended_precision = tracker.options.extended_precision,
+        full_extended_precision = tracker.corrector.full_extended_precision[],
+    )
+    if tracker.options.extended_precision && predictor.used_extended_precision
+        tracker.corrector.full_extended_precision[] = true
+        state.extended_prec = true
+    end
+    state.used_extended_prec |= predictor.used_extended_precision
+    if !is_done(state.segment_stepper) && !(
+        predictor.winding_number > 1 ? all(isfinite, predictor.xtemp) :
+        all(isfinite, predictor.tx³.data)
+    )
+        state.code = TrackerCode.terminated_ill_conditioned
+    end
+    predictor
 end
 
 """
@@ -652,6 +701,8 @@ function init!(
     @unpack x, x̄, norm, jacobian = state
 
     # intialize state
+    corrector.full_extended_precision[] = false
+    extended_precision &= options.extended_precision
     set_solution!(x, homotopy, x₁, t₁)
     init!(state.segment_stepper, t₁, t₀)
     state.Δs_prev = 0.0
@@ -659,6 +710,7 @@ function init!(
     state.ω = 1.0
     state.keep_extended_prec = false
     state.use_strict_β_τ = false
+    state.conservative_newton = false
     init!(norm, x)
     init!(jacobian)
     state.code = TrackerCode.tracking
@@ -683,7 +735,7 @@ function init!(
             a = a,
             extended_precision = extended_precision,
         )
-        if !valid && !extended_precision
+        if !valid && !extended_precision && options.extended_precision
             extended_precision = true
             valid, ω, μ = init_newton!(
                 x̄,
@@ -743,6 +795,7 @@ function init!(
     updated!(jacobian)
     init!(tracker.predictor)
     update_predictor!(tracker)
+    is_tracking(state.code) || return false
     state.τ = trust_region(predictor)
     # compute initial step size
     Δs = initial_step_size(state, predictor, tracker.options)
@@ -771,6 +824,11 @@ function update_precision!(tracker::Tracker, μ_low)
     @unpack a = options.parameters
 
     options.extended_precision || return false
+
+    if corrector.full_extended_precision[]
+        state.extended_prec = state.used_extended_prec = true
+        return true
+    end
 
     if state.extended_prec && !state.keep_extended_prec && !isnan(μ_low) && μ_low > μ
         # check if we can go low again
@@ -867,19 +925,39 @@ function step!(tracker::Tracker, debug::Bool = false)
 
     # Correct the predicted value x̂ to obtain x̄.
     # If the correction is successfull we have x̄ ≈ x(t+Δt).
-    result = newton!(
-        x̄,
-        corrector,
-        homotopy,
-        x̂,
-        t′,
-        jacobian,
-        norm;
-        ω = state.ω,
-        μ = state.μ,
-        extended_precision = state.extended_prec,
-        first_correction = state.accepted_steps == 0,
-    )
+    extended_precision = options.extended_precision && state.extended_prec
+    state.conservative_newton |= extended_precision
+    if options.newton_convergence === :fast && !state.conservative_newton
+        max_cond = options.fast_newton_max_cond
+        result = contraction_newton!(
+            x̄,
+            corrector,
+            homotopy,
+            x̂,
+            t′,
+            jacobian,
+            norm;
+            ω = state.ω,
+            tol = options.newton_tol,
+            extended_precision,
+            compute_cond = max_cond < Inf,
+        )
+        state.conservative_newton |= corrector.cond_lower_bound[] > max_cond
+    else
+        result = newton!(
+            x̄,
+            corrector,
+            homotopy,
+            x̂,
+            t′,
+            jacobian,
+            norm;
+            ω = state.ω,
+            μ = state.μ,
+            extended_precision,
+            first_correction = state.accepted_steps == 0,
+        )
+    end
 
     if debug
         println("Prediction method: ", predictor.method)
@@ -908,7 +986,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         state.τ = trust_region(predictor)
 
         state.accepted_steps += 1
-        state.ext_accepted_steps += state.extended_prec
+        state.ext_accepted_steps += state.extended_prec || predictor.used_extended_precision
         state.last_steps_failed = 0
     else
         # Step failed, so we have to try with a new (smaller) step size
@@ -917,6 +995,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         state.last_steps_failed += 1
     end
     state.norm_Δx₀ = result.norm_Δx₀
+    is_tracking(state.code) || return !state.last_step_failed
     update_stepsize!(state, result, options, predictor; ad_for_error_estimate = false)
 
     check_terminated!(state, options)

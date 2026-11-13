@@ -32,6 +32,14 @@ ModelKit.evaluate_and_jacobian!(u, U, H::FixedParameterHomotopy, x, t) =
 ModelKit.taylor!(u, v::Val, H::FixedParameterHomotopy, tx, t) =
     taylor!(u, v, H.homotopy, tx, t, H.parameters)
 
+function ModelKit.taylor!(u, v::Val, H::FixedParameterHomotopy, tx, t, incremental::Bool)
+    if H.homotopy isa Union{InterpretedHomotopy,MixedHomotopy}
+        taylor!(u, v, H.homotopy, tx, t, H.parameters, incremental)
+    else
+        taylor!(u, v, H.homotopy, tx, t, H.parameters)
+    end
+end
+
 """
     fix_parameters(H::Union{Homotopy,AbstractHomotopy}, p; compile::Union{Bool,Symbol} = $(COMPILE_DEFAULT[]))
 
