@@ -19,6 +19,13 @@ struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF
     δx::Vector{ComplexF64}
     inf_norm_est_work::Vector{ComplexF64}
     inf_norm_est_rwork::Vector{Float64}
+    # real and imaginary parts of the LU factors and of a solve (square matrices)
+    lu_re::Matrix{Float64}
+    lu_im::Matrix{Float64}
+    x_re::Vector{Float64}
+    x_im::Vector{Float64}
+    # whether `lu.factors` holds the current split factors
+    lu_synced::Base.RefValue{Bool}
 end
 
 MatrixWorkspace(m::Integer, n::Integer; kwargs...) =
@@ -47,6 +54,7 @@ function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure = true)
     δx = zeros(ComplexF64, n)
     inf_norm_est_work = Vector{ComplexF64}(undef, n)
     inf_norm_est_rwork = Vector{Float64}(undef, n)
+    k = m == n ? n : 0
 
     MatrixWorkspace(
         A,
@@ -62,6 +70,11 @@ function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure = true)
         δx,
         inf_norm_est_work,
         inf_norm_est_rwork,
+        zeros(k, k),
+        zeros(k, k),
+        zeros(k),
+        zeros(k),
+        Ref(true),
     )
 end
 
@@ -89,11 +102,8 @@ function updated!(MW::MatrixWorkspace)
     MW.factorized[] = false
     MW.scaled[] = false
     m, n = size(MW)
-    if m == n
-        @inbounds copyto!(MW.lu.factors, MW.A)
-    else
-        @inbounds copyto!(MW.qr.factors, MW.A)
-    end
+    # square matrices are read from `A` by `split_lu!`
+    m == n || @inbounds copyto!(MW.qr.factors, MW.A)
     MW
 end
 updated!(M::AbstractMatrix) = M
@@ -281,6 +291,232 @@ function lu_rank2!(A, ipiv)
     A
 end
 
+######################
+# Split LU (ComplexF64)
+######################
+# The factorization and solves of square workspaces work on separate real and
+# imaginary parts, so that the inner loops vectorize over rows (ported from wndr's
+# SplitLU). Pivots are chosen as in `lu_pivot!`. `lu.factors` receives the factors
+# only when a routine reads them directly (condition estimates, inverses), see
+# `synced_lu`.
+
+# From this size on, two pivots are eliminated per pass over the trailing matrix.
+const SPLIT_LU_RANK2_MIN = 20
+
+@inline function split_lu_pivot!(R, I, ipiv, k, n)
+    @inbounds begin
+        kp = k
+        amax = R[k, k]^2 + I[k, k]^2
+        for i = k+1:n
+            a = R[i, k]^2 + I[i, k]^2
+            kp, amax = ifelse(a > amax, (i, a), (kp, amax))
+        end
+        # Squared magnitudes over- or underflow outside the usual exponent range.
+        squared = !(iszero(amax) || !isfinite(amax))
+        if !squared
+            kp = k
+            amax = hypot(R[k, k], I[k, k])
+            for i = k+1:n
+                a = hypot(R[i, k], I[i, k])
+                if a > amax
+                    kp, amax = i, a
+                end
+            end
+        end
+        ipiv[k] = kp
+        iszero(amax) && return false
+        if kp != k
+            for j = 1:n
+                R[k, j], R[kp, j] = R[kp, j], R[k, j]
+                I[k, j], I[kp, j] = I[kp, j], I[k, j]
+            end
+        end
+        pivot = complex(R[k, k], I[k, k])
+        # naive reciprocal conj(pivot) / |pivot|² unless |pivot|² is out of range
+        ir, ii = squared ? (R[k, k] / amax, -I[k, k] / amax) : reim(inv(pivot))
+        if isfinite(ir) && isfinite(ii)
+            @simd ivdep for i = k+1:n
+                r, m = R[i, k], I[i, k]
+                R[i, k] = r * ir - m * ii
+                I[i, k] = r * ii + m * ir
+            end
+        else
+            for i = k+1:n
+                R[i, k], I[i, k] = reim(complex(R[i, k], I[i, k]) / pivot)
+            end
+        end
+    end
+    true
+end
+
+# Update of column j (rows k+1:n) by pivot column k
+@inline function split_lu_update!(R, I, j, k, n)
+    @inbounds begin
+        br, bi = R[k, j], I[k, j]
+        @simd ivdep for i = k+1:n
+            lr, li = R[i, k], I[i, k]
+            R[i, j] = muladd(-lr, br, muladd(li, bi, R[i, j]))
+            I[i, j] = muladd(-lr, bi, muladd(-li, br, I[i, j]))
+        end
+    end
+end
+
+function split_lu_rank1!(R, I, ipiv, n)
+    @inbounds for k = 1:n
+        split_lu_pivot!(R, I, ipiv, k, n) || continue
+        for j = k+1:n
+            split_lu_update!(R, I, j, k, n)
+        end
+    end
+end
+
+# Pivots k and k+1 in one pass over the trailing columns. Every entry receives the
+# updates of k and k+1 in that order, as in `split_lu_rank1!`.
+function split_lu_rank2!(R, I, ipiv, n)
+    k = 1
+    @inbounds while k ≤ n
+        ok₁ = split_lu_pivot!(R, I, ipiv, k, n)
+        k == n && break
+        ok₁ && split_lu_update!(R, I, k + 1, k, n)
+        ok₂ = split_lu_pivot!(R, I, ipiv, k + 1, n)
+        if ok₁ && ok₂
+            lr, li = R[k+1, k], I[k+1, k]
+            for j = k+2:n
+                br, bi = R[k, j], I[k, j]
+                R[k+1, j] = muladd(-lr, br, muladd(li, bi, R[k+1, j]))
+                I[k+1, j] = muladd(-lr, bi, muladd(-li, br, I[k+1, j]))
+            end
+            for j = k+2:n
+                br, bi, cr, ci = R[k, j], I[k, j], R[k+1, j], I[k+1, j]
+                @simd ivdep for i = k+2:n
+                    lr, li = R[i, k], I[i, k]
+                    mr, mi = R[i, k+1], I[i, k+1]
+                    sr = muladd(-lr, br, muladd(li, bi, R[i, j]))
+                    si = muladd(-lr, bi, muladd(-li, br, I[i, j]))
+                    R[i, j] = muladd(-mr, cr, muladd(mi, ci, sr))
+                    I[i, j] = muladd(-mr, ci, muladd(-mi, cr, si))
+                end
+            end
+        else
+            for j = k+2:n
+                ok₁ && split_lu_update!(R, I, j, k, n)
+            end
+            for j = k+2:n
+                ok₂ && split_lu_update!(R, I, j, k + 1, n)
+            end
+        end
+        k += 2
+    end
+end
+
+# Factor `D * A`, with D the row scaling if it is applied.
+function split_lu!(WS::MatrixWorkspace)
+    A, ipiv, R, I = WS.A, WS.lu.ipiv, WS.lu_re, WS.lu_im
+    n = size(R, 1)
+    if WS.scaled[]
+        d = WS.row_scaling
+        @inbounds for j = 1:n, i = 1:n
+            R[i, j], I[i, j] = reim(A[i, j] * d[i])
+        end
+    else
+        @inbounds for j = 1:n, i = 1:n
+            R[i, j], I[i, j] = reim(A[i, j])
+        end
+    end
+    if n ≥ SPLIT_LU_RANK2_MIN
+        split_lu_rank2!(R, I, ipiv, n)
+    else
+        split_lu_rank1!(R, I, ipiv, n)
+    end
+    WS.lu_synced[] = false
+    WS
+end
+
+# The LU factorization with its factors in `lu.factors`.
+function synced_lu(WS::MatrixWorkspace)
+    WS.factorized[] || factorize!(WS)
+    if !WS.lu_synced[]
+        F, R, I = WS.lu.factors, WS.lu_re, WS.lu_im
+        n = size(R, 1)
+        @inbounds for j = 1:n, i = 1:n
+            F[i, j] = complex(R[i, j], I[i, j])
+        end
+        WS.lu_synced[] = true
+    end
+    WS.lu
+end
+
+# (br + i bi) / (ar + i ai), naive complex division as in `ldiv_upper!`
+@inline function split_cdiv(br, bi, ar, ai)
+    d = ar^2 + ai^2
+    (br * ar + bi * ai) / d, (bi * ar - br * ai) / d
+end
+
+# Solve with the split factors. `b` is multiplied by `scaling` if given.
+function split_lu_ldiv!(x, WS::MatrixWorkspace, b, scaling = nothing)
+    R, I, ipiv, xr, xi = WS.lu_re, WS.lu_im, WS.lu.ipiv, WS.x_re, WS.x_im
+    n = size(R, 1)
+    @inbounds begin
+        for i = 1:n
+            bi = scaling === nothing ? b[i] : scaling[i] * b[i]
+            xr[i], xi[i] = reim(bi)
+        end
+        for i = 1:n
+            p = ipiv[i]
+            if p != i
+                xr[i], xr[p] = xr[p], xr[i]
+                xi[i], xi[p] = xi[p], xi[i]
+            end
+        end
+        # unit lower triangular, columns j and j+1 per pass
+        j = 1
+        while j < n
+            br, bi = xr[j], xi[j]
+            lr, li = R[j+1, j], I[j+1, j]
+            cr = muladd(-lr, br, muladd(li, bi, xr[j+1]))
+            ci = muladd(-lr, bi, muladd(-li, br, xi[j+1]))
+            xr[j+1], xi[j+1] = cr, ci
+            @simd ivdep for i = j+2:n
+                lr, li = R[i, j], I[i, j]
+                mr, mi = R[i, j+1], I[i, j+1]
+                sr = muladd(-lr, br, muladd(li, bi, xr[i]))
+                si = muladd(-lr, bi, muladd(-li, br, xi[i]))
+                xr[i] = muladd(-mr, cr, muladd(mi, ci, sr))
+                xi[i] = muladd(-mr, ci, muladd(-mi, cr, si))
+            end
+            j += 2
+        end
+        # upper triangular, columns j and j-1 per pass
+        j = n
+        while j ≥ 1
+            yr, yi = split_cdiv(xr[j], xi[j], R[j, j], I[j, j])
+            xr[j], xi[j] = yr, yi
+            j == 1 && break
+            ur, ui = R[j-1, j], I[j-1, j]
+            zr, zi = split_cdiv(
+                muladd(-ur, yr, muladd(ui, yi, xr[j-1])),
+                muladd(-ur, yi, muladd(-ui, yr, xi[j-1])),
+                R[j-1, j-1],
+                I[j-1, j-1],
+            )
+            xr[j-1], xi[j-1] = zr, zi
+            @simd ivdep for i = 1:j-2
+                ur, ui = R[i, j], I[i, j]
+                vr, vi = R[i, j-1], I[i, j-1]
+                sr = muladd(-ur, yr, muladd(ui, yi, xr[i]))
+                si = muladd(-ur, yi, muladd(-ui, yr, xi[i]))
+                xr[i] = muladd(-vr, zr, muladd(vi, zi, sr))
+                xi[i] = muladd(-vr, zi, muladd(-vi, zr, si))
+            end
+            j -= 2
+        end
+        for i = 1:n
+            x[i] = complex(xr[i], xi[i])
+        end
+    end
+    x
+end
+
 
 ####################
 # QR Factorization #
@@ -352,7 +588,7 @@ end
 function factorize!(WS::MatrixWorkspace)
     m, n = size(WS)
     if m == n
-        lu!(WS.lu.factors, WS.lu.ipiv)
+        split_lu!(WS)
     else
         qr!(WS.qr)
     end
@@ -509,12 +745,7 @@ function LA.ldiv!(x::AbstractVector, WS::MatrixWorkspace, b::AbstractVector)
     end
     WS.factorized[] || factorize!(WS)
     if m == n
-        if WS.scaled[]
-            x .= WS.row_scaling .* b
-            lu_ldiv!(x, WS.lu, x)
-        else
-            lu_ldiv!(x, WS.lu, b)
-        end
+        split_lu_ldiv!(x, WS, b, WS.scaled[] ? WS.row_scaling : nothing)
     else
         WS.r .= b
         qr_ldiv!(x, WS.qr, WS.r)
@@ -523,11 +754,11 @@ function LA.ldiv!(x::AbstractVector, WS::MatrixWorkspace, b::AbstractVector)
 end
 
 function LA.inv!(B::AbstractMatrix, M::MatrixWorkspace)
-    M.factorized[] || factorize!(M)
-    B .= M.lu.factors
-    LA.inv!(M.lu)
+    lu = synced_lu(M)
+    B .= lu.factors
+    LA.inv!(lu)
     @inbounds for i in eachindex(B)
-        M.lu.factors[i], B[i] = B[i], M.lu.factors[i]
+        lu.factors[i], B[i] = B[i], lu.factors[i]
     end
     return B
 end
@@ -604,8 +835,11 @@ Apply the computed row scaling.
 function apply_row_scaling!(W::MatrixWorkspace)
     A, d = W.lu.factors, W.row_scaling
     m, n = size(A)
-    @inbounds for j = 1:n, i = 1:m
-        A[i, j] = A[i, j] * d[i]
+    # square matrices are scaled by `split_lu!`
+    if m != n
+        @inbounds for j = 1:n, i = 1:m
+            A[i, j] = A[i, j] * d[i]
+        end
     end
     W.scaled[] = true
     W
@@ -702,12 +936,12 @@ function inverse_inf_norm_est(
     d_l::Union{Nothing,Vector{<:Real}} = nothing,
     d_r::Union{Nothing,Vector{<:Real}} = nothing,
 )
-    WS.factorized[] || factorize!(WS)
+    lu = synced_lu(WS)
     work, rwork = WS.inf_norm_est_work, WS.inf_norm_est_rwork
     if !WS.scaled[]
-        inverse_inf_norm_est(WS.lu, d_l, d_r, nothing, work, rwork)
+        inverse_inf_norm_est(lu, d_l, d_r, nothing, work, rwork)
     else
-        inverse_inf_norm_est(WS.lu, d_l, d_r, WS.row_scaling, work, rwork)
+        inverse_inf_norm_est(lu, d_l, d_r, WS.row_scaling, work, rwork)
     end
 end
 function inverse_inf_norm_est(
