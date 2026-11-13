@@ -23,7 +23,6 @@ import PrettyTables
 using Reexport: @reexport
 import SemialgebraicSets
 import StructArrays
-import TreeViews
 import Base.Iterators: product, reverse
 import Base: push!
 import IterTools: imap

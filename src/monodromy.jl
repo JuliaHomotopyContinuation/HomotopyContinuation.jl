@@ -242,7 +242,6 @@ struct MonodromyResult{P,LP}
     certified_solutions::Union{Nothing,Vector{Vector{ComplexF64}}}
 end
 
-Base.show(io::IO, ::MIME"application/prs.juno.inline", x::MonodromyResult) = x
 function Base.show(io::IO, result::MonodromyResult{T}) where {T}
     println(io, "MonodromyResult")
     println(io, "="^length("MonodromyResult"))
@@ -257,60 +256,6 @@ function Base.show(io::IO, result::MonodromyResult{T}) where {T}
     if !isnothing(result.trace)
         print(io, "\n• trace → ", sprint(show, result.trace))
     end
-end
-
-TreeViews.hastreeview(::MonodromyResult) = true
-TreeViews.numberofnodes(::MonodromyResult) = 7
-TreeViews.treelabel(io::IO, x::MonodromyResult, ::MIME"application/prs.juno.inline") =
-    print(
-        io,
-        "<span class=\"syntax--support syntax--type syntax--julia\">MonodromyResult</span>",
-    )
-#
-function TreeViews.nodelabel(
-    io::IO,
-    x::MonodromyResult,
-    i::Int,
-    ::MIME"application/prs.juno.inline",
-)
-    if i == 1
-        if x.equivalence_classes
-            print(io, "$(nsolutions(x)) solutions (modulo group action)")
-        else
-            print(io, "$(nsolutions(x)) solutions")
-        end
-    elseif i == 2
-        print(io, "Return code")
-    elseif i == 3
-        print(io, "Tracked loops")
-    elseif i == 4
-        print(io, "Statistics")
-    elseif i == 5
-        print(io, "Parameters")
-    elseif i == 6
-        print(io, "Seed")
-    elseif i == 7
-        print(io, "Trace")
-    end
-end
-function TreeViews.treenode(r::MonodromyResult, i::Integer)
-    if i == 1
-        return isnothing(r.certified_solutions) ? indexed_solutions(r) :
-               r.certified_solutions
-    elseif i == 2
-        return r.returncode
-    elseif i == 3
-        return r.statistics.tracked_loops[]
-    elseif i == 4
-        return r.statistics
-    elseif i == 5
-        return r.parameters
-    elseif i == 6
-        return r.seed
-    elseif i == 7
-        return something(r.trace, missing)
-    end
-    missing
 end
 
 """

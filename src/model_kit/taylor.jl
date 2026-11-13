@@ -569,6 +569,59 @@ end
     taylor_acos_impl(K, M)
 end
 
+# OP_ATAN: (1 + x²)y′ = x′, where y = atan(x).
+function taylor_atan_impl(K, M)
+    D = DiffMap()
+    list = IntermediateRepresentation()
+    for k = 0:(M-1)
+        D[:x, k] = Symbol(:x, k)
+    end
+    g = Any[]
+    for k = 0:(K-1)
+        gk = k == 0 ? 1 : nothing
+        for j = 0:k
+            gk = muladd!(list, D[:x, j], D[:x, k-j], gk)
+        end
+        push!(g, gk)
+    end
+    # pw[n] = g₀^n
+    pw = Any[g[1]]
+    for n = 2:K
+        push!(pw, mul!(list, pw[n-1], g[1]))
+    end
+
+    # Q[k][n] = quotient-free numerator of the 1/g₀^n part of k*y_k
+    Q = Vector{Any}[]
+    ids = Any[:at₀]
+    for k = 1:K
+        Qk = Any[mul!(list, k, D[:x, k])]
+        for n = 1:(k-1)
+            acc = nothing
+            for j = 1:(k-n)          # need Q[k-j] to have an index n
+                acc = muladd!(list, g[j+1], Q[k-j][n], acc)
+            end
+            push!(Qk, mul!(list, -1, acc))
+        end
+        push!(Q, Qk)
+        total = nothing
+        for n = 1:k
+            term = div!(list, div!(list, Qk[n], pw[n]), k)
+            total = total === nothing ? term : muladd!(list, term, 1, total)
+        end
+        push!(ids, total)
+    end
+    quote
+        Base.@_inline_meta
+        $(untuple(:x, M - 1))
+        at₀ = atan(x0)
+        $(to_julia_expr(list))
+        $(taylor_tuple(ids))
+    end
+end
+@generated function taylor_op_atan(::Val{K}, x::TruncatedTaylorSeries{M}) where {K,M}
+    taylor_atan_impl(K, M)
+end
+
 # OP_EXP
 function taylor_exp_helper!(list, D, k)
     k == 0 && return :e₀

@@ -13,7 +13,6 @@
 
         @test startswith(sprint(show, res), "Result with 3 solutions")
         @test seed(res) isa UInt32
-        test_treeviews(res)
 
         seeded_res = solve(
             F;
@@ -21,7 +20,6 @@
             seed = seed(res),
         )
         @test seed(seeded_res) == seed(res)
-        test_treeviews(res)
 
         @test length(path_results(res)) == ntracked(res) == 7
         @test length(results(res)) == nresults(res) == 3
@@ -49,7 +47,6 @@
         res = solve(g; start_system = :total_degree)
         @test startswith(sprint(show, res), "Result with 1 solution")
         @test seed(res) isa UInt32
-        test_treeviews(res)
         @test !isempty(sprint(show, statistics(res)))
         @test !isempty(sprint(show, res))
     end
