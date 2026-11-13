@@ -1,0 +1,58 @@
+name = "tritangents"
+tier = "HC"
+description = "Tritangent planes to a space sextic: the curve is the intersection of the quadric Q = x3 - x1 x2 and a dense cubic C with 20 coefficients c1..c20 (HC.jl dense_poly monomial order). Unknowns: plane h (h . x = 1) and three contact points x, y, z; each contact point lies on the plane, Q and C, and det([h grad(Q) grad(C)]) = 0. 12 unknowns, 20 parameters. Equations exported from HC.jl Tritangtens() (expanded, indexed names flattened: h[1] -> h1, c[1] -> c1)."
+tags = [
+  "enumerative-geometry",
+  "parameter-homotopy",
+  "symmetric",
+  "hcjl",
+]
+variables = [
+  "h1", "h2", "h3", "x1", "x2", "x3", "y1", "y2",
+  "y3", "z1", "z2", "z3",
+]
+parameters = [
+  "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8",
+  "c9", "c10", "c11", "c12", "c13", "c14", "c15", "c16",
+  "c17", "c18", "c19", "c20",
+]
+equations = [
+  "-1 + h1*x1 + h2*x2 + h3*x3",
+  "x3 - x2*x1",
+  "c20 + x1*c17 + x1^2*c11 + x1^3*c1 + x2*c18 + x2^2*c14 + x2^3*c7 + x3*c19 + x3^2*c16 + x3^3*c10 + x1*x3*c13 + x1*x3^2*c6 + x1^2*x3*c3 + x2*x1*c12 + x2*x1^2*c2 + x2*x3*c15 + x2*x3^2*c9 + x2^2*x1*c4 + x2^2*x3*c8 + x2*x1*x3*c5",
+  "-h1*c18 + h2*c17 - h1*x1*c12 - h1*x1*c19 - h1*x1^2*c13 - h1*x1^2*c2 - h1*x1^3*c3 - 2*h1*x2*c14 - 3*h1*x2^2*c7 - h1*x3*c15 - h1*x3^2*c9 + 2*h2*x1*c11 + 3*h2*x1^2*c1 + h2*x2*c12 + h2*x2*c19 + h2*x2^2*c15 + h2*x2^2*c4 + h2*x2^3*c8 + h2*x3*c13 + h2*x3^2*c6 + h3*x1*c17 + 2*h3*x1^2*c11 + 3*h3*x1^3*c1 - h3*x2*c18 - 2*h3*x2^2*c14 - 3*h3*x2^3*c7 - 2*h1*x1*x3*c16 - h1*x1*x3*c5 - 3*h1*x1*x3^2*c10 - 2*h1*x1^2*x3*c6 - h1*x2*x1*c15 - 2*h1*x2*x1*c4 - h1*x2*x1^2*c5 - 2*h1*x2*x3*c8 - h1*x2^2*x1*c8 + 2*h2*x1*x3*c3 + h2*x2*x1*c13 + 2*h2*x2*x1*c2 + h2*x2*x1^2*c3 + 2*h2*x2*x3*c16 + h2*x2*x3*c5 + 3*h2*x2*x3^2*c10 + h2*x2^2*x1*c5 + 2*h2*x2^2*x3*c9 + h3*x1*x3*c13 + h3*x1*x3^2*c6 + 2*h3*x1^2*x3*c3 + h3*x2*x1^2*c2 - h3*x2*x3*c15 - h3*x2*x3^2*c9 - h3*x2^2*x1*c4 - 2*h3*x2^2*x3*c8 - 2*h1*x2*x1*x3*c9 + 2*h2*x2*x1*x3*c6",
+  "-1 + h1*y1 + h2*y2 + h3*y3",
+  "y3 - y1*y2",
+  "c20 + y1*c17 + y1^2*c11 + y1^3*c1 + y2*c18 + y2^2*c14 + y2^3*c7 + y3*c19 + y3^2*c16 + y3^3*c10 + y1*y2*c12 + y1*y2^2*c4 + y1*y3*c13 + y1*y3^2*c6 + y1^2*y2*c2 + y1^2*y3*c3 + y2*y3*c15 + y2*y3^2*c9 + y2^2*y3*c8 + y1*y2*y3*c5",
+  "-h1*c18 + h2*c17 - h1*y1*c12 - h1*y1*c19 - h1*y1^2*c13 - h1*y1^2*c2 - h1*y1^3*c3 - 2*h1*y2*c14 - 3*h1*y2^2*c7 - h1*y3*c15 - h1*y3^2*c9 + 2*h2*y1*c11 + 3*h2*y1^2*c1 + h2*y2*c12 + h2*y2*c19 + h2*y2^2*c15 + h2*y2^2*c4 + h2*y2^3*c8 + h2*y3*c13 + h2*y3^2*c6 + h3*y1*c17 + 2*h3*y1^2*c11 + 3*h3*y1^3*c1 - h3*y2*c18 - 2*h3*y2^2*c14 - 3*h3*y2^3*c7 - h1*y1*y2*c15 - 2*h1*y1*y2*c4 - h1*y1*y2^2*c8 - 2*h1*y1*y3*c16 - h1*y1*y3*c5 - 3*h1*y1*y3^2*c10 - h1*y1^2*y2*c5 - 2*h1*y1^2*y3*c6 - 2*h1*y2*y3*c8 + h2*y1*y2*c13 + 2*h2*y1*y2*c2 + h2*y1*y2^2*c5 + 2*h2*y1*y3*c3 + h2*y1^2*y2*c3 + 2*h2*y2*y3*c16 + h2*y2*y3*c5 + 3*h2*y2*y3^2*c10 + 2*h2*y2^2*y3*c9 - h3*y1*y2^2*c4 + h3*y1*y3*c13 + h3*y1*y3^2*c6 + h3*y1^2*y2*c2 + 2*h3*y1^2*y3*c3 - h3*y2*y3*c15 - h3*y2*y3^2*c9 - 2*h3*y2^2*y3*c8 - 2*h1*y1*y2*y3*c9 + 2*h2*y1*y2*y3*c6",
+  "-1 + h1*z1 + h2*z2 + h3*z3",
+  "z3 - z2*z1",
+  "c20 + z1*c17 + z1^2*c11 + z1^3*c1 + z2*c18 + z2^2*c14 + z2^3*c7 + z3*c19 + z3^2*c16 + z3^3*c10 + z1*z3*c13 + z1*z3^2*c6 + z1^2*z3*c3 + z2*z1*c12 + z2*z1^2*c2 + z2*z3*c15 + z2*z3^2*c9 + z2^2*z1*c4 + z2^2*z3*c8 + z2*z1*z3*c5",
+  "-h1*c18 + h2*c17 - h1*z1*c12 - h1*z1*c19 - h1*z1^2*c13 - h1*z1^2*c2 - h1*z1^3*c3 - 2*h1*z2*c14 - 3*h1*z2^2*c7 - h1*z3*c15 - h1*z3^2*c9 + 2*h2*z1*c11 + 3*h2*z1^2*c1 + h2*z2*c12 + h2*z2*c19 + h2*z2^2*c15 + h2*z2^2*c4 + h2*z2^3*c8 + h2*z3*c13 + h2*z3^2*c6 + h3*z1*c17 + 2*h3*z1^2*c11 + 3*h3*z1^3*c1 - h3*z2*c18 - 2*h3*z2^2*c14 - 3*h3*z2^3*c7 - 2*h1*z1*z3*c16 - h1*z1*z3*c5 - 3*h1*z1*z3^2*c10 - 2*h1*z1^2*z3*c6 - h1*z2*z1*c15 - 2*h1*z2*z1*c4 - h1*z2*z1^2*c5 - 2*h1*z2*z3*c8 - h1*z2^2*z1*c8 + 2*h2*z1*z3*c3 + h2*z2*z1*c13 + 2*h2*z2*z1*c2 + h2*z2*z1^2*c3 + 2*h2*z2*z3*c16 + h2*z2*z3*c5 + 3*h2*z2*z3^2*c10 + h2*z2^2*z1*c5 + 2*h2*z2^2*z3*c9 + h3*z1*z3*c13 + h3*z1*z3^2*c6 + 2*h3*z1^2*z3*c3 + h3*z2*z1^2*c2 - h3*z2*z3*c15 - h3*z2*z3^2*c9 - h3*z2^2*z1*c4 - 2*h3*z2^2*z3*c8 - 2*h1*z2*z1*z3*c9 + 2*h2*z2*z1*z3*c6",
+]
+
+[source]
+citation = "A. Kulkarni, Y. Ren, M. Sayyary Namin, B. Sturmfels, 'Real space sextics and their tritangents', ISSAC 2018; HC.jl example https://www.juliahomotopycontinuation.org/examples/tritangents/."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/blob/0cbf1e27d062d7eb01d962c3b948c39444c9a62c/test/test_systems.jl#L31-L53"
+file = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/test_systems.jl:31-53 (Tritangtens); benchmarks/tritangents.jl"
+
+[solutions]
+generic_nonsingular = 720
+count_source = "120 tritangent planes of a generic space sextic of genus 4, times 3! orderings of the contact points = 720. HC.jl benchmarks/tritangents.jl: nnonsingular(solve(f)) 'should be 720' (total degree and polyhedral) for PolynomialTestSystems.jl tritangents() (fixed random cubic)."
+
+[parametrization]
+kind = "explicit"
+
+[hcjl]
+function = "Tritangtens()"
+location = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/test_systems.jl:31-53"
+parametrization = "parameters = the 20 coefficients c of the dense cubic (dense_poly(x, 3, coeff_name = :c))."
+how_solved = "In TEST_SYSTEM_COLLECTION (evaluation benchmark only). benchmarks/tritangents.jl solves PolynomialTestSystems.tritangents() (same system with a fixed random complex cubic, different coefficient order) with solve(f) and solve(f; start_system = :polyhedral) and expects 720 nonsingular solutions."
+used_in = "benchmarks/run_system_benchmark.jl times evaluate!, evaluate_and_jacobian! and taylor! of every system in TEST_SYSTEM_COLLECTION (test/test_systems.jl:1003-1018) for InterpretedSystem and CompiledSystem at random x and p; it does not solve them."
+
+[verification]
+status = "verified"
+method = "HC.jl monodromy_solve from a random start pair found by HC (find_start_pair), max_loops_no_progress = 10; 69 s. Transcription equals HC.jl Tritangtens() (rel. err. 3e-16)."
+hc_version = "2.22.4"
+verified_count = 720
+date = "2026-11-07"

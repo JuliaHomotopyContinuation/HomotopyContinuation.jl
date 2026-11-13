@@ -1,0 +1,44 @@
+name = "biquadratic_factorization_issue649"
+tier = "A"
+description = "Factorization of a 2-D biquadratic model into a product of two quadratics (T. Holy, HC.jl issue #649): unknowns are two symmetric 2x2 matrices A0, A1 and vectors b0, b1 (10 unknowns); parameters are the given gradients g0, g1 and symmetric Hessians H0, H1 (10 parameters). Generic count 6, but a direct polyhedral solve tracks 252 paths. The user's real data are of size 1e9 .. 1e10, and its two real solutions mix coordinates of size 1e9 and 1e-2 .. 1. A direct solve at the data finds 0-1 of the 6 solutions. The parameter homotopy from random complex parameters (the maintainers' recommendation) finds all 6. Badly scaled target parameters: a real application."
+tags = ["badly-scaled", "parameter-homotopy", "optimization", "factorization", "user-report"]
+variables = ["A0_1", "A0_2", "A0_3", "b0_1", "b0_2", "A1_1", "A1_2", "A1_3", "b1_1", "b1_2"]
+parameters = ["g0_1", "g0_2", "g1_1", "g1_2", "H0_11", "H0_12", "H0_22", "H1_11", "H1_12", "H1_22"]
+equations = [
+  "-A1_1-A1_2+b0_1+b1_1-g0_1+(1/2)*b0_1*A1_1+b0_1*A1_2+(1/2)*b0_1*A1_3-b1_1*b0_1-b1_2*b0_1",
+  "-A1_2-A1_3+b0_2+b1_2-g0_2+(1/2)*b0_2*A1_1+b0_2*A1_2+(1/2)*b0_2*A1_3-b1_1*b0_2-b1_2*b0_2",
+  "A0_1+A0_2+b0_1+b1_1-g1_1+(1/2)*b1_1*A0_1+b1_1*A0_2+(1/2)*b1_1*A0_3+b1_1*b0_1+b1_1*b0_2",
+  "A0_2+A0_3+b0_2+b1_2-g1_2+(1/2)*b1_2*A0_1+b1_2*A0_2+(1/2)*b1_2*A0_3+b1_2*b0_1+b1_2*b0_2",
+  "A0_1+A1_1-H0_11+(1/2)*A1_1*A0_1+A1_2*A0_1+(1/2)*A1_3*A0_1-2*b0_1*A1_1-2*b0_1*A1_2-b1_1*A0_1+2*b1_1*b0_1-b1_2*A0_1",
+  "A0_2+A1_2-H0_12+(1/2)*A1_1*A0_2+A1_2*A0_2+(1/2)*A1_3*A0_2-b0_1*A1_2-b0_1*A1_3-b0_2*A1_1-b0_2*A1_2-b1_1*A0_2+b1_1*b0_2-b1_2*A0_2+b1_2*b0_1",
+  "A0_3+A1_3-H0_22+(1/2)*A1_1*A0_3+A1_2*A0_3+(1/2)*A1_3*A0_3-2*b0_2*A1_2-2*b0_2*A1_3-b1_1*A0_3-b1_2*A0_3+2*b1_2*b0_2",
+  "A0_1+A1_1-H1_11+(1/2)*A1_1*A0_1+A1_1*A0_2+(1/2)*A1_1*A0_3+b0_1*A1_1+b0_2*A1_1+2*b1_1*A0_1+2*b1_1*A0_2+2*b1_1*b0_1",
+  "A0_2+A1_2-H1_12+(1/2)*A1_2*A0_1+A1_2*A0_2+(1/2)*A1_2*A0_3+b0_1*A1_2+b0_2*A1_2+b1_1*A0_2+b1_1*A0_3+b1_1*b0_2+b1_2*A0_1+b1_2*A0_2+b1_2*b0_1",
+  "A0_3+A1_3-H1_22+(1/2)*A1_3*A0_1+A1_3*A0_2+(1/2)*A1_3*A0_3+b0_1*A1_3+b0_2*A1_3+2*b1_2*A0_2+2*b1_2*A0_3+2*b1_2*b0_2",
+]
+target_parameters = ["-2.0572295698118172e9", "-1.0946872831524246e10", "-2.654355654346107e9", "-1.8026431499130545e9", "-5.799857157583843e9", "2.2112130890346775e9", "1.1904739805563393e10", "-9.605191673340421e8", "2.881331173461073e9", "1.971553859807829e9"]
+
+[source]
+citation = "HomotopyContinuation.jl issue #649 'Stochastic results in 2-dimensional biquadratic factorization' (timholy, 2025), parametrized as in saschatimme's reply (factorbiq_system). H0 and H1 are symmetric, so only their entries (1,1), (1,2), (2,2) enter; the source's H[2,1] (differing in the last digits) is unused."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/issues/649"
+file = ""
+
+[solutions]
+generic_nonsingular = 6
+count_source = "Maintainers (issue #649) and HC.jl 2.22.4: polyhedral solve at random complex parameters gives 6 nonsingular, 5/5 runs."
+target_endpoints = "6 nonsingular, 2 real."
+expected_outcome = "All 6 solutions at target_parameters, including the 2 real ones in reference_real_solutions (variable order as in `variables`)."
+reference_real_solutions = [
+  ["-2.7940017822215576e9", "6.237312709437258e9", "-4.353989641624983e9", "-1.753008182817548e9", "-9.328058435099428e9", "-0.01053114958353485", "-0.19238146498792302", "0.4341175976543101", "0.5161306281585974", "-0.6702613492291367"],
+  ["0.5424262561146524", "-0.7222287649638782", "0.9349262099012681", "0.7903552508081654", "-0.9617825421313181", "3.4025057207910933e9", "2.166562170749885e9", "-1.4489885337354205e9", "-3.1411742915498085e9", "-2.1332545645940216e9"],
+]
+
+[parametrization]
+kind = "explicit"
+
+[verification]
+status = "verified"
+method = "HC.jl 2.22.4: direct polyhedral solve at target_parameters (252 paths), seeds 1-5: 0, 0, 1, 1, 0 nonsingular and never a real one. Parameter homotopy from random complex parameters (6 solutions) to the target, 5 runs: 6/6 :success, 2 real, every time; the real solutions agree with the issue to ~1e-14 relative."
+hc_version = "2.22.4"
+verified_count = 6
+date = "2026-11-08"

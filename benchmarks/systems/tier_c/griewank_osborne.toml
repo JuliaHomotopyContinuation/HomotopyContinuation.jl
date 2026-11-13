@@ -1,0 +1,44 @@
+name = "griewank_osborne"
+tier = "C"
+description = "Coefficient family containing the Griewank-Osborne system [(29/16) x^3 - 2 x y, x^2 - y]. Generic member: f2 = d1 x^2 + d2 y + d3 x + d4 is linear in y; eliminating y gives a cubic in x, so 3 nonsingular solutions. At the target the 3 paths converge to the isolated triple root (0, 0) at which Newton's method diverges from any nearby start."
+tags = [
+  "endgame",
+  "singular-endpoint",
+  "multiplicity",
+  "newton-failure",
+]
+variables = [
+  "x", "y",
+]
+parameters = [
+  "c1", "c2", "c3", "c4", "c5", "d1", "d2", "d3",
+  "d4",
+]
+equations = [
+  "c1*x^3 + c2*x*y + c3*x + c4*y + c5",
+  "d1*x^2 + d2*y + d3*x + d4",
+]
+target_parameters = [
+  "29/16", "-2", "0", "0", "0", "1", "-1", "0",
+  "0",
+]
+
+[source]
+citation = "A. Griewank, M. R. Osborne, 'Analysis of Newton's method at irregular singularities', SIAM J. Numer. Anal. 20(4), 1983. System from PolynomialTestSystems.jl griewank_osborne(); coefficient family added here."
+url = "https://github.com/JuliaHomotopyContinuation/PolynomialTestSystems.jl/blob/e04087ef08cf91ffafd88546c4d4ccb25613a3c7/src/systems.jl#L360-L372"
+file = "PolynomialTestSystems.jl@e04087ef08cf91ffafd88546c4d4ccb25613a3c7:src/systems.jl (griewank_osborne)"
+
+[solutions]
+generic_nonsingular = 3
+count_source = "Elimination argument in `description`."
+target_endpoints = "1 isolated singular solution (0, 0) of multiplicity 3; all 3 paths end there; 0 nonsingular solutions."
+
+[parametrization]
+kind = "explicit"
+
+[verification]
+status = "verified"
+method = "HC.jl: total-degree solve at random complex parameters gives 3 nonsingular; parameter homotopy to target_parameters: all 3 paths :success, winding number 3, endpoint (0, 0) with multiplicity 3."
+hc_version = "2.22.4"
+verified_count = 3
+date = "2026-11-07"

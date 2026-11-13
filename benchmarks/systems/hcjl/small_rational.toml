@@ -1,0 +1,42 @@
+name = "small_rational"
+tier = "HC"
+description = "A single rational function in 6 unknowns and 8 parameters (q3, q4, q6, q7 do not occur). Not a zero-dimensional system: used only to benchmark/test evaluation of rational expressions."
+tags = [
+  "rational",
+  "evaluation-only",
+  "not-square",
+  "hcjl",
+]
+square = false
+variables = [
+  "y1", "y2", "y3", "y4", "y5", "y6",
+]
+parameters = [
+  "q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8",
+]
+equations = [
+  "q1/y1 - q2/(-y1 + y2) + q5*y4/(y1*y4 - y2*y3) + q8*y6/(y1*y6 - y2*y5)",
+]
+
+[source]
+citation = "HomotopyContinuation.jl test/test_systems.jl small_rational()."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/blob/0cbf1e27d062d7eb01d962c3b948c39444c9a62c/test/test_systems.jl#L981-L995"
+file = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/test_systems.jl:981-995 (small_rational)"
+
+[solutions]
+zero_dimensional = false
+count_source = "Not applicable: 1 equation in 6 unknowns (a hypersurface)."
+
+[parametrization]
+kind = "explicit"
+
+[hcjl]
+function = "small_rational()"
+location = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/test_systems.jl:981-995"
+parametrization = "parameters q[1:8]."
+how_solved = "Not solved; part of TEST_SYSTEM_COLLECTION."
+used_in = "benchmarks/run_system_benchmark.jl times evaluate!, evaluate_and_jacobian! and taylor! of every system in TEST_SYSTEM_COLLECTION (test/test_systems.jl:1003-1018) for InterpretedSystem and CompiledSystem at random x and p; it does not solve them."
+
+[verification]
+status = "not-needed"
+method = "not zero-dimensional"

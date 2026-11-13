@@ -1,0 +1,54 @@
+name = "biochem_network1"
+tier = "HC"
+description = "Steady states of a 3-species reaction network with 10 rate parameters (network 1 of HC.jl benchmarks/bio-chemical-rection-networks.jl)."
+tags = [
+  "chemistry",
+  "reaction-network",
+  "steady-states",
+  "parameter-homotopy",
+  "consistency",
+  "hcjl",
+]
+variables = [
+  "x1", "x2", "x3",
+]
+parameters = [
+  "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8",
+  "p9", "p10",
+]
+equations = [
+  "p1 - p2*x1 - p3*x1*x3",
+  "-p4*x2*p10 - p4*x2*x3 - p6*p5*x2*p10 - p6*p5*x2*x3 + p8*p7*p9*x1*x3 + p8*p9*x2*x1*x3",
+  "-1.0 + x2 + x3",
+]
+target_parameters = [
+  "0.04", "0.04", "1.0", "1.0", "10.0", "0.0", "0.04", "35.0",
+  "0.1", "0.04",
+]
+
+[source]
+citation = "HomotopyContinuation.jl benchmarks/bio-chemical-rection-networks.jl (networks from T. Loman, BioDiffEq/Catalyst.jl)."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/blob/0cbf1e27d062d7eb01d962c3b948c39444c9a62c/benchmarks/bio-chemical-rection-networks.jl#L19-L44"
+file = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:benchmarks/bio-chemical-rection-networks.jl:19-44"
+
+[solutions]
+generic_nonsingular = 3
+count_source = "No count stated in HC.jl. Computed here with HC.jl 2.22.4 (polyhedral solve at random complex parameters and monodromy agree: 3). At target_parameters: 3 nonsingular, 1 real."
+
+[parametrization]
+kind = "explicit"
+notes = "target_parameters = p_vals of the benchmark (note p6 = 0, a degenerate value)."
+
+[hcjl]
+function = "pol (network 1)"
+location = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:benchmarks/bio-chemical-rection-networks.jl:19-44"
+parametrization = "p[1:10]."
+how_solved = "benchmarks/bio-chemical-rection-networks.jl (sent by Torkel Loman for the BioDiffEq / Catalyst integration) runs N = 1000 times: (a) a direct solve(...) at the given real parameters, and (b) solve at random complex parameters followed by a parameter homotopy (solve(pol, sols; parameters, p1 = template, p0 = target)) to the target; it tallies the number of solutions found and expects (a) and (b) to agree in every run."
+used_in = "benchmarks/bio-chemical-rection-networks.jl"
+
+[verification]
+status = "verified"
+method = "HC.jl polyhedral solve at random complex parameters: 3 nonsingular; monodromy: 3. Parameter homotopy to target_parameters and direct solve at the target agree: 3 nonsingular, 1 real."
+hc_version = "2.22.4"
+verified_count = 3
+date = "2026-11-07"

@@ -1,0 +1,54 @@
+name = "rigid_multiview"
+tier = "HC"
+description = "Rigid two-point multiview triangulation (critical points): two 3D points x, y at prescribed squared distance delta, seen by two cameras A[:, :, k] (3x4, k = 1, 2); minimize the reprojection error of x to image point u and of y to image point v in both cameras, with Lagrange multiplier lambda. RATIONAL equations (gradient of a sum of squares of ratios). 7 unknowns (x1..x3, y1..y3, lambda), 29 parameters (u, v, delta, A). Exported from HC.jl RigidMultiView() without expansion."
+tags = [
+  "vision",
+  "triangulation",
+  "critical-points",
+  "rational",
+  "hcjl",
+]
+variables = [
+  "x1", "x2", "x3", "y1", "y2", "y3", "λ",
+]
+parameters = [
+  "u1", "u2", "v1", "v2", "delta", "A1_1_1", "A2_1_1", "A3_1_1",
+  "A1_2_1", "A2_2_1", "A3_2_1", "A1_3_1", "A2_3_1", "A3_3_1", "A1_4_1", "A2_4_1",
+  "A3_4_1", "A1_1_2", "A2_1_2", "A3_1_2", "A1_2_2", "A2_2_2", "A3_2_2", "A1_3_2",
+  "A2_3_2", "A3_3_2", "A1_4_2", "A2_4_2", "A3_4_2",
+]
+equations = [
+  "2*(u1 - (A1_4_1 + x1*A1_1_1 + x2*A1_2_1 + x3*A1_3_1)/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1))*(-A1_1_1/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1) + A3_1_1*(A1_4_1 + x1*A1_1_1 + x2*A1_2_1 + x3*A1_3_1)/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1)^2) + 2*(u1 - (A1_4_2 + x1*A1_1_2 + x2*A1_2_2 + x3*A1_3_2)/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2))*(-A1_1_2/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2) + A3_1_2*(A1_4_2 + x1*A1_1_2 + x2*A1_2_2 + x3*A1_3_2)/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2)^2) + 2*(u2 - (A2_4_1 + x1*A2_1_1 + x2*A2_2_1 + x3*A2_3_1)/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1))*(-A2_1_1/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1) + A3_1_1*(A2_4_1 + x1*A2_1_1 + x2*A2_2_1 + x3*A2_3_1)/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1)^2) + 2*(u2 - (A2_4_2 + x1*A2_1_2 + x2*A2_2_2 + x3*A2_3_2)/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2))*(-A2_1_2/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2) + A3_1_2*(A2_4_2 + x1*A2_1_2 + x2*A2_2_2 + x3*A2_3_2)/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2)^2) + 2*(x1 - y1)*λ",
+  "2*(u1 - (A1_4_1 + x1*A1_1_1 + x2*A1_2_1 + x3*A1_3_1)/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1))*(-A1_2_1/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1) + A3_2_1*(A1_4_1 + x1*A1_1_1 + x2*A1_2_1 + x3*A1_3_1)/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1)^2) + 2*(u1 - (A1_4_2 + x1*A1_1_2 + x2*A1_2_2 + x3*A1_3_2)/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2))*(-A1_2_2/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2) + A3_2_2*(A1_4_2 + x1*A1_1_2 + x2*A1_2_2 + x3*A1_3_2)/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2)^2) + 2*(u2 - (A2_4_1 + x1*A2_1_1 + x2*A2_2_1 + x3*A2_3_1)/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1))*(-A2_2_1/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1) + A3_2_1*(A2_4_1 + x1*A2_1_1 + x2*A2_2_1 + x3*A2_3_1)/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1)^2) + 2*(u2 - (A2_4_2 + x1*A2_1_2 + x2*A2_2_2 + x3*A2_3_2)/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2))*(-A2_2_2/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2) + A3_2_2*(A2_4_2 + x1*A2_1_2 + x2*A2_2_2 + x3*A2_3_2)/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2)^2) + 2*(x2 - y2)*λ",
+  "2*(u1 - (A1_4_1 + x1*A1_1_1 + x2*A1_2_1 + x3*A1_3_1)/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1))*(-A1_3_1/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1) + A3_3_1*(A1_4_1 + x1*A1_1_1 + x2*A1_2_1 + x3*A1_3_1)/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1)^2) + 2*(u1 - (A1_4_2 + x1*A1_1_2 + x2*A1_2_2 + x3*A1_3_2)/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2))*(-A1_3_2/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2) + A3_3_2*(A1_4_2 + x1*A1_1_2 + x2*A1_2_2 + x3*A1_3_2)/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2)^2) + 2*(u2 - (A2_4_1 + x1*A2_1_1 + x2*A2_2_1 + x3*A2_3_1)/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1))*(-A2_3_1/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1) + A3_3_1*(A2_4_1 + x1*A2_1_1 + x2*A2_2_1 + x3*A2_3_1)/(A3_4_1 + x1*A3_1_1 + x2*A3_2_1 + x3*A3_3_1)^2) + 2*(u2 - (A2_4_2 + x1*A2_1_2 + x2*A2_2_2 + x3*A2_3_2)/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2))*(-A2_3_2/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2) + A3_3_2*(A2_4_2 + x1*A2_1_2 + x2*A2_2_2 + x3*A2_3_2)/(A3_4_2 + x1*A3_1_2 + x2*A3_2_2 + x3*A3_3_2)^2) + 2*(x3 - y3)*λ",
+  "2*(v1 - (A1_4_1 + y1*A1_1_1 + y2*A1_2_1 + y3*A1_3_1)/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1))*(-A1_1_1/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1) + A3_1_1*(A1_4_1 + y1*A1_1_1 + y2*A1_2_1 + y3*A1_3_1)/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1)^2) + 2*(v1 - (A1_4_2 + y1*A1_1_2 + y2*A1_2_2 + y3*A1_3_2)/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2))*(-A1_1_2/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2) + A3_1_2*(A1_4_2 + y1*A1_1_2 + y2*A1_2_2 + y3*A1_3_2)/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2)^2) + 2*(v2 - (A2_4_1 + y1*A2_1_1 + y2*A2_2_1 + y3*A2_3_1)/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1))*(-A2_1_1/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1) + A3_1_1*(A2_4_1 + y1*A2_1_1 + y2*A2_2_1 + y3*A2_3_1)/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1)^2) + 2*(v2 - (A2_4_2 + y1*A2_1_2 + y2*A2_2_2 + y3*A2_3_2)/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2))*(-A2_1_2/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2) + A3_1_2*(A2_4_2 + y1*A2_1_2 + y2*A2_2_2 + y3*A2_3_2)/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2)^2) - 2*(x1 - y1)*λ",
+  "2*(v1 - (A1_4_1 + y1*A1_1_1 + y2*A1_2_1 + y3*A1_3_1)/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1))*(-A1_2_1/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1) + A3_2_1*(A1_4_1 + y1*A1_1_1 + y2*A1_2_1 + y3*A1_3_1)/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1)^2) + 2*(v1 - (A1_4_2 + y1*A1_1_2 + y2*A1_2_2 + y3*A1_3_2)/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2))*(-A1_2_2/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2) + A3_2_2*(A1_4_2 + y1*A1_1_2 + y2*A1_2_2 + y3*A1_3_2)/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2)^2) + 2*(v2 - (A2_4_1 + y1*A2_1_1 + y2*A2_2_1 + y3*A2_3_1)/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1))*(-A2_2_1/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1) + A3_2_1*(A2_4_1 + y1*A2_1_1 + y2*A2_2_1 + y3*A2_3_1)/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1)^2) + 2*(v2 - (A2_4_2 + y1*A2_1_2 + y2*A2_2_2 + y3*A2_3_2)/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2))*(-A2_2_2/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2) + A3_2_2*(A2_4_2 + y1*A2_1_2 + y2*A2_2_2 + y3*A2_3_2)/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2)^2) - 2*(x2 - y2)*λ",
+  "2*(v1 - (A1_4_1 + y1*A1_1_1 + y2*A1_2_1 + y3*A1_3_1)/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1))*(-A1_3_1/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1) + A3_3_1*(A1_4_1 + y1*A1_1_1 + y2*A1_2_1 + y3*A1_3_1)/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1)^2) + 2*(v1 - (A1_4_2 + y1*A1_1_2 + y2*A1_2_2 + y3*A1_3_2)/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2))*(-A1_3_2/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2) + A3_3_2*(A1_4_2 + y1*A1_1_2 + y2*A1_2_2 + y3*A1_3_2)/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2)^2) + 2*(v2 - (A2_4_1 + y1*A2_1_1 + y2*A2_2_1 + y3*A2_3_1)/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1))*(-A2_3_1/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1) + A3_3_1*(A2_4_1 + y1*A2_1_1 + y2*A2_2_1 + y3*A2_3_1)/(A3_4_1 + y1*A3_1_1 + y2*A3_2_1 + y3*A3_3_1)^2) + 2*(v2 - (A2_4_2 + y1*A2_1_2 + y2*A2_2_2 + y3*A2_3_2)/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2))*(-A2_3_2/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2) + A3_3_2*(A2_4_2 + y1*A2_1_2 + y2*A2_2_2 + y3*A2_3_2)/(A3_4_2 + y1*A3_1_2 + y2*A3_2_2 + y3*A3_3_2)^2) - 2*(x3 - y3)*λ",
+  "-delta + (x1 - y1)^2 + (x2 - y2)^2 + (x3 - y3)^2",
+]
+
+[source]
+citation = "HomotopyContinuation.jl test/test_systems.jl RigidMultiView() (no external reference given in the source)."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/blob/0cbf1e27d062d7eb01d962c3b948c39444c9a62c/test/test_systems.jl#L1-L29"
+file = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/test_systems.jl:1-29 (RigidMultiView; the function first builds a plain 2-view triangulation system and discards it, only the rigid system is returned)"
+
+[solutions]
+count_known = false
+count_source = "Unknown: HC.jl gives no count (the system is only used for evaluation benchmarks) and it was not computed here; see [verification]."
+
+[parametrization]
+kind = "explicit"
+notes = "Parameter A1_4_2 means A[1, 4, 2] (row, column, camera). Equations contain '/'; clearing denominators changes the solution set (spurious solutions where a camera depth vanishes)."
+
+[hcjl]
+function = "RigidMultiView()"
+location = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/test_systems.jl:1-29"
+parametrization = "parameters = [u; v; delta; vec(A)]."
+how_solved = "Not solved in the HC.jl test suite; only part of TEST_SYSTEM_COLLECTION."
+used_in = "benchmarks/run_system_benchmark.jl times evaluate!, evaluate_and_jacobian! and taylor! of every system in TEST_SYSTEM_COLLECTION (test/test_systems.jl:1003-1018) for InterpretedSystem and CompiledSystem at random x and p; it does not solve them."
+
+[verification]
+status = "not-verified"
+method = "Transcription equals HC.jl RigidMultiView() (rel. err. 6e-16). Count not determined: find_start_pair fails (parameters enter through denominators) and no start pair is available."
+hc_version = "2.22.4"
+date = "2026-11-07"

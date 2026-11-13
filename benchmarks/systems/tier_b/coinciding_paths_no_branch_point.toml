@@ -1,0 +1,36 @@
+name = "coinciding_paths_no_branch_point"
+tier = "B"
+description = "Telen-Van Barel-Verschelde Example 3: H(x, t) = (x - (t - (a + b*im))^2) * (x + (t - (a + b*im))^2), t in [0, 1], 0 < a < 1, |b| small. Both solution paths x = +-(t - (a + b*im))^2 are entire functions of t (no branch point), but they meet at t = a + b*im, close to the real segment. A step-size control based only on distance to the nearest singularity (Pade pole) is fooled; tests the 'distance to nearest path' safeguard."
+tags = [
+  "path-jumping",
+  "stress",
+  "univariate",
+  "near-singular",
+]
+variables = [
+  "x",
+]
+parameters = [
+  "t", "a", "b",
+]
+equations = [
+  "(x - (t - (a + b*im))^2)*(x + (t - (a + b*im))^2)",
+]
+benchmark_paths = "t: 0 -> 1 along the real segment, e.g. a = 0.5 and b in {1e-1, ..., 1e-7}"
+
+[source]
+citation = "S. Telen, M. Van Barel, J. Verschelde, arXiv:1909.04984, Example 3 (Sec. 5)."
+url = "https://arxiv.org/abs/1909.04984"
+file = ""
+
+[solutions]
+generic_nonsingular = 2
+count_source = "Explicit: x = +-(t - (a + b*im))^2."
+expected_outcome = "The path starting at x = (0 - (a + b*im))^2 must end at x = (1 - (a + b*im))^2."
+
+[parametrization]
+kind = "explicit"
+
+[verification]
+status = "not-needed"
+method = "closed-form solutions"

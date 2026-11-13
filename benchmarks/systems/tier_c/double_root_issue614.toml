@@ -1,0 +1,42 @@
+name = "double_root_issue614"
+tier = "C"
+description = "Monic quadratic family x^2 + b x + c. Target b = -4, c = 4 is (x - 2)^2: both paths converge to the double root x = 2 (winding number 2). HC.jl issue #614 reported inconsistent results for solve(System([x*x - 4x + 4])): sometimes one path returns :terminated_accuracy_limit at x ~ 1.97 instead of reaching the singular endpoint."
+tags = [
+  "endgame",
+  "singular-endpoint",
+  "multiplicity",
+  "regression",
+]
+variables = [
+  "x",
+]
+parameters = [
+  "b", "c",
+]
+equations = [
+  "x^2 + b*x + c",
+]
+target_parameters = [
+  "-4", "4",
+]
+
+[source]
+citation = "HomotopyContinuation.jl issue #614 'Inconsistent results for simple polynomial' (A. Sabharwal)."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/issues/614"
+file = ""
+
+[solutions]
+generic_nonsingular = 2
+count_source = "Degree 2 with discriminant b^2 - 4c != 0."
+target_endpoints = "1 singular solution x = 2 of multiplicity 2; both paths end there with winding number 2."
+notes = "Still flaky in HC.jl 2.22.4: in 10 repetitions of solve(System([x^2 - 4x + 4]); threading = false), 2 runs had one path end with :terminated_step_size_too_small."
+
+[parametrization]
+kind = "explicit"
+
+[verification]
+status = "partial"
+method = "HC.jl: 2 nonsingular at random parameters. Parameter homotopy to the target: in one run both paths :success (winding number 2, x = 2, multiplicity 2); in another run neither path returned a solution. Direct solve(System([x^2 - 4x + 4])) 10 times: 2 runs had a path with :terminated_step_size_too_small."
+hc_version = "2.22.4"
+verified_count = 2
+date = "2026-11-07"

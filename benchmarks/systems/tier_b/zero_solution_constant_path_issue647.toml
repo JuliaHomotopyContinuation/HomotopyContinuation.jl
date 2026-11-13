@@ -1,0 +1,32 @@
+name = "zero_solution_constant_path_issue647"
+tier = "B"
+description = "Regression case from HC.jl issue #647: F = y (x - y) with parameter x. The two solutions y = 0 and y = x are nonsingular for every x != 0. The y = 0 path is constant and exactly zero. HC.jl before PR #691 (2026-09) returned :terminated_max_steps after 0 steps on it (the trust region became non-finite at an exactly-zero solution, because of the weighted norm). Tests that a tracker handles exactly-zero coordinates and constant paths."
+tags = ["regression", "single-path", "zero-coordinate", "user-report", "univariate"]
+variables = ["y"]
+parameters = ["x"]
+equations = [
+  "y*(x - y)",
+]
+start_parameters = ["0.5332030289131389+0.9617113737712917im"]
+target_parameters = ["5.0"]
+benchmark_paths = "From start_parameters (solutions y = 0 and y = x) to target_parameters = 5.0 (real) and to random complex x. Both paths must succeed."
+
+[source]
+citation = "HomotopyContinuation.jl issue #647 'Losing regular solutions' (tbrysiewicz, 2025); fixed by PR #691 'Fallback when trust region becomes non-finite'."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/issues/647"
+file = ""
+
+[solutions]
+generic_nonsingular = 2
+count_source = "Factorization: y = 0 and y = x."
+expected_outcome = "Both paths :success; y = 0 stays exactly 0, y = x ends at the target x."
+
+[parametrization]
+kind = "explicit"
+
+[verification]
+status = "verified"
+method = "HC.jl 2.22.4: 5 random complex start parameters; parameter homotopy to x = 5.0 and to random complex x: both paths :success in all 10 runs (fixed in 2.22.4)."
+hc_version = "2.22.4"
+verified_count = 2
+date = "2026-11-08"

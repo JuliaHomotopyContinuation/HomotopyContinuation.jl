@@ -1,0 +1,48 @@
+name = "katsura10"
+tier = "B"
+description = "Katsura-10 (magnetism / mean-field spin glass). n+1 = 11 unknowns x0..x10 (with x_{-i} = x_i): for m = 0..9: sum_{l = -n..n, |m-l| <= n} x_l x_{m-l} - x_m = 0, plus x0 + 2 sum_{i=1..n} x_i - 1 = 0. Number of solutions equals the Bezout number 2^n; standard scaling benchmark (HC.jl, Bertini 2 comparison, algpath-bench, Telen et al. go up to katsura-20)."
+tags = [
+  "stress",
+  "scaling",
+  "coefficient-parameter",
+  "generator",
+]
+variables = [
+  "x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7",
+  "x8", "x9", "x10",
+]
+parameters = []
+equations = [
+  "x0^2 + 2*x1^2 + 2*x2^2 + 2*x3^2 + 2*x4^2 + 2*x5^2 + 2*x6^2 + 2*x7^2 + 2*x8^2 + 2*x9^2 + 2*x10^2 - x0",
+  "2*x0*x1 + 2*x1*x2 + 2*x2*x3 + 2*x3*x4 + 2*x4*x5 + 2*x5*x6 + 2*x6*x7 + 2*x7*x8 + 2*x8*x9 + 2*x9*x10 - x1",
+  "2*x0*x2 + x1^2 + 2*x1*x3 + 2*x2*x4 + 2*x3*x5 + 2*x4*x6 + 2*x5*x7 + 2*x6*x8 + 2*x7*x9 + 2*x8*x10 - x2",
+  "2*x0*x3 + 2*x1*x2 + 2*x1*x4 + 2*x2*x5 + 2*x3*x6 + 2*x4*x7 + 2*x5*x8 + 2*x6*x9 + 2*x7*x10 - x3",
+  "2*x0*x4 + 2*x1*x3 + 2*x1*x5 + x2^2 + 2*x2*x6 + 2*x3*x7 + 2*x4*x8 + 2*x5*x9 + 2*x6*x10 - x4",
+  "2*x0*x5 + 2*x1*x4 + 2*x1*x6 + 2*x2*x3 + 2*x2*x7 + 2*x3*x8 + 2*x4*x9 + 2*x5*x10 - x5",
+  "2*x0*x6 + 2*x1*x5 + 2*x1*x7 + 2*x2*x4 + 2*x2*x8 + x3^2 + 2*x3*x9 + 2*x4*x10 - x6",
+  "2*x0*x7 + 2*x1*x6 + 2*x1*x8 + 2*x2*x5 + 2*x2*x9 + 2*x3*x4 + 2*x3*x10 - x7",
+  "2*x0*x8 + 2*x1*x7 + 2*x1*x9 + 2*x2*x6 + 2*x2*x10 + 2*x3*x5 + x4^2 - x8",
+  "2*x0*x9 + 2*x1*x8 + 2*x1*x10 + 2*x2*x7 + 2*x3*x6 + 2*x4*x5 - x9",
+  "x0 + 2*x1 + 2*x2 + 2*x3 + 2*x4 + 2*x5 + 2*x6 + 2*x7 + 2*x8 + 2*x9 + 2*x10 - 1",
+]
+generator = "katsura(n): variables x0..xn; equations as in `description`. Python: for m in 0..n-1: sum(x[abs(l)]*x[abs(m-l)] for l in -n..n if abs(m-l) <= n) - x[m]; then x[0] + 2*sum(x[1:n]) - 1. Identical to PolynomialTestSystems.jl katsura(n) and Bertini 2 benchmark/comparison/systems.py katsura(n)."
+
+[source]
+citation = "S. Katsura, 'Users posing problems to PoSSo', PoSSo Newsletter 2, 1994; S. Katsura et al., Cell Biophysics 11 (1987) 309-319. Standard form from PolynomialTestSystems.jl katsura(n) / PHCpack Demo/katsura10."
+url = "https://github.com/JuliaHomotopyContinuation/PolynomialTestSystems.jl/blob/e04087ef08cf91ffafd88546c4d4ccb25613a3c7/src/systems.jl#L101-L109"
+file = "PolynomialTestSystems.jl@e04087ef08cf91ffafd88546c4d4ccb25613a3c7:src/systems.jl (katsura); PHCpack@ed77cc0234aec45099d1d587a90a1617d5bfdacd:src/Demo/katsura10 (same system, variables x1..x11 = x0..x10)"
+
+[solutions]
+generic_nonsingular = 1024
+count_source = "Total degree 2^10 = 1024 is attained, all solutions finite and nonsingular (PHCpack Demo/katsura10 lists 1024 solutions for n = 10; Timme arXiv:1902.02968 Sec. 5.4; PolynomialTestSystems.jl). Note: the torus mixed volume can be smaller (HC.jl mixed_volume gives 4020 for n = 12) because some solutions have zero coordinates."
+
+[parametrization]
+kind = "coefficients"
+description = "All coefficients are parameters: the generic family multiplies every monomial term of every equation (in the expanded form stored above, including the constant -1) by an independent complex parameter. The stored equations are the member with the Katsura coefficients. Generic count of the family = 2^n (checked for n = 10 with random monomial coefficients: 1024 nonsingular)."
+
+[verification]
+status = "verified"
+method = "HC.jl solve (polyhedral): 1024 paths, 1024 nonsingular (10 s). Generic monomial coefficients on the same support: 1024 nonsingular. Transcription equals PHCpack Demo/katsura10 (rel. err. 2e-16)."
+hc_version = "2.22.4"
+verified_count = 1024
+date = "2026-11-07"

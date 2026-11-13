@@ -1,0 +1,39 @@
+name = "bicritical_cycle_issue502"
+tier = "C"
+description = "Bicritical rational maps f(z) = (1 + a z^2)/(1 + b z^2) whose two critical points 0 and infinity lie on one common cycle of length n = 9 (the critical point infinity at position m = 7), from HC.jl issue #502 (L. Bartholdi). Normalized so that f(0) = 1; z2..z6, z8 are the other cycle points. The issue's code also creates an unused variable z7 and an identically zero equation f(0) - 1; both are dropped here. The target has 86 nonsingular solutions, 84 with a != b (the dynamically meaningful maps; a = b is the constant map), and 40 singular endpoints out of mixed volume 127. Default polyhedral solve occasionally loses one of the 84 (56/100 complete runs in 2022)."
+tags = ["dynamics", "rational-maps", "lost-solutions", "singular-endpoint", "user-report", "coefficient-parameter"]
+variables = ["a", "b", "z2", "z3", "z4", "z5", "z6", "z8"]
+parameters = []
+equations = [
+  "1+a-(1+b)*z2",
+  "1+a*z2^2-z3*(1+b*z2^2)",
+  "1+a*z3^2-z4*(1+b*z3^2)",
+  "1+a*z4^2-z5*(1+b*z4^2)",
+  "1+a*z5^2-z6*(1+b*z5^2)",
+  "1+b*z6^2",
+  "a-b*z8",
+  "1+a*z8^2",
+]
+generator = "hc_bicrit(m, n) from the issue: cycle = [0, 1, z_2..z_(m-1), infinity, z_m..z_(n-2)]; for consecutive (v, w): v = infinity -> a - w b; w = infinity -> 1 + b v^2; else (1 + a v^2) - w (1 + b v^2). Drop the zero equation for (0, 1) and unused variables. (m, n) = (2, 9) should give the same 84 maps."
+
+[source]
+citation = "HomotopyContinuation.jl issue #502 'Missed solution' (laurentbartholdi, 2022), function hc_bicrit(7, 9)."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/issues/502"
+file = ""
+
+[solutions]
+generic_nonsingular = 127
+count_source = "Coefficient family over the monomial supports: mixed volume 127; a polyhedral solve at random complex coefficients gives 127 nonsingular (HC.jl 2.22.4)."
+target_endpoints = "86 nonsingular (10 real; 84 with a != b, 2 with a = b) and 40 singular endpoints (multiplicity 1 in HC.jl's table, i.e. on positive-dimensional or degenerate components). The total-degree homotopy (9216 paths) finds the same 86 nonsingular."
+expected_outcome = "All 84 nonsingular solutions with a != b, in every run."
+
+[parametrization]
+kind = "coefficients"
+description = "Fixed instance; parameter homotopy from random complex coefficients of the same monomials to the stored integer coefficients."
+
+[verification]
+status = "verified"
+method = "HC.jl 2.22.4: 20 polyhedral solves (seeds 1..20): 19 runs gave 84 (86 nonsingular), seed 14 gave 83 (85). Total degree: 84. Parameter homotopy from 127 generic solutions to the target, 5 runs: 86 nonsingular / 84 with a != b / 40 singular every time. bicrit(2, 9) also gives 84."
+hc_version = "2.22.4"
+verified_count = 127
+date = "2026-11-08"

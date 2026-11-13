@@ -1,0 +1,60 @@
+name = "eco8"
+tier = "B"
+description = "8-dimensional economics problem (Morgan): (x_k + sum_{i=1..n-k-1} x_i x_{i+k}) x_n = k for k = 1..n-1, and x_1 + ... + x_{n-1} + 1 = 0. Many paths diverge in total-degree homotopies (total degree 1458 vs 64 solutions)."
+tags = [
+  "stress",
+  "coefficient-parameter",
+  "diverging-paths",
+]
+variables = [
+  "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8",
+]
+parameters = []
+equations = [
+  "(x1 + x1*x2 + x2*x3 + x3*x4 + x4*x5 + x5*x6 + x6*x7)*x8 - 1",
+  "(x2 + x1*x3 + x2*x4 + x3*x5 + x4*x6 + x5*x7)*x8 - 2",
+  "(x3 + x1*x4 + x2*x5 + x3*x6 + x4*x7)*x8 - 3",
+  "(x4 + x1*x5 + x2*x6 + x3*x7)*x8 - 4",
+  "(x5 + x1*x6 + x2*x7)*x8 - 5",
+  "(x6 + x1*x7)*x8 - 6",
+  "(x7)*x8 - 7",
+  "x1 + x2 + x3 + x4 + x5 + x6 + x7 + 1",
+]
+
+[source]
+citation = "A. Morgan, 'Solving polynomial systems using continuation for engineering and scientific problems', Prentice-Hall 1987, p. 148. PHCpack Demo/eco8."
+url = "https://github.com/janverschelde/PHCpack/blob/ed77cc0234aec45099d1d587a90a1617d5bfdacd/src/Demo/eco8"
+file = "PHCpack@ed77cc0234aec45099d1d587a90a1617d5bfdacd:src/Demo/eco8"
+
+[solutions]
+generic_nonsingular = 64
+count_source = "PHCpack Demo/eco8: mixed volume 64, 64 solutions listed (3-hom Bezout 256, total degree 1458)."
+
+[parametrization]
+kind = "coefficients"
+description = "All coefficients are parameters (one per monomial), generic form below. Generic count = mixed volume = 64."
+generic_parameters = [
+  "c1_1", "c1_2", "c1_3", "c1_4", "c1_5", "c1_6", "c1_7", "d1",
+  "c2_1", "c2_2", "c2_3", "c2_4", "c2_5", "c2_6", "d2", "c3_1",
+  "c3_2", "c3_3", "c3_4", "c3_5", "d3", "c4_1", "c4_2", "c4_3",
+  "c4_4", "d4", "c5_1", "c5_2", "c5_3", "d5", "c6_1", "c6_2",
+  "d6", "c7_1", "d7", "c8_1", "c8_2", "c8_3", "c8_4", "c8_5",
+  "c8_6", "c8_7", "d8",
+]
+generic_equations = [
+  "c1_1*x1*x8 + c1_2*x1*x2*x8 + c1_3*x2*x3*x8 + c1_4*x3*x4*x8 + c1_5*x4*x5*x8 + c1_6*x5*x6*x8 + c1_7*x6*x7*x8 - d1",
+  "c2_1*x2*x8 + c2_2*x1*x3*x8 + c2_3*x2*x4*x8 + c2_4*x3*x5*x8 + c2_5*x4*x6*x8 + c2_6*x5*x7*x8 - d2",
+  "c3_1*x3*x8 + c3_2*x1*x4*x8 + c3_3*x2*x5*x8 + c3_4*x3*x6*x8 + c3_5*x4*x7*x8 - d3",
+  "c4_1*x4*x8 + c4_2*x1*x5*x8 + c4_3*x2*x6*x8 + c4_4*x3*x7*x8 - d4",
+  "c5_1*x5*x8 + c5_2*x1*x6*x8 + c5_3*x2*x7*x8 - d5",
+  "c6_1*x6*x8 + c6_2*x1*x7*x8 - d6",
+  "c7_1*x7*x8 - d7",
+  "c8_1*x1 + c8_2*x2 + c8_3*x3 + c8_4*x4 + c8_5*x5 + c8_6*x6 + c8_7*x7 + d8",
+]
+
+[verification]
+status = "verified"
+method = "HC.jl solve (polyhedral): 64 nonsingular; mixed volume of generic_equations = 64. Transcription equals PHCpack Demo/eco8."
+hc_version = "2.22.4"
+verified_count = 64
+date = "2026-11-07"

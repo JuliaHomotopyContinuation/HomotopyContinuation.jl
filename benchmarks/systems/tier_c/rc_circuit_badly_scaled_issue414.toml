@@ -1,0 +1,59 @@
+name = "rc_circuit_badly_scaled_issue414"
+tier = "C"
+description = "Electrical RC-network identification system from HC.jl issue #414: 4 equations in capacitances c1, c2, c12 (physically ~1e-10..1e-6) and resistance r12 (~1e6..1e9), degree 6, coefficients spanning ~1e-32..1e7 (Maple floats). Maple RootFinding[Isolate] finds 22 real solutions, with entries from 1e-15 to 1e21. HC.jl (2020) lost most real solutions because solutions with huge/tiny coordinates are classified as diverging; manual rescaling recovered 13-17 of 22. A hard test for scaling, ill-conditioning and at-infinity classification. Stored as a fixed instance; the coefficient family (every monomial times a parameter) gives a parameter homotopy from a generic member."
+tags = ["badly-scaled", "ill-conditioned", "lost-solutions", "circuit", "user-report", "coefficient-parameter"]
+variables = ["c1", "c2", "c12", "r12"]
+parameters = []
+equations = [
+  "-0.2066406559e-11*r12^2*c2^2-0.2053123796e-11*r12^2*c12^2-0.3806159607e-17*r12^2*c1-0.1521617220e-18*r12^2*c2-0.1516727100e-18*r12^2*c12-953930.0022*c1^2-1907860.004*c1*c2-953930.0022*c2^2+0.3681553891e-7*r12*c2+r12*c2^2-0.1292941371e-8*r12^2*c1^2-0.2053123796e-11-953930.0022*r12^2*c1^2*c12^2-0.2807994176e-2*r12^2*c1*c2^2-0.2067624146e-9*r12^2*c1*c2-0.7023889423e-1*r12^2*c1^2*c2-0.1075041261e-9*r12^2*c2*c12-0.2798974369e-2*r12^2*c1*c12^2-0.2064303456e-9*r12^2*c1*c12-953930.0022*r12^2*c1^2*c2^2-953930.0022*r12^2*c2^2*c12^2-0.7023889423e-1*r12^2*c1^2*c12-0.2807994176e-2*r12^2*c2^2*c12-0.2798974369e-2*r12^2*c2*c12^2-0.2801141605e-26*r12^2-0.2798974369e-2*c1-0.2798974369e-2*c2-1907860.004*r12^2*c1^2*c2*c12-1907860.004*r12^2*c1*c2^2*c12-0.7584586278e-1*r12^2*c1*c2*c12-1907860.004*r12^2*c1*c12^2*c2",
+  "0.1e-14*r12*c1^2-0.3388459762e-12*r12*c1+0.1e-22*r12*c12-0.1464271968e-8*r12^2*c2^2-0.1464271968e-8*r12^2*c12^2-0.1340014176e-14*r12^2*c1-0.1078159232e-15*r12^2*c2-0.1078159232e-15*r12^2*c12+3850195.2259312803*c1^2+7700390.452*c1*c2+3850195.2259312803*c2^2+0.3743118556e-13*r12*c2+0.1561592443e-5*r12*c2^2+0.5218492640e-8*r12^2*c1^2-0.1464271968e-8-0.901980703e-5*r12*c1*c2+0.1e-13*r12*c1*c12+0.1e-13*r12*c2*c12+3850195.2259312803*r12^2*c1^2*c12^2-0.9886602390*r12^2*c1*c2^2-0.7279611900e-7*r12^2*c1*c2+0.2834940243*r12^2*c1^2*c2-0.3932660344e-7*r12^2*c2*c12-0.9886602390*r12^2*c1*c12^2-0.7279611900e-7*r12^2*c1*c12+3850195.2259312803*r12^2*c1^2*c2^2+3850195.2259312803*r12^2*c2^2*c12^2+0.2834940243*r12^2*c1^2*c12-0.9886602390*r12^2*c2^2*c12-0.9886602390*r12^2*c2*c12^2-0.1984650658e-23*r12^2-0.9886602390*c1-0.9886602390*c2+7700390.452*r12^2*c1^2*c2*c12+7700390.452*r12^2*c1*c2^2*c12-1.693826454*r12^2*c1*c2*c12+7700390.452*r12^2*c1*c12^2*c2-0.4989918887e-21*r12",
+  "r12*c1^2+0.61359232e-10*r12*c1-0.2728910201e-14*r12^2*c2^2-0.1556269877e-11*r12^2*c12^2-0.1909857920e-21*r12^2*c1-0.7997523228e-23*r12^2*c2-0.1909844336e-21*r12^2*c12-724818.7531*c1^2-1449637.506*c1*c2-724818.7531*c2^2-0.1556292015e-11*r12^2*c1^2-0.1556269877e-11-724818.7531*r12^2*c1^2*c12^2-0.8894864333e-4*r12^2*c1*c2^2-0.2606787098e-12*r12^2*c1*c2-0.2124201074e-2*r12^2*c1^2*c2-0.2606777874e-12*r12^2*c2*c12-0.2124186041e-2*r12^2*c1*c12^2-0.3242901257e-11*r12^2*c1*c12-724818.7531*r12^2*c1^2*c2^2-724818.7531*r12^2*c2^2*c12^2-0.2124201074e-2*r12^2*c1^2*c12-0.8894864333e-4*r12^2*c2^2*c12-0.2124186041e-2*r12^2*c2*c12^2-0.5859371563e-32*r12^2-0.2124186041e-2*c1-0.2124186041e-2*c2-1449637.506*r12^2*c1^2*c2*c12-1449637.506*r12^2*c1*c2^2*c12-0.4337335758e-2*r12^2*c1*c2*c12-1449637.506*r12^2*c1*c12^2*c2",
+  "-0.1465350698e-8+0.1056636647e-4*r12*c1^2+0.62618738e-15*r12*c1+0.1262301703e-13*r12^2*c2^2-0.1465350698e-8*r12^2*c12^2-0.1798255855e-18*r12^2*c1-0.3727777439e-20*r12^2*c2-0.1798255855e-18*r12^2*c12+3352766.778624862*c1^2+6705533.558*c1*c2+3352766.778624862*c2^2-0.9412385e-18*r12*c2-0.1465350698e-8*r12^2*c1^2-0.1503300e-7*r12*c1*c2+3352766.778624862*r12^2*c1^2*c12^2+0.4114463859e-3*r12^2*c1*c2^2-0.1215066534e-9*r12^2*c1*c2-0.9901252867*r12^2*c1^2*c2-0.1215066534e-9*r12^2*c2*c12-0.9901252867*r12^2*c1*c12^2-0.2991454724e-8*r12^2*c1*c12+3352766.778624862*r12^2*c1^2*c2^2+3352766.778624862*r12^2*c2^2*c12^2-0.9901252867*r12^2*c1^2*c12+0.4114463859e-3*r12^2*c2^2*c12-0.9901252867*r12^2*c2*c12^2-0.5516979867e-29*r12^2-0.9901252867*c1-0.9901252867*c2+6705533.558*r12^2*c1^2*c2*c12+6705533.558*r12^2*c1*c2^2*c12-1.979839127*r12^2*c1*c2*c12+6705533.558*r12^2*c1*c12^2*c2-0.13860881e-26*r12",
+]
+
+[source]
+citation = "HomotopyContinuation.jl issue #414 'solve does not find all solutions' (juergenboehm, 2020). Equations: attachment nonlinsys.txt; real solutions: attachment sols_gold.txt (Maple RootFinding[Isolate])."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/issues/414"
+file = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/files/5441335/nonlinsys.txt"
+
+[solutions]
+generic_nonsingular = 144
+count_source = "Coefficient family over the monomial supports: mixed volume 144, and a polyhedral solve at random complex coefficients returns 144 nonsingular (HC.jl 2.22.4). The stored instance has 22 real solutions according to Maple RootFinding[Isolate] (sols_gold.txt); its complex count is not established."
+real_solutions_reference = 22
+target_endpoints = "22 real solutions (Maple RootFinding[Isolate], reference_real_solutions); complex count and singular / infinite endpoints of the instance unknown. HC.jl 2.22.4 finds 7-10 solutions per polyhedral run, matching 0-6 of the 22."
+expected_outcome = "All 22 real solutions (listed in reference_real_solutions, order c1, c2, c12, r12), including the physical one with all entries positive: c1 = 1.995628625e-7, c2 = 2.307374242e-7, c12 = 3.109109627e-8, r12 = 1.033163359e7."
+reference_real_solutions = [
+  ["-0.1469654363e-8", "-0.1546930390e-8", "0.6777931639e-10", "-0.8634797582e21"],
+  ["-0.1561528530e-8", "0.7539183219e-9", "0.5022751538e-8", "-0.1579084016e21"],
+  ["-0.1541862973e-8", "0.9650994849e-11", "-0.3682655681e-7", "-0.1200659032e19"],
+  ["-0.1531435745e-8", "0.2919159902e-12", "-0.3699951100e-7", "-0.1171487984e19"],
+  ["-0.1532685975e-8", "0.3160046867e-10", "-0.7775456434e-7", "-0.2758116349e18"],
+  ["-0.6135979738e-10", "-0.1411261759e-8", "-0.3521190280e-7", "-0.2083901642e11"],
+  ["0.5324897747e-15", "-0.1472622089e-8", "-0.3514252612e-7", "-0.2001104265e11"],
+  ["-0.1511388379e-8", "0.3876682159e-10", "-1.879993223", "-472.1633861"],
+  ["0.1889430240e-8", "-0.3362051796e-8", "-289.0131171", "-0.8104636777"],
+  ["-0.3208248238e-7", "0.3060986083e-7", "-2632.896766", "0.3782442316e-3"],
+  ["-0.3763642467e-8", "0.2291020911e-8", "188.9010345", "0.9771320020"],
+  ["-0.4317070934e-5", "0.4897442942e-5", "0.6449803054e-4", "80091.47142"],
+  ["-0.9216034880e-2", "0.1106597077e-1", "0.5513718459e-1", "309499.5039"],
+  ["0.9219831626e-2", "-0.1107086844e-1", "-0.5513432107e-1", "309681.6479"],
+  ["0.1995628625e-6", "0.2307374242e-6", "0.3109109627e-7", "10331633.59"],
+  ["0.5420782953e-2", "0.7535569016e-2", "-0.3152727667e-2", "33836514.03"],
+  ["-0.5420834134e-2", "-0.7535703300e-2", "0.3152897340e-2", "33837008.13"],
+  ["0.7299004213e-7", "0.4260115944e-7", "-0.1010437091e-6", "97363932.98"],
+  ["-0.5139371580e-2", "-0.6652616758e-2", "0.2899430659e-2", "122270467.4"],
+  ["0.5139073568e-2", "0.6652198141e-2", "-0.2899293090e-2", "122285950.0"],
+  ["0.3534291734e-7", "-0.3681553891e-7", "-0.3959957112e-7", "1102640580."],
+  ["-0.1472621556e-8", "0.1447448549e-17", "0.1404294402e-8", "0.6638757792e12"],
+]
+
+[parametrization]
+kind = "coefficients"
+description = "Fixed instance. Parameter homotopy: coefficient family over the monomial supports of the 4 equations, start at random complex coefficients, target the stored coefficients."
+
+[verification]
+status = "partial"
+method = "HC.jl 2.22.4: mixed volume 144; polyhedral solve at random complex coefficients of the same supports gives 144 nonsingular (so generic count of the coefficient family is 144, lower bound). Target instance: 3 polyhedral runs matched 0, 6, 4 of the 22 Maple real solutions (rel. tol 1e-4) and returned 7-10 solutions total; total-degree solve returned 0 solutions. Double-precision Newton from the Maple values converges (is_success) for only 7 of 22; others move by < 1.4e-5 relative but the accuracy estimate stays large because of the 1e-15..1e21 scaling (needs scaled or extended-precision verification)."
+hc_version = "2.22.4"
+verified_count = 144
+date = "2026-11-08"

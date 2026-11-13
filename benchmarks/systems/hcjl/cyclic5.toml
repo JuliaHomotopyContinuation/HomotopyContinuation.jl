@@ -1,0 +1,47 @@
+name = "cyclic5"
+tier = "HC"
+description = "Cyclic 5-roots (see tier_b/cyclic7.toml for the family)."
+tags = [
+  "coefficient-parameter",
+  "symmetric",
+  "polyhedral",
+  "hcjl",
+]
+variables = [
+  "z1", "z2", "z3", "z4", "z5",
+]
+parameters = []
+equations = [
+  "z1 + z2 + z3 + z4 + z5",
+  "z1*z5 + z2*z1 + z2*z3 + z4*z3 + z5*z4",
+  "z1*z5*z4 + z2*z1*z3 + z2*z1*z5 + z2*z4*z3 + z5*z4*z3",
+  "z1*z5*z4*z3 + z2*z1*z4*z3 + z2*z1*z5*z3 + z2*z1*z5*z4 + z2*z5*z4*z3",
+  "-1 + z2*z1*z5*z4*z3",
+]
+
+[source]
+citation = "G. Bjorck, R. Froberg, J. Symb. Comp. 12 (1991). HC.jl cyclic(5)."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/blob/0cbf1e27d062d7eb01d962c3b948c39444c9a62c/test/test_systems.jl#L72-L77"
+file = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/test_systems.jl:72-77 (cyclic(n), n = 5)"
+
+[solutions]
+generic_nonsingular = 70
+count_source = "Mixed volume 70 (PolynomialTestSystems.jl cyclic(5)); 70 cyclic 5-roots (Bjorck-Froberg)."
+
+[parametrization]
+kind = "coefficients"
+description = "All coefficients are parameters (one per monomial, as in tier_b/cyclic7.toml); generic count = mixed volume = 70."
+
+[hcjl]
+function = "cyclic(5)"
+location = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/test_systems.jl:72-77"
+parametrization = "none (fixed coefficients)."
+how_solved = "In TEST_SYSTEM_COLLECTION as 'cyclic5' (evaluation benchmark only). cyclic(7) is solved in test/solve_test.jl and test/endgame_test.jl (see tier_b/cyclic7.toml)."
+used_in = "benchmarks/run_system_benchmark.jl times evaluate!, evaluate_and_jacobian! and taylor! of every system in TEST_SYSTEM_COLLECTION (test/test_systems.jl:1003-1018) for InterpretedSystem and CompiledSystem at random x and p; it does not solve them."
+
+[verification]
+status = "verified"
+method = "HC.jl solve (polyhedral): 70 nonsingular."
+hc_version = "2.22.4"
+verified_count = 70
+date = "2026-11-07"

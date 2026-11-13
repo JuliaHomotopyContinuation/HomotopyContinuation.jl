@@ -1,0 +1,52 @@
+name = "jacobian_3torsion_genus3_issue574"
+tier = "C"
+description = "3-torsion points (and their inverses) on the Jacobian of a genus-3 hyperelliptic curve y^2 = f(x), deg f = 7, from HC.jl issue #574 (E. Lupoian), adapted from arXiv:2210.02225. 10 equations in 10 unknowns, obtained by matching coefficients of a degree-7 polynomial identity. The reporter states the system has exactly 364 regular solutions. HC.jl consistently finds 348 nonsingular solutions. The other 16 are nearly singular (smallest Jacobian singular values 1e-12 .. 1e-7), and HC.jl only finds them with a relaxed endgame (sing_accuracy = 0.1). The variant for f = x^7 - 1 (9 x 9, below) gives 364 without trouble. A hard case for telling nearly singular from singular endpoints."
+tags = ["number-theory", "torsion-points", "near-singular", "lost-solutions", "endgame", "user-report", "coefficient-parameter"]
+variables = ["x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10"]
+parameters = []
+equations = [
+  "x2*x6^2 - x7*x10^3",
+  "-x1^2 + 2*x2*x5*x6 - 3*x7*x9*x10^2",
+  "-2*x1 + 2*x2*x4*x6 + x2*x5^2 - 3*x7*x8*x10^2 - 3*x7*x9^2*x10",
+  "2*x2*x3*x6 + 2*x2*x4*x5 - 6*x7*x8*x9*x10 - x7*x9^3 - 3*x7*x10^2 - 1",
+  "2*x2*x3*x5 + x2*x4^2 + 2*x2*x6 - 3*x7*x8^2*x10 - 3*x7*x8*x9^2 - 6*x7*x9*x10",
+  "2*x2*x3*x4 + 2*x2*x5 - 3*x7*x8^2*x9 - 6*x7*x8*x10 - 3*x7*x9^2",
+  "x2*x3^2 + 2*x2*x4 - x7*x8^3 - 6*x7*x8*x9 - 3*x7*x10",
+  "-x1^2 + 2*x2*x3 - 3*x7*x8^2 - 3*x7*x9",
+  "-2*x1 + x2 - 3*x7*x8",
+  "-x7 - 1",
+]
+alternative_system_easy = [
+  "-x1^2 + x2*x6^2 + x9^3",
+  "-2*x1 + 2*x2*x5*x6 + 3*x8*x9^2",
+  "2*x2*x4*x6 + x2*x5^2 + 3*x7*x9^2 + 3*x8^2*x9 - 1",
+  "2*x2*x3*x6 + 2*x2*x4*x5 + 6*x7*x8*x9 + x8^3 + 3*x9^2",
+  "2*x2*x3*x5 + x2*x4^2 + 2*x2*x6 + 3*x7^2*x9 + 3*x7*x8^2 + 6*x8*x9",
+  "2*x2*x3*x4 + 2*x2*x5 + 3*x7^2*x8 + 6*x7*x9 + 3*x8^2",
+  "x2*x3^2 + 2*x2*x4 + x7^3 + 6*x7*x8 + 3*x9",
+  "-x1^2 + 2*x2*x3 + 3*x7^2 + 3*x8",
+  "-2*x1 + x2 + 3*x7",
+]
+alternative_system_easy_variables = ["x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9"]
+
+[source]
+citation = "HomotopyContinuation.jl issue #574 'Missing Solutions' (ElviraLupoian, 2024); system adapted from https://arxiv.org/abs/2210.02225 (3-torsion on Jacobians of hyperelliptic curves)."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/issues/574"
+file = ""
+
+[solutions]
+generic_nonsingular = 732
+count_source = "Coefficient family over the monomial supports: mixed volume 732, and a solve at random complex coefficients gives 732 nonsingular (HC.jl 2.22.4)."
+target_endpoints = "Reporter: 364 regular solutions (3-torsion points and inverses). HC.jl 2.22.4: 348 nonsingular + about 220 singular endpoints in every run. The relaxed endgame gives 359 nonsingular, of which 347 certify as distinct."
+expected_outcome = "364 nonsingular solutions (16 of them badly conditioned, sigma_min down to ~1e-12)."
+
+[parametrization]
+kind = "coefficients"
+description = "Fixed instance (one particular degree-7 f); parameter homotopy from random complex coefficients of the same monomials. A natural parametrization by the coefficients of f is in arXiv:2210.02225, but the issue does not give it."
+
+[verification]
+status = "partial"
+method = "HC.jl 2.22.4: polyhedral solve, seeds 1-3: 348 nonsingular each (237/221/216 singular). Parameter homotopy from the 732 generic solutions to the target, 3 runs: 348 nonsingular, 223 singular. solve with EndgameOptions(sing_accuracy = 0.1, singular_min_accuracy = 1e-5) (maintainer's suggestion; reported 364 in 2024): 359 nonsingular; certify -> 347 distinct certified. The smallest Jacobian singular values at those 359 points: 2e-12, 7e-11, 8e-11, 5e-10, ... (17 below 1e-6). The claimed 364 could not be confirmed."
+hc_version = "2.22.4"
+verified_count = 732
+date = "2026-11-08"

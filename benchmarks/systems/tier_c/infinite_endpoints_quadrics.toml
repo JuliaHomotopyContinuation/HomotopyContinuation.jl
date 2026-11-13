@@ -1,0 +1,43 @@
+name = "infinite_endpoints_quadrics"
+tier = "C"
+description = "Two dense conics; target is HC.jl's 'Beyond Polyhedral Homotopy Example' [2.3 x^2 + 1.2 y^2 + 3x - 2y + 3, 2.3 x^2 + 1.2 y^2 + 5x + 2y - 5]: the quadratic parts coincide, so 2 of the 4 generic solutions go to infinity."
+tags = [
+  "endgame",
+  "infinite-endpoint",
+  "diverging-paths",
+]
+variables = [
+  "x", "y",
+]
+parameters = [
+  "a1", "a2", "a3", "a4", "a5", "a6", "b1", "b2",
+  "b3", "b4", "b5", "b6",
+]
+equations = [
+  "a1*x^2 + a2*x*y + a3*y^2 + a4*x + a5*y + a6",
+  "b1*x^2 + b2*x*y + b3*y^2 + b4*x + b5*y + b6",
+]
+target_parameters = [
+  "2.3", "0", "1.2", "3", "-2", "3", "2.3", "0",
+  "1.2", "5", "2", "-5",
+]
+
+[source]
+citation = "HomotopyContinuation.jl test/endgame_test.jl testset 'Beyond Polyhedral Homotopy Example' (target system); dense-conic family added here."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/blob/0cbf1e27d062d7eb01d962c3b948c39444c9a62c/test/endgame_test.jl#L54-L60"
+file = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/endgame_test.jl:54-60"
+
+[solutions]
+generic_nonsingular = 4
+count_source = "Bezout 2*2 = 4 for generic conics."
+target_endpoints = "2 finite nonsingular solutions, 2 paths diverge to infinity."
+
+[parametrization]
+kind = "explicit"
+
+[verification]
+status = "verified"
+method = "HC.jl: 4 nonsingular at random parameters; parameter homotopy to target: 2 finite nonsingular solutions, 2 paths at infinity."
+hc_version = "2.22.4"
+verified_count = 4
+date = "2026-11-07"
