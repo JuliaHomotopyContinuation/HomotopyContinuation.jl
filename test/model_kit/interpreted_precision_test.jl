@@ -66,3 +66,32 @@
     evaluate_and_jacobian!(u, J, F, z)
     @test J[1] == 2δ
 end
+
+@testset "Compiled double-double Jacobians and Taylor series are interpreted" begin
+    D = HC.DoubleDouble.DoubleF64
+    C = HC.DoubleDouble.ComplexDF64
+    δ = D(2.0^-60)
+    @var x p t
+    F = CompiledSystem(System([(p - 1) * x^2]; variables = [x], parameters = [p]))
+    @test isnothing(F.extended[])
+    u, J = zeros(C, 1), zeros(C, 1, 1)
+    evaluate_and_jacobian!(u, J, F, C[2], C[1+δ])
+    @test u[1] == 4δ
+    @test J[1] == 4δ
+    I = F.extended[]
+    @test I isa InterpretedSystem
+    tx = TaylorVector{4}(reshape(C[2, 1, 0, 0], 4, 1))
+    taylor!(u, Val(1), F, tx, C[1+δ])
+    @test u[1] == 4δ
+    @test F.extended[] === I
+    # Float64 Jacobians stay compiled and do not build the interpreter.
+    G = CompiledSystem(System([(p - 1) * x^2]; variables = [x], parameters = [p]))
+    evaluate_and_jacobian!(zeros(ComplexF64, 1), zeros(ComplexF64, 1, 1), G, [2.0], [3.0])
+    @test isnothing(G.extended[])
+
+    H = CompiledHomotopy(Homotopy([(t - 1) * x], [x], t))
+    evaluate_and_jacobian!(u, J, H, C[2], 1 + δ)
+    @test u[1] == 2δ
+    @test J[1] == δ
+    @test H.extended[] isa InterpretedHomotopy
+end
