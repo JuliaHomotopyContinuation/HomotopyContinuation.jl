@@ -15,6 +15,9 @@ struct ParameterHomotopy{T<:AbstractSystem} <: AbstractHomotopy
     t_cache::Base.RefValue{ComplexF64}
     pt::Vector{ComplexF64}
     taylor_pt::TaylorVector{2,ComplexF64}
+    t_cache_extended::Base.RefValue{ComplexDF64}
+    pt_extended::Vector{ComplexDF64}
+    taylor_pt_extended::TaylorVector{2,ComplexDF64}
 end
 
 function ParameterHomotopy(
@@ -40,7 +43,17 @@ function ParameterHomotopy(F::AbstractSystem, p::AbstractVector, q::AbstractVect
     taylor_pt = TaylorVector{2}(ComplexF64, length(q))
     pt = copy(p̂)
 
-    ParameterHomotopy(F, p̂, q̂, Ref(complex(NaN)), pt, taylor_pt)
+    ParameterHomotopy(
+        F,
+        p̂,
+        q̂,
+        Ref(complex(NaN)),
+        pt,
+        taylor_pt,
+        Ref(ComplexDF64(NaN)),
+        ComplexDF64.(p̂),
+        TaylorVector{2}(ComplexDF64, length(q)),
+    )
 end
 
 Base.size(H::ParameterHomotopy) = size(H.F)
@@ -49,17 +62,20 @@ function start_parameters!(H::ParameterHomotopy, p)
     H.p .= p
     # void cache
     H.t_cache[] = NaN
+    H.t_cache_extended[] = ComplexDF64(NaN)
     H
 end
 function target_parameters!(H::ParameterHomotopy, q)
     H.q .= q
     H.t_cache[] = NaN
+    H.t_cache_extended[] = ComplexDF64(NaN)
     H
 end
 function parameters!(H::ParameterHomotopy, p, q)
     H.p .= p
     H.q .= q
     H.t_cache[] = NaN
+    H.t_cache_extended[] = ComplexDF64(NaN)
     H
 end
 
@@ -87,16 +103,45 @@ function tp!(H::ParameterHomotopy, t::Union{ComplexF64,Float64})
 end
 
 function ModelKit.evaluate!(u, H::ParameterHomotopy, x, t)
-    tp!(H, t)
-    evaluate!(u, H.F, x, H.pt)
+    T = promote_type(ModelKit._interpreter_precision(x), ModelKit._interpreter_precision(t))
+    tp!(H, t, T)
+    evaluate!(u, H.F, x, T === ComplexDF64 ? H.pt_extended : H.pt)
 end
 
 function ModelKit.evaluate_and_jacobian!(u, U, H::ParameterHomotopy, x, t)
-    tp!(H, t)
-    evaluate_and_jacobian!(u, U, H.F, x, H.pt)
+    T = promote_type(ModelKit._interpreter_precision(x), ModelKit._interpreter_precision(t))
+    tp!(H, t, T)
+    evaluate_and_jacobian!(u, U, H.F, x, T === ComplexDF64 ? H.pt_extended : H.pt)
 end
 
 function ModelKit.taylor!(u, v::Val, H::ParameterHomotopy, tx, t)
-    taylor!(u, v, H.F, tx, tp!(H, t))
+    T = promote_type(
+        ModelKit._interpreter_precision(tx),
+        ModelKit._interpreter_precision(t),
+    )
+    taylor!(u, v, H.F, tx, tp!(H, t, T))
     u
+end
+function ModelKit.taylor!(u, v::Val, H::ParameterHomotopy, tx, t, incremental::Bool)
+    T = promote_type(
+        ModelKit._interpreter_precision(tx),
+        ModelKit._interpreter_precision(t),
+    )
+    ModelKit.predictor_taylor!(u, v, H.F, tx, tp!(H, t, T), incremental)
+end
+
+tp!(H::ParameterHomotopy, t, ::Type{ComplexF64}) = tp!(H, ComplexF64(t))
+function tp!(H::ParameterHomotopy, t, ::Type{ComplexDF64})
+    τ = ComplexDF64(t)
+    τ == H.t_cache_extended[] && return H.taylor_pt_extended
+    from_target = abs2(ComplexF64(t)) <= abs2(ComplexF64(t) - 1)
+    @inbounds for i in eachindex(H.p)
+        p, q = ComplexDF64(H.p[i]), ComplexDF64(H.q[i])
+        d = p - q
+        value = from_target ? q + τ * d : p + (τ - 1) * d
+        H.pt_extended[i] = value
+        H.taylor_pt_extended[i] = (value, d)
+    end
+    H.t_cache_extended[] = τ
+    H.taylor_pt_extended
 end

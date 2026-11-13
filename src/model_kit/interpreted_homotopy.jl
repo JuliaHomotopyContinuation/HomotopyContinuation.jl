@@ -19,7 +19,9 @@ mutable struct InterpretedHomotopy <: AbstractHomotopy
     # Construct acb lazily since its often not needed
     eval_acb::Union{Nothing,Interpreter{AcbRefVector}}
     taylor_ComplexF64::TaylorInterpreters{ComplexF64}
+    taylor_ComplexDF64::TaylorInterpreters{ComplexDF64}
     jac_ComplexF64::Interpreter{Vector{ComplexF64}}
+    jac_ComplexDF64::Union{Nothing,Interpreter{Vector{ComplexDF64}}}
     jac_acb::Union{Nothing,Interpreter{AcbRefVector}}
 end
 
@@ -37,7 +39,9 @@ function InterpretedHomotopy(H::Homotopy)
         eval_ComplexDF64,
         eval_acb,
         taylor_ComplexF64,
+        TaylorInterpreters{ComplexDF64}(),
         jac_ComplexF64,
+        nothing,
         jac_acb,
     )
 end
@@ -55,25 +59,19 @@ end
 
 (H::InterpretedHomotopy)(x, t, p = nothing) = H.homotopy(x, t, p)
 function evaluate!(u, H::InterpretedHomotopy, x, t, p = nothing)
-    execute!(u, H.eval_ComplexF64, x, t, p)
-end
-function evaluate!(
-    u,
-    H::InterpretedHomotopy,
-    x::AbstractVector{ComplexDF64},
-    t,
-    p = nothing,
-)
-    execute!(u, H.eval_ComplexDF64, x, t, p)
+    T = promote_type(_interpreter_precision(x, p), _interpreter_precision(t))
+    execute!(u, _evaluation_interpreter(H, T), x, t, p)
 end
 
 
 function evaluate_and_jacobian!(u, U, H::InterpretedHomotopy, x, t, p = nothing)
-    execute!(u, U, H.jac_ComplexF64, x, t, p)
+    T = promote_type(_interpreter_precision(x, p), _interpreter_precision(t))
+    execute!(u, U, _jacobian_interpreter!(H, T), x, t, p)
     nothing
 end
 function jacobian!(U, H::InterpretedHomotopy, x, t, p = nothing)
-    execute!(nothing, U, H.jac_ComplexF64, x, t, p;)
+    T = promote_type(_interpreter_precision(x, p), _interpreter_precision(t))
+    execute!(nothing, U, _jacobian_interpreter!(H, T), x, t, p)
     U
 end
 
@@ -87,7 +85,8 @@ function taylor!(
     assign_highest_order_only = u isa Vector,
 ) where {M}
     t = (t_, 1)
-    I = _get_or_create_taylor_interpreter!(H, Order)
+    T = promote_type(_interpreter_precision(x, p), _interpreter_precision(t_))
+    I = _get_or_create_taylor_interpreter!(H, Order, T)
     execute_taylor!(
         u,
         Order,
@@ -101,6 +100,15 @@ function taylor!(
 end
 
 # Acb
+function taylor!(u, v::Val{K}, H::InterpretedHomotopy, x, t, p, incremental::Bool) where {K}
+    K > 3 && return taylor!(u, v, H, x, t, p)
+    T = promote_type(_interpreter_precision(x, p), _interpreter_precision(t))
+    I = _predictor_taylor_interpreter!(H, T)
+    predictor_taylor!(u, v, I, x, (t, 1), p, incremental)
+end
+taylor!(u, v::Val, H::InterpretedHomotopy, x, t, incremental::Bool) =
+    taylor!(u, v, H, x, t, nothing, incremental)
+
 function evaluate!(
     u::AbstractArray{<:Union{Acb,AcbRef}},
     H::InterpretedHomotopy,

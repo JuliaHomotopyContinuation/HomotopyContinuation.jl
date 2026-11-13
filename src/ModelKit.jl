@@ -53,7 +53,8 @@ export @var,
     variable_groups,
     vectors
 
-using ..DoubleDouble: ComplexDF64
+using ..DoubleDouble: ComplexDF64, DoubleF64
+using ..DoubleDouble: two_sum, two_prod
 import ..is_real    # required to ensure that ModelKit and HomotopyContinuation define methods of the same `is_real` function
 
 import Arblib: Arblib, Acb, AcbRef, AcbRefVector
@@ -74,11 +75,13 @@ const MP = MultivariatePolynomials
 include("./model_kit/symengine.jl")
 include("./model_kit/symbolic.jl")
 include("./model_kit/operations.jl")
+include("./model_kit/double_double_operations.jl")
 include("./model_kit/intermediate_representation.jl")
 include("./model_kit/taylor.jl")
 include("./model_kit/acb.jl")
 include("./model_kit/instruction_sequence.jl")
 include("./model_kit/instruction_interpreter.jl")
+include("./model_kit/incremental_taylor.jl")
 include("./model_kit/abstract_system_homotopy.jl")
 include("./model_kit/interpreted_system.jl")
 include("./model_kit/interpreted_homotopy.jl")

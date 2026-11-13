@@ -81,7 +81,7 @@ The set of options for a [`Tracker`](@ref).
   be necessary, then the tracking gets terminated.
 * `extended_precision = true`: Whether to allow for the use of extended precision,
   if necessary, in some computations. This can greatly improve the ability to track
-  numerically difficult paths.
+  numerically difficult paths. The path coordinates and returned solutions remain `ComplexF64`.
 * `terminate_cond = 1e13`: If the relative component-wise condition number
   `cond(H_x, ẋ)` is larger than `terminate_cond` then the path is terminated as too
   ill-conditioned.
@@ -620,7 +620,29 @@ end
 
 function update_predictor!(tracker::Tracker, x̂ = nothing, Δs = nothing, t_prev = NaN)
     @unpack predictor, homotopy, state = tracker
-    update!(predictor, homotopy, state.x, state.t, state.jacobian, state.norm, x̂)
+    update!(
+        predictor,
+        homotopy,
+        state.x,
+        state.t,
+        state.jacobian,
+        state.norm,
+        x̂;
+        extended_precision = tracker.options.extended_precision,
+        full_extended_precision = tracker.corrector.full_extended_precision[],
+    )
+    if tracker.options.extended_precision && predictor.used_extended_precision
+        tracker.corrector.full_extended_precision[] = true
+        state.extended_prec = true
+    end
+    state.used_extended_prec |= predictor.used_extended_precision
+    if !is_done(state.segment_stepper) && !(
+        predictor.winding_number > 1 ? all(isfinite, predictor.xtemp) :
+        all(isfinite, predictor.tx³.data)
+    )
+        state.code = TrackerCode.terminated_ill_conditioned
+    end
+    predictor
 end
 
 """
@@ -652,6 +674,8 @@ function init!(
     @unpack x, x̄, norm, jacobian = state
 
     # intialize state
+    corrector.full_extended_precision[] = false
+    extended_precision &= options.extended_precision
     set_solution!(x, homotopy, x₁, t₁)
     init!(state.segment_stepper, t₁, t₀)
     state.Δs_prev = 0.0
@@ -683,7 +707,7 @@ function init!(
             a = a,
             extended_precision = extended_precision,
         )
-        if !valid && !extended_precision
+        if !valid && !extended_precision && options.extended_precision
             extended_precision = true
             valid, ω, μ = init_newton!(
                 x̄,
@@ -743,6 +767,7 @@ function init!(
     updated!(jacobian)
     init!(tracker.predictor)
     update_predictor!(tracker)
+    is_tracking(state.code) || return false
     state.τ = trust_region(predictor)
     # compute initial step size
     Δs = initial_step_size(state, predictor, tracker.options)
@@ -771,6 +796,11 @@ function update_precision!(tracker::Tracker, μ_low)
     @unpack a = options.parameters
 
     options.extended_precision || return false
+
+    if corrector.full_extended_precision[]
+        state.extended_prec = state.used_extended_prec = true
+        return true
+    end
 
     if state.extended_prec && !state.keep_extended_prec && !isnan(μ_low) && μ_low > μ
         # check if we can go low again
@@ -877,7 +907,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         norm;
         ω = state.ω,
         μ = state.μ,
-        extended_precision = state.extended_prec,
+        extended_precision = options.extended_precision && state.extended_prec,
         first_correction = state.accepted_steps == 0,
     )
 
@@ -908,7 +938,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         state.τ = trust_region(predictor)
 
         state.accepted_steps += 1
-        state.ext_accepted_steps += state.extended_prec
+        state.ext_accepted_steps += state.extended_prec || predictor.used_extended_precision
         state.last_steps_failed = 0
     else
         # Step failed, so we have to try with a new (smaller) step size
@@ -917,6 +947,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         state.last_steps_failed += 1
     end
     state.norm_Δx₀ = result.norm_Δx₀
+    is_tracking(state.code) || return !state.last_step_failed
     update_stepsize!(state, result, options, predictor; ad_for_error_estimate = false)
 
     check_terminated!(state, options)

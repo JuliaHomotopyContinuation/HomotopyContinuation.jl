@@ -18,6 +18,9 @@ struct CompiledSystem{HI} <: AbstractSystem
     nvariables::Int
     nparameters::Int
     system::System
+    # Interpreted evaluator for double-double Jacobians and Taylor series, built on
+    # first use. Compiling these is slow for large systems and they are rarely needed.
+    extended::Base.RefValue{Union{Nothing,InterpretedSystem}}
 end
 
 function CompiledSystem(F::System)
@@ -58,7 +61,13 @@ function CompiledSystem(F::System)
         end
         k
     end
-    return CompiledSystem{(h, k)}(n, nvars, nparams, F)
+    return CompiledSystem{(h, k)}(
+        n,
+        nvars,
+        nparams,
+        F,
+        Ref{Union{Nothing,InterpretedSystem}}(nothing),
+    )
 end
 function Base.show(io::IO, TS::CompiledSystem)
     print(io, "Compiled: ")
@@ -111,6 +120,8 @@ struct CompiledHomotopy{HI} <: AbstractHomotopy
     nvariables::Int
     nparameters::Int
     homotopy::Homotopy
+    # See CompiledSystem.
+    extended::Base.RefValue{Union{Nothing,InterpretedHomotopy}}
 end
 
 function CompiledHomotopy(H::Homotopy)
@@ -153,7 +164,13 @@ function CompiledHomotopy(H::Homotopy)
         end
         k
     end
-    return CompiledHomotopy{(h, k)}(n, nvars, nparams, H)
+    return CompiledHomotopy{(h, k)}(
+        n,
+        nvars,
+        nparams,
+        H,
+        Ref{Union{Nothing,InterpretedHomotopy}}(nothing),
+    )
 end
 
 Base.size(CH::CompiledHomotopy) = (CH.nexpressions, CH.nvariables)
@@ -375,3 +392,72 @@ Compute the Taylor series order order `K` of ``u = H(x,t,p)``.
         $(_taylor!_impl(T))
     end
 end
+
+
+####################
+## DOUBLE-DOUBLE  ##
+####################
+
+# Double-double Jacobians and Taylor series are only needed when Float64 linear
+# algebra fails. Generating compiled code for them takes tens of seconds for large
+# systems, so they are evaluated by an interpreter instead. Residuals in double-double
+# are evaluated often and stay compiled.
+function extended_interpreter(T::CompiledSystem)
+    I = T.extended[]
+    if I === nothing
+        I = InterpretedSystem(T.system)
+        T.extended[] = I
+    end
+    I
+end
+function extended_interpreter(T::CompiledHomotopy)
+    I = T.extended[]
+    if I === nothing
+        I = InterpretedHomotopy(T.homotopy)
+        T.extended[] = I
+    end
+    I
+end
+
+evaluate_and_jacobian!(
+    u,
+    U::AbstractMatrix{ComplexDF64},
+    T::CompiledSystem,
+    x,
+    p = nothing,
+) = evaluate_and_jacobian!(u, U, extended_interpreter(T), x, p)
+evaluate_and_jacobian!(
+    u,
+    U::AbstractMatrix{ComplexDF64},
+    T::CompiledHomotopy,
+    x,
+    t,
+    p = nothing,
+) = evaluate_and_jacobian!(u, U, extended_interpreter(T), x, t, p)
+
+taylor!(
+    u::AbstractArray{ComplexDF64},
+    Order::Val,
+    T::CompiledSystem,
+    x::AbstractArray,
+    p::Union{Nothing,AbstractArray} = nothing;
+    assign_highest_order_only::Bool = u isa Vector,
+) = taylor!(u, Order, extended_interpreter(T), x, p; assign_highest_order_only)
+taylor!(
+    u::AbstractArray{ComplexDF64},
+    Order::Val,
+    T::CompiledHomotopy,
+    x::AbstractArray,
+    t,
+    p::Union{Nothing,AbstractArray} = nothing;
+    assign_highest_order_only::Bool = u isa Vector,
+) = taylor!(u, Order, extended_interpreter(T), x, t, p; assign_highest_order_only)
+
+predictor_taylor!(
+    u::AbstractVector{ComplexDF64},
+    v,
+    F::CompiledSystem,
+    x,
+    p,
+    incremental::Bool,
+) = predictor_taylor!(u, v, extended_interpreter(F), x, p, incremental)

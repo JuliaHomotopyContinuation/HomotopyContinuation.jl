@@ -1,4 +1,5 @@
 @testset "LinearAlgebra" begin
+    include("linear_algebra_triangular_test.jl")
     @testset "Constructor + basics" begin
         A = rand(ComplexF32, 12, 12)
         WS = HC.MatrixWorkspace(A)
