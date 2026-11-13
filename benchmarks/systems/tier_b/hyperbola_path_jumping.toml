@@ -1,0 +1,36 @@
+name = "hyperbola_path_jumping"
+tier = "B"
+description = "Family of hyperbolas H_p(x, t) = x^2 - (t - 1/2)^2 - p^2. Track t from 0 to 1 (real segment) for fixed real p = 10^-k, k = 1..7. Fibers {x = +-sqrt((t-1/2)^2 + p^2)}; branch points at t = 1/2 +- p*im, so the two paths come within distance 2p of each other at t = 1/2 and path jumping is likely for small p. Start solutions at t = 0: x = +-sqrt(1/4 + p^2). Telen et al. also use the complex parameter paths Gamma2(s) = s - 4 p s (s - 1) im and Gamma3(s) = s + 0.2 sin(pi s) im."
+tags = [
+  "path-jumping",
+  "stress",
+  "univariate",
+  "near-singular",
+]
+variables = [
+  "x",
+]
+parameters = [
+  "t", "p",
+]
+equations = [
+  "x^2 - (t - 1/2)^2 - p^2",
+]
+benchmark_paths = "t: 0 -> 1 along the real segment, p in {1e-1, 1e-2, ..., 1e-7} fixed"
+
+[source]
+citation = "S. Telen, M. Van Barel, J. Verschelde, 'A Robust Numerical Path Tracking Algorithm for Polynomial Homotopy Continuation', SIAM J. Sci. Comput. 42(6), 2020 (arXiv:1909.04984), Example 1 and Sec. 6.1; S. Timme, 'Mixed precision path tracking for polynomial homotopy continuation', Adv. Comput. Math. 47, 2021 (arXiv:1902.02968), Sec. 5.1 eq. (5.1), Table 1 (HC.jl 1.4 and Bertini path-jump for small p)."
+url = "https://arxiv.org/abs/1909.04984"
+file = ""
+
+[solutions]
+generic_nonsingular = 2
+count_source = "Explicit: x = +-sqrt((t - 1/2)^2 + p^2); nonsingular for t not in {1/2 +- p*im}."
+expected_outcome = "Both paths must be tracked without swapping: the path starting at +sqrt(1/4 + p^2) must end at +sqrt(1/4 + p^2) (t = 1)."
+
+[parametrization]
+kind = "explicit"
+
+[verification]
+status = "not-needed"
+method = "closed-form solutions"

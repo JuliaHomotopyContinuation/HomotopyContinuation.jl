@@ -1,0 +1,57 @@
+name = "stewart_gough_fk"
+tier = "A"
+description = "Forward kinematics of the general Stewart-Gough platform (Dietmaier's formulation as used in PHCpack Demo/stewgou40). Base frame E1,E2,E3; platform frame a1, a2, e3 = a1 x a2 (orthonormal); n = unit vector from base point A1 = 0 to platform point B1 = 0 (leg 1 has length 1). Leg i (i = 2..6) joins base point Ai = (Ai1,Ai2,Ai3) to platform point Bi = Bi1 a1 + Bi2 a2 + Bi3 e3 and has length Li; zero coordinates (A21's 2nd/3rd, A3's 3rd, ...) are omitted as in the source. 9 unknowns, 29 parameters."
+tags = [
+  "kinematics",
+  "robotics",
+  "forward-kinematics",
+  "parameter-homotopy",
+  "many-diverging-paths",
+]
+variables = [
+  "n1", "n2", "n3", "a11", "a12", "a13", "a21", "a22",
+  "a23",
+]
+parameters = [
+  "A21", "B21", "A31", "A32", "B31", "B32", "A41", "A42",
+  "A43", "B41", "B42", "B43", "A51", "A52", "A53", "B51",
+  "B52", "B53", "A61", "A62", "A63", "B61", "B62", "B63",
+  "L2", "L3", "L4", "L5", "L6",
+]
+equations = [
+  "n1^2 + n2^2 + n3^2 - 1",
+  "a11^2 + a12^2 + a13^2 - 1",
+  "a21^2 + a22^2 + a23^2 - 1",
+  "a11*a21 + a12*a22 + a13*a23",
+  "(n1 + B21*a11 - A21)^2 + (n2 + B21*a12)^2 + (n3 + B21*a13)^2 - L2^2",
+  "(n1 + B31*a11 + B32*a21 - A31)^2 + (n2 + B31*a12 + B32*a22 - A32)^2 + (n3 + B31*a13 + B32*a23)^2 - L3^2",
+  "(n1 + B41*a11 + B42*a21 + B43*(a12*a23 - a13*a22) - A41)^2 + (n2 + B41*a12 + B42*a22 + B43*(a13*a21 - a11*a23) - A42)^2 + (n3 + B41*a13 + B42*a23 + B43*(a11*a22 - a12*a21) - A43)^2 - L4^2",
+  "(n1 + B51*a11 + B52*a21 + B53*(a12*a23 - a13*a22) - A51)^2 + (n2 + B51*a12 + B52*a22 + B53*(a13*a21 - a11*a23) - A52)^2 + (n3 + B51*a13 + B52*a23 + B53*(a11*a22 - a12*a21) - A53)^2 - L5^2",
+  "(n1 + B61*a11 + B62*a21 + B63*(a12*a23 - a13*a22) - A61)^2 + (n2 + B61*a12 + B62*a22 + B63*(a13*a21 - a11*a23) - A62)^2 + (n3 + B61*a13 + B62*a23 + B63*(a11*a22 - a12*a21) - A63)^2 - L6^2",
+]
+example_parameters = [
+  "1.107915", "0.542805", "0.549094", "0.756063", "0.956919", "-0.528915", "0.735077", "-0.223935",
+  "0.525991", "0.665885", "-0.353482", "1.402538", "0.514188", "-0.526063", "-0.368418", "0.478359",
+  "1.158742", "0.107672", "0.590473", "0.094733", "-0.205018", "-0.137087", "-0.235121", "0.353913",
+  "0.645275", "1.086284", "1.503439", "1.281933", "0.771071",
+]
+
+[source]
+citation = "P. Dietmaier, 'The Stewart-Gough platform of general geometry can have 40 real postures', in Advances in Robot Kinematics: Analysis and Control (Lenarcic, Husty eds.), Kluwer 1998, pp. 1-10. Equations follow the Maple program in PHCpack src/Demo/stewgou40 (base-point coordinates renamed a_ij -> A_ij and platform coordinates b_ij -> B_ij to avoid clashing with the unknowns a1, a2)."
+url = "https://github.com/janverschelde/PHCpack/blob/ed77cc0234aec45099d1d587a90a1617d5bfdacd/src/Demo/stewgou40"
+file = "PHCpack@ed77cc0234aec45099d1d587a90a1617d5bfdacd:src/Demo/stewgou40"
+
+[solutions]
+generic_nonsingular = 40
+count_source = "M. Raghavan, 'The Stewart platform of general geometry has 40 configurations', ASME J. Mech. Design 115 (1993); Ronga-Vust 1995; Lazard 1993; Mourrain 1993. Dietmaier's example_parameters have all 40 real. PHCpack: total degree 4096, 2-hom Bezout 2560, mixed volume 1536 (so 1496 paths diverge in a non-parameter homotopy)."
+
+[parametrization]
+kind = "explicit"
+notes = "example_parameters = Dietmaier's data (40 real postures) in the order of `parameters`."
+
+[verification]
+status = "verified"
+method = "HC.jl monodromy_solve from a hand-made start pair (random pose with complex unit vectors, random A/B, leg lengths L_i computed); then parameter homotopy to Dietmaier's example_parameters: 40 nonsingular, all 40 real."
+hc_version = "2.22.4"
+verified_count = 40
+date = "2026-11-07"

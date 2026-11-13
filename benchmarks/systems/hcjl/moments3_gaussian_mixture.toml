@@ -1,0 +1,55 @@
+name = "moments3_gaussian_mixture"
+tier = "HC"
+description = "Method of moments for a mixture of 3 univariate Gaussians: mixture weights a_i, means x_i, variances s_i; the first 9 moments (orders 0..8) are prescribed by parameters m0..m8. 9 unknowns, 9 parameters. Symmetric under the S3 relabeling of components."
+tags = [
+  "statistics",
+  "parameter-homotopy",
+  "symmetric",
+  "group-action",
+  "hcjl",
+]
+variables = [
+  "a1", "a2", "a3", "s1", "s2", "s3", "x1", "x2",
+  "x3",
+]
+parameters = [
+  "m0", "m1", "m2", "m3", "m4", "m5", "m6", "m7",
+  "m8",
+]
+equations = [
+  "a1 + a2 + a3 - m0",
+  "-m1 + x1*a1 + x2*a2 + x3*a3",
+  "-m2 + s1*a1 + s2*a2 + s3*a3 + x1^2*a1 + x2^2*a2 + x3^2*a3",
+  "-m3 + x1^3*a1 + x2^3*a2 + x3^3*a3 + 3*s1*x1*a1 + 3*s2*x2*a2 + 3*s3*x3*a3",
+  "-m4 + 3*s1^2*a1 + 3*s2^2*a2 + 3*s3^2*a3 + x1^4*a1 + x2^4*a2 + x3^4*a3 + 6*s1*x1^2*a1 + 6*s2*x2^2*a2 + 6*s3*x3^2*a3",
+  "-m5 + x1^5*a1 + x2^5*a2 + x3^5*a3 + 10*s1*x1^3*a1 + 15*s1^2*x1*a1 + 10*s2*x2^3*a2 + 15*s2^2*x2*a2 + 10*s3*x3^3*a3 + 15*s3^2*x3*a3",
+  "-m6 + 15*s1^3*a1 + 15*s2^3*a2 + 15*s3^3*a3 + x1^6*a1 + x2^6*a2 + x3^6*a3 + 15*s1*x1^4*a1 + 45*s1^2*x1^2*a1 + 15*s2*x2^4*a2 + 45*s2^2*x2^2*a2 + 15*s3*x3^4*a3 + 45*s3^2*x3^2*a3",
+  "-m7 + x1^7*a1 + x2^7*a2 + x3^7*a3 + 21*s1*x1^5*a1 + 105*s1^2*x1^3*a1 + 105*s1^3*x1*a1 + 21*s2*x2^5*a2 + 105*s2^2*x2^3*a2 + 105*s2^3*x2*a2 + 21*s3*x3^5*a3 + 105*s3^2*x3^3*a3 + 105*s3^3*x3*a3",
+  "-m8 + 105*s1^4*a1 + 105*s2^4*a2 + 105*s3^4*a3 + x1^8*a1 + x2^8*a2 + x3^8*a3 + 28*s1*x1^6*a1 + 210*s1^2*x1^4*a1 + 420*s1^3*x1^2*a1 + 28*s2*x2^6*a2 + 210*s2^2*x2^4*a2 + 420*s2^3*x2^2*a2 + 28*s3*x3^6*a3 + 210*s3^2*x3^4*a3 + 420*s3^3*x3^2*a3",
+]
+
+[source]
+citation = "C. Amendola, J.-C. Faugere, B. Sturmfels, 'Moment varieties of Gaussian mixtures', J. Algebraic Statistics 7(1), 2016 (225 solutions up to label swapping for k = 3)."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/blob/0cbf1e27d062d7eb01d962c3b948c39444c9a62c/test/test_systems.jl#L903-L952"
+file = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/test_systems.jl:903-952 (moments3)"
+
+[solutions]
+generic_nonsingular = 1350
+count_source = "225 orbits under S3 (Amendola-Faugere-Sturmfels; HC.jl test/monodromy_test.jl asserts nsolutions == 225 with group_action = relabeling, which stores one representative per orbit), i.e. 225 * 3! = 1350 solutions if the action is free on generic fibers; see [verification]."
+
+[parametrization]
+kind = "explicit"
+
+[hcjl]
+function = "moments3()"
+location = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/test_systems.jl:903-952"
+parametrization = "parameters = moments m[0:8]."
+how_solved = "test/monodromy_test.jl:180-203: monodromy_solve(f; group_action = relabeling (S3 permuting the 3 components), max_loops_no_progress = 20, target_solutions_count = 225), threading on and off; expects 225."
+used_in = "benchmarks/run_system_benchmark.jl times evaluate!, evaluate_and_jacobian! and taylor! of every system in TEST_SYSTEM_COLLECTION (test/test_systems.jl:1003-1018) for InterpretedSystem and CompiledSystem at random x and p; it does not solve them."
+
+[verification]
+status = "verified"
+method = "HC.jl monodromy_solve from a random start pair found by HC (find_start_pair), max_loops_no_progress = 10 WITHOUT group action finds 1350 = 225 * 3!; transcription equals HC.jl moments3()."
+hc_version = "2.22.4"
+verified_count = 1350
+date = "2026-11-07"

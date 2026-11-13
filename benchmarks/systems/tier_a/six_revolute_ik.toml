@@ -1,0 +1,73 @@
+name = "six_revolute_ik"
+tier = "A"
+description = "Inverse kinematics of a general 6R serial manipulator in the formulation of HC.jl's six_revolute(): unknown joint axes z2..z5 (unit vectors), fixed z1 = z6 = (1,0,0). Equations: unit-norm of z2..z5, z_i . z_{i+1} = cos(alpha_i) (i = 1..5), and the hand-position equation sum_{i=1..3} a_i (z_i x z_{i+1}) + sum_{i=2..5} a_{i+4} z_i = p. Parameters: c_i = cos(alpha_i), link data a1,a2,a3,a6..a9 (a4, a5 do not occur in this formulation), target position p. 2-homogeneous structure {z2,z4},{z3,z5}."
+tags = [
+  "kinematics",
+  "robotics",
+  "inverse-kinematics",
+  "parameter-homotopy",
+  "multi-homogeneous",
+]
+variables = [
+  "z2_1", "z2_2", "z2_3", "z4_1", "z4_2", "z4_3", "z3_1", "z3_2",
+  "z3_3", "z5_1", "z5_2", "z5_3",
+]
+variable_groups = [
+  ["z2_1", "z2_2", "z2_3", "z4_1", "z4_2", "z4_3"],
+  ["z3_1", "z3_2", "z3_3", "z5_1", "z5_2", "z5_3"],
+]
+parameters = [
+  "c1", "c2", "c3", "c4", "c5", "a1", "a2", "a3",
+  "a6", "a7", "a8", "a9", "p1", "p2", "p3",
+]
+equations = [
+  "z2_1^2 + z2_2^2 + z2_3^2 - 1",
+  "z3_1^2 + z3_2^2 + z3_3^2 - 1",
+  "z4_1^2 + z4_2^2 + z4_3^2 - 1",
+  "z5_1^2 + z5_2^2 + z5_3^2 - 1",
+  "z2_1 - c1",
+  "z2_1*z3_1 + z2_2*z3_2 + z2_3*z3_3 - c2",
+  "z3_1*z4_1 + z3_2*z4_2 + z3_3*z4_3 - c3",
+  "z4_1*z5_1 + z4_2*z5_2 + z4_3*z5_3 - c4",
+  "z5_1 - c5",
+  "a2*(z2_2*z3_3 - z2_3*z3_2) + a3*(z3_2*z4_3 - z3_3*z4_2) + a6*z2_1 + a7*z3_1 + a8*z4_1 + a9*z5_1 - p1",
+  "a1*(-z2_3) + a2*(z2_3*z3_1 - z2_1*z3_3) + a3*(z3_3*z4_1 - z3_1*z4_3) + a6*z2_2 + a7*z3_2 + a8*z4_2 + a9*z5_2 - p2",
+  "a1*(z2_2) + a2*(z2_1*z3_2 - z2_2*z3_1) + a3*(z3_1*z4_2 - z3_2*z4_1) + a6*z2_3 + a7*z3_3 + a8*z4_3 + a9*z5_3 - p3",
+]
+example_parameters = [
+  "0.5729746706001716",
+  "0.9920289750443207",
+  "0.6807617488031723",
+  "0.8954955624626647",
+  "0.981727500623239",
+  "-0.6508165773155992",
+  "-0.6252070694344862",
+  "1.2753203087262615",
+  "-0.4042256983795828",
+  "-1.1485430048515646",
+  "-0.22145594990414993",
+  "0.9590486265536351",
+  "1",
+  "1",
+  "0",
+]
+
+[source]
+citation = "M. Raghavan, B. Roth, 'Inverse kinematics of the general 6R manipulator and related linkages', ASME J. Mech. Design 115 (1993) 502-508; H.-Y. Lee, C.-G. Liang, Mech. Mach. Theory 23 (1988). Formulation and example values copied from HomotopyContinuation.jl test/test_systems.jl six_revolute() (originally the HC.jl '6R inverse kinematics' example)."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/blob/0cbf1e27d062d7eb01d962c3b948c39444c9a62c/test/test_systems.jl#L695-L728"
+file = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/test_systems.jl:695-728 (six_revolute)"
+
+[solutions]
+generic_nonsingular = 16
+count_source = "Lee-Liang 1988, Raghavan-Roth 1993: the general 6R inverse kinematics problem has 16 solutions. The 2-homogeneous Bezout number of this formulation is 320 (HC.jl paths_to_track)."
+
+[parametrization]
+kind = "explicit"
+notes = "example_parameters are the HC.jl test values in the order of `parameters` (c_i = cos(alpha_i) computed from the alpha values in the test)."
+
+[verification]
+status = "verified"
+method = "HC.jl monodromy_solve from a random start pair found by HC (find_start_pair), max_loops_no_progress = 10; then a parameter homotopy to example_parameters gives 16 nonsingular (0 real). 2-hom. Bezout number (paths_to_track with variable_groups) = 320."
+hc_version = "2.22.4"
+verified_count = 16
+date = "2026-11-07"

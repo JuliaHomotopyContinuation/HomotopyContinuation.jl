@@ -9,3 +9,9 @@ docs/build/
 **/**/tmp_params.txt
 **/**/tmp_sols.txt
 **/**/tmp_cert.txt
+
+# Benchmark harness caches and per-path results
+benchmarks/cache/
+benchmarks/results/
+# Large benchmark systems, written by benchmarks/systems/tier_d/generate.jl
+benchmarks/systems/tier_d/*.toml

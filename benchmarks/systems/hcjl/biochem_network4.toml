@@ -1,0 +1,50 @@
+name = "biochem_network4"
+tier = "HC"
+description = "Univariate steady-state equation -p3 x^3 - p2^2 p3 x + p1 x^2 = 0 (network 4 of HC.jl benchmarks/bio-chemical-rection-networks.jl). x = 0 is always a solution."
+tags = [
+  "chemistry",
+  "reaction-network",
+  "univariate",
+  "parameter-homotopy",
+  "consistency",
+  "hcjl",
+]
+variables = [
+  "x1",
+]
+parameters = [
+  "p1", "p2", "p3",
+]
+equations = [
+  "p1*x1^2 - p3*x1^3 - p2^2*p3*x1",
+]
+target_parameters = [
+  "1.0", "0.2", "1.0",
+]
+
+[source]
+citation = "HomotopyContinuation.jl benchmarks/bio-chemical-rection-networks.jl (networks from T. Loman, BioDiffEq/Catalyst.jl)."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/blob/0cbf1e27d062d7eb01d962c3b948c39444c9a62c/benchmarks/bio-chemical-rection-networks.jl#L106-L125"
+file = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:benchmarks/bio-chemical-rection-networks.jl:106-125"
+
+[solutions]
+generic_nonsingular = 3
+count_source = "Cubic with distinct roots for generic parameters (x = 0 and the two roots of p3 x^2 - p1 x + p2^2 p3)."
+notes = "x = 0 is a separate component of the incidence variety, so monodromy from a single start solution finds only 2 (observed with HC.jl 2.22.4)."
+
+[parametrization]
+kind = "explicit"
+
+[hcjl]
+function = "pol4 (network 4)"
+location = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:benchmarks/bio-chemical-rection-networks.jl:106-125"
+parametrization = "p[1:3]."
+how_solved = "benchmarks/bio-chemical-rection-networks.jl (sent by Torkel Loman for the BioDiffEq / Catalyst integration) runs N = 1000 times: (a) a direct solve(...) at the given real parameters, and (b) solve at random complex parameters followed by a parameter homotopy (solve(pol, sols; parameters, p1 = template, p0 = target)) to the target; it tallies the number of solutions found and expects (a) and (b) to agree in every run."
+used_in = "benchmarks/bio-chemical-rection-networks.jl"
+
+[verification]
+status = "verified"
+method = "HC.jl polyhedral solve at random complex parameters: 3 nonsingular; monodromy from one start finds only 2 (x = 0 is a separate component). Direct solve at target: 3 (all real); parameter homotopy from the 2 monodromy solutions: 2."
+hc_version = "2.22.4"
+verified_count = 3
+date = "2026-11-07"

@@ -1,0 +1,46 @@
+name = "sqrt_parameters"
+tier = "HC"
+description = "Polynomial in the unknowns, non-polynomial (sqrt) in the parameters: [sqrt(a + b) x^2 - y, (x y + a - sqrt(b))^2 - 3]. Eliminating y = sqrt(a + b) x^2 gives (sqrt(a + b) x^3 + a - sqrt(b))^2 = 3, so 6 solutions. Tests homotopies whose coefficients are non-polynomial functions of the parameters."
+tags = [
+  "non-polynomial-parameters",
+  "sqrt",
+  "small",
+  "hcjl",
+]
+variables = [
+  "x", "y",
+]
+parameters = [
+  "a", "b",
+]
+equations = [
+  "-y + x^2*sqrt(a + b)",
+  "-3 + (a + x*y - sqrt(b))^2",
+]
+
+[source]
+citation = "HomotopyContinuation.jl test/test_systems.jl sqrt_parameters()."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/blob/0cbf1e27d062d7eb01d962c3b948c39444c9a62c/test/test_systems.jl#L997-L1001"
+file = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/test_systems.jl:997-1001 (sqrt_parameters)"
+
+[solutions]
+generic_nonsingular = 6
+count_source = "Elimination argument in `description` (3 cube roots for each of the 2 signs); see [verification]."
+
+[parametrization]
+kind = "explicit"
+notes = "Uses sqrt of parameter expressions; along a parameter path the branch of sqrt must be continued consistently."
+
+[hcjl]
+function = "sqrt_parameters()"
+location = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/test_systems.jl:997-1001"
+parametrization = "parameters a, b (entering through sqrt)."
+how_solved = "Not solved in the tests; part of TEST_SYSTEM_COLLECTION."
+used_in = "benchmarks/run_system_benchmark.jl times evaluate!, evaluate_and_jacobian! and taylor! of every system in TEST_SYSTEM_COLLECTION (test/test_systems.jl:1003-1018) for InterpretedSystem and CompiledSystem at random x and p; it does not solve them."
+
+[verification]
+status = "verified"
+method = "HC.jl solve at random complex (a, b): 6 paths, 6 nonsingular."
+hc_version = "2.22.4"
+verified_count = 6
+date = "2026-11-07"

@@ -1,0 +1,55 @@
+name = "biochem_network2"
+tier = "HC"
+description = "Steady states of a 3-species network with degree-6 equations and 8 parameters (networks 2 and 3 of HC.jl benchmarks/bio-chemical-rection-networks.jl, which share the equations and differ in p8). Network 2 uses PRECISION_ADAPTIVE in the parameter homotopy; network 3 (p8 = 1) is expected to have 3 real solutions instead of 1."
+tags = [
+  "chemistry",
+  "reaction-network",
+  "steady-states",
+  "parameter-homotopy",
+  "consistency",
+  "hcjl",
+]
+variables = [
+  "x1", "x2", "x3",
+]
+parameters = [
+  "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8",
+]
+equations = [
+  "p1*p3^4 + p1*x1^4 + p2*x1^4 - p7*x1^5 + p4*p3^4*x3 + p4*x1^4*x3 - p5*x2*x1^5 - p7*p3^4*x1 - p5*p3^4*x2*x1 + p6*p8*p3^4*x3 + p6*p8*x1^4*x3",
+  "p1*p3^4 + p1*x1^4 + p2*x1^4 + p4*p3^4*x3 + p4*x1^4*x3 - p5*x2*x1^5 - p7*p3^4*x2 - p7*x2*x1^4 - p5*p3^4*x2*x1",
+  "-p4*x3 - p7*x3 + p5*x2*x1 - p6*p8*x3",
+]
+target_parameters = [
+  "0.005", "0.1", "2.8", "10", "100", "0.1", "0.01", "0.0",
+]
+alternative_target_parameters = [
+  "0.005", "0.1", "2.8", "10", "100", "0.1", "0.01", "1.0",
+]
+
+[source]
+citation = "HomotopyContinuation.jl benchmarks/bio-chemical-rection-networks.jl (networks from T. Loman, BioDiffEq/Catalyst.jl)."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/blob/0cbf1e27d062d7eb01d962c3b948c39444c9a62c/benchmarks/bio-chemical-rection-networks.jl#L46-L104"
+file = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:benchmarks/bio-chemical-rection-networks.jl:46-104"
+
+[solutions]
+generic_nonsingular = 6
+count_source = "No generic count stated in HC.jl; computed here with HC.jl 2.22.4 (polyhedral solve at random complex parameters and monodromy agree: 6). At target_parameters (p8 = 0): 6 nonsingular, 2 real; at alternative_target_parameters (p8 = 1): 6 nonsingular, 4 real (real, not necessarily positive; the HC.jl comment at line 85 says 'there should be 3 real solutions instead of 1', presumably counting positive steady states)."
+
+[parametrization]
+kind = "explicit"
+notes = "target_parameters = p2_vals (network 2, p8 = 0); alternative_target_parameters = p3_vals (network 3, p8 = 1)."
+
+[hcjl]
+function = "pol2 / pol3 (networks 2 and 3)"
+location = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:benchmarks/bio-chemical-rection-networks.jl:46-104"
+parametrization = "p[1:8]."
+how_solved = "benchmarks/bio-chemical-rection-networks.jl (sent by Torkel Loman for the BioDiffEq / Catalyst integration) runs N = 1000 times: (a) a direct solve(...) at the given real parameters, and (b) solve at random complex parameters followed by a parameter homotopy (solve(pol, sols; parameters, p1 = template, p0 = target)) to the target; it tallies the number of solutions found and expects (a) and (b) to agree in every run."
+used_in = "benchmarks/bio-chemical-rection-networks.jl"
+
+[verification]
+status = "verified"
+method = "HC.jl polyhedral solve at random complex parameters: 6; monodromy: 6. Target (p8 = 0): 6 nonsingular, 2 real; alternative target (p8 = 1): 6 nonsingular, 4 real (parameter homotopy and direct solve agree)."
+hc_version = "2.22.4"
+verified_count = 6
+date = "2026-11-07"

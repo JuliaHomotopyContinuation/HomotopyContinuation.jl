@@ -1,0 +1,60 @@
+name = "triangulation_4view"
+tier = "A"
+description = "Optimal 4-view triangulation (L2 reprojection error) via Lagrange multipliers, GPU-HC formulation: unknowns are the corrected image points (2 per view) and one Lagrange multiplier per epipolar constraint between consecutive views (views 1-2, 2-3, 3-4); parameters are the fundamental-matrix entries of consecutive view pairs (9 per pair, 3rd row/col folded in) and the measured image points (2 per view)."
+tags = [
+  "vision",
+  "triangulation",
+  "critical-points",
+  "optimization",
+  "parameter-homotopy",
+  "gpu-hc",
+]
+variables = [
+  "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8",
+  "x9", "x10", "x11",
+]
+parameters = [
+  "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8",
+  "p9", "p10", "p11", "p12", "p13", "p14", "p15", "p16",
+  "p17", "p18", "p19", "p20", "p21", "p22", "p23", "p24",
+  "p25", "p26", "p27", "p28", "p29", "p30", "p31", "p32",
+  "p33", "p34", "p35",
+]
+equations = [
+  "2*x1 + p1*x3*x9 + p2*x4*x9 + p3*x9 - 2*p28",
+  "2*x2 + p4*x3*x9 + p5*x4*x9 + p6*x9 - 2*p29",
+  "p1*x1*x9 + p4*x2*x9 + 2*x3 + p10*x5*x10 + p11*x6*x10 + p7*x9 + p12*x10 - 2*p30",
+  "p2*x1*x9 + p5*x2*x9 + 2*x4 + p13*x5*x10 + p14*x6*x10 + p8*x9 + p15*x10 - 2*p31",
+  "p10*x3*x10 + p13*x4*x10 + 2*x5 + p19*x7*x11 + p20*x8*x11 + p16*x10 + p21*x11 - 2*p32",
+  "p11*x3*x10 + p14*x4*x10 + 2*x6 + p22*x7*x11 + p23*x8*x11 + p17*x10 + p24*x11 - 2*p33",
+  "p19*x5*x11 + p22*x6*x11 + 2*x7 + p25*x11 - 2*p34",
+  "p20*x5*x11 + p23*x6*x11 + 2*x8 + p26*x11 - 2*p35",
+  "p1*x1*x3 + p2*x1*x4 + p3*x1 + p4*x2*x3 + p5*x2*x4 + p6*x2 + p7*x3 + p8*x4 + p9",
+  "p10*x3*x5 + p11*x3*x6 + p12*x3 + p13*x4*x5 + p14*x4*x6 + p15*x4 + p16*x5 + p17*x6 + p18",
+  "p19*x5*x7 + p20*x5*x8 + p21*x5 + p22*x6*x7 + p23*x6*x8 + p24*x6 + p25*x7 + p26*x8 + p27",
+]
+
+[source]
+citation = "C.-H. Chien, H. Fan, A. Abdelfattah, E. Tsigaridas, S. Tomov, B. Kimia, 'GPU-Based Homotopy Continuation for Minimal Problems in Computer Vision', CVPR 2022. Equations copied from GPU-HC."
+url = "https://github.com/Brown-LEMS/Homotopy-Continuation-Tracker-on-GPU/blob/67df2ab3582eef0ee2aa8e6d3a1c2274ab5105b5/auto-data-gen-tools/p2c-problems/sys_4view_triangulation.m"
+file = "Homotopy-Continuation-Tracker-on-GPU@67df2ab3582eef0ee2aa8e6d3a1c2274ab5105b5:auto-data-gen-tools/p2c-problems/sys_4view_triangulation.m; start/target data in GPU-HC/problems/4view_triangulation/"
+
+[solutions]
+generic_nonsingular = 142
+count_source = "GPU-HC gpuhc_settings.yaml Num_Of_Tracks = 142 (number of start solutions obtained by monodromy). Note: this formulation imposes only the epipolar constraints of consecutive view pairs, so its count differs from the 47 stationary points of exact 3-view triangulation (Stewenius-Schaffalitzky-Nister, ICCV 2005)."
+
+[parametrization]
+kind = "explicit"
+
+[start_data]
+format = "GPU-HC text: one complex number per line as 'real<TAB>imag'."
+start_parameters = "GPU-HC/problems/4view_triangulation/start_params.txt"
+start_solutions = "GPU-HC/problems/4view_triangulation/start_sols.txt"
+target_parameters = "GPU-HC/problems/4view_triangulation/target_params.txt"
+
+[verification]
+status = "verified"
+method = "All 142 GPU-HC start solutions have residual <= 5.9e-11; HC.jl monodromy_solve from the first one finds 142."
+hc_version = "2.22.4"
+verified_count = 142
+date = "2026-11-07"

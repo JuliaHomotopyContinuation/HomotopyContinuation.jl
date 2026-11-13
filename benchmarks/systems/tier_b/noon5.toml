@@ -1,0 +1,52 @@
+name = "noon5"
+tier = "B"
+description = "Noonburg's neural network (adaptive Lotka-Volterra), n = 5: x_i * sum_{j != i} x_j^2 - 1.1 x_i + 1 = 0."
+tags = [
+  "stress",
+  "coefficient-parameter",
+  "symmetric",
+]
+variables = [
+  "x1", "x2", "x3", "x4", "x5",
+]
+parameters = []
+equations = [
+  "x1*x2^2 + x1*x3^2 + x1*x4^2 + x1*x5^2 - 1.1*x1 + 1",
+  "x2*x1^2 + x2*x3^2 + x2*x4^2 + x2*x5^2 - 1.1*x2 + 1",
+  "x3*x1^2 + x3*x2^2 + x3*x4^2 + x3*x5^2 - 1.1*x3 + 1",
+  "x4*x1^2 + x4*x2^2 + x4*x3^2 + x4*x5^2 - 1.1*x4 + 1",
+  "x5*x1^2 + x5*x2^2 + x5*x3^2 + x5*x4^2 - 1.1*x5 + 1",
+]
+
+[source]
+citation = "V. W. Noonburg, 'A neural network modeled by an adaptive Lotka-Volterra system', SIAM J. Appl. Math. 49 (1989). PHCpack Demo/noon5."
+url = "https://github.com/janverschelde/PHCpack/blob/ed77cc0234aec45099d1d587a90a1617d5bfdacd/src/Demo/noon5"
+file = "PHCpack@ed77cc0234aec45099d1d587a90a1617d5bfdacd:src/Demo/noon5"
+
+[solutions]
+generic_nonsingular = 233
+count_source = "PHCpack Demo/noon5: total degree 243, generalized Bezout 233, mixed volume 233; 19 generating solutions generate 233 solutions under the S5 symmetry."
+
+[parametrization]
+kind = "coefficients"
+description = "All coefficients are parameters (one per monomial), generic form below. Generic count = mixed volume = 233."
+generic_parameters = [
+  "c1_1", "c1_2", "c1_3", "c1_4", "c1_5", "d1", "c2_1", "c2_2",
+  "c2_3", "c2_4", "c2_5", "d2", "c3_1", "c3_2", "c3_3", "c3_4",
+  "c3_5", "d3", "c4_1", "c4_2", "c4_3", "c4_4", "c4_5", "d4",
+  "c5_1", "c5_2", "c5_3", "c5_4", "c5_5", "d5",
+]
+generic_equations = [
+  "c1_2*x1*x2^2 + c1_3*x1*x3^2 + c1_4*x1*x4^2 + c1_5*x1*x5^2 + c1_1*x1 + d1",
+  "c2_1*x2*x1^2 + c2_3*x2*x3^2 + c2_4*x2*x4^2 + c2_5*x2*x5^2 + c2_2*x2 + d2",
+  "c3_1*x3*x1^2 + c3_2*x3*x2^2 + c3_4*x3*x4^2 + c3_5*x3*x5^2 + c3_3*x3 + d3",
+  "c4_1*x4*x1^2 + c4_2*x4*x2^2 + c4_3*x4*x3^2 + c4_5*x4*x5^2 + c4_4*x4 + d4",
+  "c5_1*x5*x1^2 + c5_2*x5*x2^2 + c5_3*x5*x3^2 + c5_4*x5*x4^2 + c5_5*x5 + d5",
+]
+
+[verification]
+status = "verified"
+method = "HC.jl solve (polyhedral): 233 nonsingular; mixed volume of generic_equations = 233. Transcription equals PHCpack Demo/noon5."
+hc_version = "2.22.4"
+verified_count = 233
+date = "2026-11-07"

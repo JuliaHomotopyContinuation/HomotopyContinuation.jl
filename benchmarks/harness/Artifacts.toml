@@ -1,0 +1,7 @@
+[benchmark_starts]
+git-tree-sha1 = "9f4a04201d4c0074ba8d0111d244d45092c3bf51"
+lazy = true
+
+    [[benchmark_starts.download]]
+    sha256 = "d58228c8a2728c2cbdb19af30e785de0c2ece79f19bc89332f8a915965caf348"
+    url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/releases/download/benchmark-starts-v1/benchmark_starts-v1.tar.gz"

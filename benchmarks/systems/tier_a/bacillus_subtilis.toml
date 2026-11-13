@@ -1,0 +1,52 @@
+name = "bacillus_subtilis"
+tier = "A"
+description = "Steady states of a B. subtilis sigmaB stress-response reaction network (10 species). Copied from HC.jl test/test_systems.jl bacillus() with the total phosphatase concentration (2.0 in the source) promoted to a parameter T: the conservation law reads phos + vPp = T. All rate constants are kept at the source values. Rate constants span 0.2 .. 3600 (badly scaled)."
+tags = [
+  "chemistry",
+  "reaction-network",
+  "steady-states",
+  "badly-scaled",
+  "parameter-homotopy",
+]
+variables = [
+  "w", "w2", "w2v", "v", "w2v2", "vP", "sigmaB", "w2sigmaB",
+  "vPp", "phos",
+]
+parameters = [
+  "T",
+]
+equations = [
+  "(-1*0.7*w + -2*3600.0*(w^2/2) + 2*18.0*w2)*(0.2 + sigmaB) + 4.0*0.4*(1 + 30.0*sigmaB)",
+  "-1*0.7*w2 + 3600.0*(w^2/2) + -1*18.0*w2 + -1*3600.0*w2*v + 18.0*w2v + 36.0*w2v + -1*3600.0*w2*sigmaB + 18.0*w2sigmaB",
+  "-1*0.7*w2v + 3600.0*w2*v + -1*18.0*w2v + -1*3600.0*w2v*v + 18.0*w2v2 + -1*36.0*w2v + 36.0*w2v2 + 1800.0*w2sigmaB*v + -1*1800.0*w2v*sigmaB",
+  "(-1*0.7*v + -1*3600.0*w2*v + 18.0*w2v + -1*3600.0*w2v*v + 18.0*w2v2 + -1*1800.0*w2sigmaB*v + 1800.0*w2v*sigmaB + 180.0*vPp)*(0.2 + sigmaB) + 4.5*0.4*(1 + 30.0*sigmaB)",
+  "-1*0.7*w2v2 + 3600.0*w2v*v + -1*18.0*w2v2 + -1*36.0*w2v2",
+  "-1*0.7*vP + 36.0*w2v + 36.0*w2v2 + -1*3600.0*vP*phos + 18.0*vPp",
+  "(-1*0.7*sigmaB + -1*3600.0*w2*sigmaB + 18.0*w2sigmaB + 1800.0*w2sigmaB*v + -1*1800.0*w2v*sigmaB)*(0.2 + sigmaB) + 0.4*(1 + 30.0*sigmaB)",
+  "-1*0.7*w2sigmaB + 3600.0*w2*sigmaB + -1*18.0*w2sigmaB + -1*1800.0*w2sigmaB*v + 1800.0*w2v*sigmaB",
+  "-1*0.7*vPp + 3600.0*vP*phos + -1*18.0*vPp + -1*180.0*vPp",
+  "(phos + vPp) - T",
+]
+example_parameters = [
+  "2.0",
+]
+
+[source]
+citation = "sigmaB stress-response model from PLoS Comput. Biol., doi:10.1371/journal.pcbi.1005267 (reference given in PolynomialTestSystems.jl), as packaged in HomotopyContinuation.jl test/test_systems.jl bacillus() and PolynomialTestSystems.jl bacillus_subtilis()."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/blob/0cbf1e27d062d7eb01d962c3b948c39444c9a62c/test/test_systems.jl#L79-L129"
+file = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/test_systems.jl:79-129 (bacillus); PolynomialTestSystems.jl@e04087ef08cf91ffafd88546c4d4ccb25613a3c7:src/systems.jl (bacillus_subtilis, nsolutions=44)"
+
+[solutions]
+generic_nonsingular = 44
+count_source = "PolynomialTestSystems.jl bacillus_subtilis() declares nsolutions=44 (for T = 2.0); HC.jl test/endgame_test.jl has a (commented-out) test nsolutions(solve(bacillus())) == 44."
+
+[parametrization]
+kind = "explicit"
+notes = "Single physical parameter T. For a richer family one can additionally treat every numeric rate constant as a parameter; that family is not stored here."
+
+[verification]
+status = "verified"
+method = "HC.jl solve (polyhedral) at T = 2.0: 76 paths, 44 nonsingular (12 real); at 3 random complex T: 44, 44, 44 nonsingular. One further run at a random complex T returned only 43 (one path lost), so this badly scaled system is a good robustness test. monodromy_solve seeded with the 44 solutions at T = 2.0 kept only 43."
+hc_version = "2.22.4"
+verified_count = 44
+date = "2026-11-07"

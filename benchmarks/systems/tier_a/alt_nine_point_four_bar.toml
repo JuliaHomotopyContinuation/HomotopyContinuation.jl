@@ -1,0 +1,66 @@
+name = "alt_nine_point_four_bar"
+tier = "A"
+description = "Alt's problem (nine-point path synthesis of planar four-bar linkages) in isotropic coordinates. The 9 precision points are P0..P8; delta_i, delta_hat_i are the isotropic coordinates of the displacements P_i - P0 (i = 1..8), i.e. 16 parameters. Unknowns: pivots/link data x, a, y, b and their conjugate-isotropic partners (8) plus the rotation variables gamma_i, gamma_hat_i (16). Physically meaningful parameters have delta_hat_i = conj(delta_i)."
+tags = [
+  "kinematics",
+  "mechanism-synthesis",
+  "parameter-homotopy",
+  "large-count",
+  "path-jumping",
+  "ill-conditioned",
+]
+variables = [
+  "x", "a", "y", "b", "x_hat", "a_hat", "y_hat", "b_hat",
+  "gamma1", "gamma2", "gamma3", "gamma4", "gamma5", "gamma6", "gamma7", "gamma8",
+  "gamma_hat1", "gamma_hat2", "gamma_hat3", "gamma_hat4", "gamma_hat5", "gamma_hat6", "gamma_hat7", "gamma_hat8",
+]
+parameters = [
+  "delta1", "delta2", "delta3", "delta4", "delta5", "delta6", "delta7", "delta8",
+  "delta_hat1", "delta_hat2", "delta_hat3", "delta_hat4", "delta_hat5", "delta_hat6", "delta_hat7", "delta_hat8",
+]
+equations = [
+  "(a_hat*x - delta_hat1*x)*gamma1 + (a*x_hat - delta1*x_hat)*gamma_hat1 + (a_hat - x_hat)*delta1 + (a - x)*delta_hat1 - delta1*delta_hat1",
+  "(a_hat*x - delta_hat2*x)*gamma2 + (a*x_hat - delta2*x_hat)*gamma_hat2 + (a_hat - x_hat)*delta2 + (a - x)*delta_hat2 - delta2*delta_hat2",
+  "(a_hat*x - delta_hat3*x)*gamma3 + (a*x_hat - delta3*x_hat)*gamma_hat3 + (a_hat - x_hat)*delta3 + (a - x)*delta_hat3 - delta3*delta_hat3",
+  "(a_hat*x - delta_hat4*x)*gamma4 + (a*x_hat - delta4*x_hat)*gamma_hat4 + (a_hat - x_hat)*delta4 + (a - x)*delta_hat4 - delta4*delta_hat4",
+  "(a_hat*x - delta_hat5*x)*gamma5 + (a*x_hat - delta5*x_hat)*gamma_hat5 + (a_hat - x_hat)*delta5 + (a - x)*delta_hat5 - delta5*delta_hat5",
+  "(a_hat*x - delta_hat6*x)*gamma6 + (a*x_hat - delta6*x_hat)*gamma_hat6 + (a_hat - x_hat)*delta6 + (a - x)*delta_hat6 - delta6*delta_hat6",
+  "(a_hat*x - delta_hat7*x)*gamma7 + (a*x_hat - delta7*x_hat)*gamma_hat7 + (a_hat - x_hat)*delta7 + (a - x)*delta_hat7 - delta7*delta_hat7",
+  "(a_hat*x - delta_hat8*x)*gamma8 + (a*x_hat - delta8*x_hat)*gamma_hat8 + (a_hat - x_hat)*delta8 + (a - x)*delta_hat8 - delta8*delta_hat8",
+  "(b_hat*y - delta_hat1*y)*gamma1 + (b*y_hat - delta1*y_hat)*gamma_hat1 + (b_hat - y_hat)*delta1 + (b - y)*delta_hat1 - delta1*delta_hat1",
+  "(b_hat*y - delta_hat2*y)*gamma2 + (b*y_hat - delta2*y_hat)*gamma_hat2 + (b_hat - y_hat)*delta2 + (b - y)*delta_hat2 - delta2*delta_hat2",
+  "(b_hat*y - delta_hat3*y)*gamma3 + (b*y_hat - delta3*y_hat)*gamma_hat3 + (b_hat - y_hat)*delta3 + (b - y)*delta_hat3 - delta3*delta_hat3",
+  "(b_hat*y - delta_hat4*y)*gamma4 + (b*y_hat - delta4*y_hat)*gamma_hat4 + (b_hat - y_hat)*delta4 + (b - y)*delta_hat4 - delta4*delta_hat4",
+  "(b_hat*y - delta_hat5*y)*gamma5 + (b*y_hat - delta5*y_hat)*gamma_hat5 + (b_hat - y_hat)*delta5 + (b - y)*delta_hat5 - delta5*delta_hat5",
+  "(b_hat*y - delta_hat6*y)*gamma6 + (b*y_hat - delta6*y_hat)*gamma_hat6 + (b_hat - y_hat)*delta6 + (b - y)*delta_hat6 - delta6*delta_hat6",
+  "(b_hat*y - delta_hat7*y)*gamma7 + (b*y_hat - delta7*y_hat)*gamma_hat7 + (b_hat - y_hat)*delta7 + (b - y)*delta_hat7 - delta7*delta_hat7",
+  "(b_hat*y - delta_hat8*y)*gamma8 + (b*y_hat - delta8*y_hat)*gamma_hat8 + (b_hat - y_hat)*delta8 + (b - y)*delta_hat8 - delta8*delta_hat8",
+  "gamma1*gamma_hat1 + gamma1 + gamma_hat1",
+  "gamma2*gamma_hat2 + gamma2 + gamma_hat2",
+  "gamma3*gamma_hat3 + gamma3 + gamma_hat3",
+  "gamma4*gamma_hat4 + gamma4 + gamma_hat4",
+  "gamma5*gamma_hat5 + gamma5 + gamma_hat5",
+  "gamma6*gamma_hat6 + gamma6 + gamma_hat6",
+  "gamma7*gamma_hat7 + gamma7 + gamma_hat7",
+  "gamma8*gamma_hat8 + gamma8 + gamma_hat8",
+]
+
+[source]
+citation = "C. W. Wampler, A. P. Morgan, A. J. Sommese, 'Complete Solution of the Nine-Point Path Synthesis Problem for Four-Bar Linkages', ASME J. Mech. Design 114 (1992) 153-159. Formulation copied from HomotopyContinuation.jl test/test_systems.jl four_bar() (also test/test_cases/four_bar.jl, which contains a start solution s and parameters p, q). Path-jumping study: S. Timme, arXiv:1902.02968, Sec. 5.2 (Table 2)."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/blob/0cbf1e27d062d7eb01d962c3b948c39444c9a62c/test/test_systems.jl#L954-L979"
+file = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/test_systems.jl:954-979 (four_bar); test/test_cases/four_bar.jl (start pair, see hcjl/four_bar_tracker_case.toml)"
+
+[solutions]
+generic_nonsingular = 8652
+count_source = "Wampler-Morgan-Sommese 1992: 1442 coupler curves (cognate triples) -> 4326 linkages -> 8652 solutions (2-fold relabeling symmetry). Upper bound 1442 proven by Brysiewicz, arXiv:2609.22003. HC.jl example 'Alt's problem' (juliahomotopycontinuation.org/examples/alts-problem) states 6*1442 = 8652 solutions for this 24x24 system."
+notes = "1442 = number of paths when tracking one representative per orbit of the (Z/3 x Z/2) symmetry group (Roberts cognates x relabeling); a full parameter homotopy tracks 8652 paths."
+
+[parametrization]
+kind = "explicit"
+
+[verification]
+status = "verified"
+method = "HC.jl monodromy_solve from the start pair of HC.jl test/test_cases/four_bar.jl (start solution refined by Newton, residual 5e-15), threading, max_loops_no_progress = 5, target_solutions_count = 8652: 8652 solutions in 293 s (3 threads). Transcription equals HC.jl four_bar() (rel. err. 0)."
+hc_version = "2.22.4"
+verified_count = 8652
+date = "2026-11-07"

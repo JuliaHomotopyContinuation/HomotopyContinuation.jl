@@ -1,0 +1,46 @@
+name = "algpath_clustered_roots"
+tier = "B"
+description = "Clustered-roots univariate homotopies (pointer only). Construction (Telen et al. Sec. 6.2; algpath-bench gen.sage ClusteredHomotopy): nc cluster centers c_k = exp(2 pi i k / nc), cs roots per cluster z_{k,l} = c_k + alpha * u^(1/cs) * exp(2 pi i l / cs) with u = 2^-53; E(x) = prod (x - z_{k,l}), degree d = nc*cs. Homotopy H(x, t) = (1 - t)(1/2 - t) g0 (x^d - 1) + g1 t (1 - t) E(x) + g2 t (1/2 - t) F(x) with random complex g0, g1, g2 and a random dense target F; at t = 1/2 the fiber is the clustered root set. Instances: data/clustered-{nc}-{cs}-{alpha}/1.json for (nc, cs, alpha) in (5,5,10), (5,3,100), (10,5,10), (10,10,1), (10,10,1000)."
+tags = [
+  "path-jumping",
+  "clustered-roots",
+  "stress",
+  "univariate",
+  "pointer",
+]
+variables = [
+  "x_0",
+]
+parameters = [
+  "t",
+]
+equations = []
+
+[external]
+repository = "https://gitlab.inria.fr/numag/algpath-bench"
+revision = "c9ccea9eef12fbc21594eafe9d3f185ba0ee6e6d"
+files = [
+  "data/clustered-5-5-10/1.json",
+  "data/clustered-5-5-10/2.json",
+  "data/clustered-5-3-100/1.json",
+  "data/clustered-10-5-10/1.json",
+  "data/clustered-10-10-1/1.json",
+  "data/clustered-10-10-1000/1.json",
+]
+format = "JSON: system (list of strings, Sage syntax with I = sqrt(-1)), variables, parameters ([\"t\"]), path ([[\"0.0\"],[\"1.0\"]]), fiber (start solutions as strings). Replace 'I' by 'im' for Julia parsing."
+
+[source]
+citation = "S. Telen, M. Van Barel, J. Verschelde, arXiv:1909.04984, Sec. 6.2 (clustered solutions experiment); A. Guillemot, P. Lairez, 'Validated Numerics for Algebraic Path Tracking', ISSAC 2024; A. Guillemot, 'Certified Algebraic Path Tracking with Algpath', ISSAC 2025."
+url = "https://gitlab.inria.fr/numag/algpath-bench/-/tree/c9ccea9eef12fbc21594eafe9d3f185ba0ee6e6d/data"
+file = "algpath-bench@c9ccea9eef12fbc21594eafe9d3f185ba0ee6e6d:gen.sage (class ClusteredHomotopy)"
+
+[solutions]
+generic_nonsingular_formula = "nc*cs (instances: 25, 15, 50, 100, 100)"
+count_source = "Degree of the univariate homotopy; the JSON fiber has d start roots."
+
+[parametrization]
+kind = "pointer"
+
+[verification]
+status = "not-needed"
+method = "count is the degree"

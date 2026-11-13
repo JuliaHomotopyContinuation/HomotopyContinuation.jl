@@ -1,0 +1,45 @@
+name = "hyperbolic_6_6"
+tier = "C"
+description = "Coefficient family on the support of HC.jl's endgame test 'Hyperbolic - 6,6' (dehomogenized at y = 1, unknowns x, z). At the target coefficients the system has 2 solutions of multiplicity 6 on the hyperplane z = 0, each approached by paths with winding number 3. Generic member: f2 = z (e1 x^2 + e2 + e3 z^2), so 4 solutions on z = 0 plus 8 others."
+tags = [
+  "endgame",
+  "singular-endpoint",
+  "multiplicity",
+  "winding-number",
+]
+variables = [
+  "x", "z",
+]
+parameters = [
+  "d1", "d2", "d3", "d4", "d5", "d6", "e1", "e2",
+  "e3",
+]
+equations = [
+  "d1*x^4 + d2*x^2 + d3*x^2*z^2 + d4 + d5*z^2 + d6*z^4",
+  "e1*x^2*z + e2*z + e3*z^3",
+]
+target_parameters = [
+  "0.75", "1.5", "-2.5", "0.75", "-2.5", "0.75", "10", "10",
+  "-6",
+]
+
+[source]
+citation = "HomotopyContinuation.jl test/endgame_test.jl testset 'Hyperbolic - 6,6' (target system); coefficient family added here."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/blob/0cbf1e27d062d7eb01d962c3b948c39444c9a62c/test/endgame_test.jl#L7-L22"
+file = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/endgame_test.jl:7-22"
+
+[solutions]
+generic_nonsingular = 12
+count_source = "Bezout number 4*3 = 12 attained (see [verification]); HC.jl test: 12 paths with winding number 3, 2 results of multiplicity 6 at the target."
+target_endpoints = "2 singular solutions (x, z) = (+-im, 0) of multiplicity 6; with HC.jl's total-degree homotopy all 12 paths end there with winding number 3."
+notes = "HC.jl 2.22.4 succeeds with its total-degree homotopy on the target, but the parameter homotopy from a generic member of this family fails: all 12 paths end with :terminated_max_extended_steps or :terminated_step_size_too_small (some near (+-im, 0))."
+
+[parametrization]
+kind = "explicit"
+
+[verification]
+status = "partial"
+method = "HC.jl: 12 nonsingular at random parameters. Parameter homotopy from there to target_parameters: all 12 paths FAIL (:terminated_max_extended_steps / :terminated_step_size_too_small). Direct total-degree solve of the target (as in HC.jl's test): 2 results, multiplicity 6 each, 12 paths with winding number 3."
+hc_version = "2.22.4"
+verified_count = 12
+date = "2026-11-07"

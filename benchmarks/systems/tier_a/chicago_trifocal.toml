@@ -1,0 +1,82 @@
+name = "chicago_trifocal"
+tier = "A"
+description = "'Chicago' trifocal relative pose from lines at points (3 calibrated views, 2 points with tangent lines + 1 point), 30x30 GPU-HC formulation (TPAMI 2022). Unknowns x1..x30 (depths, translations, Cayley rotation parameters), parameters c1..c33 (image data and auxiliary random linear-slice coefficients)."
+tags = [
+  "vision",
+  "minimal-problem",
+  "trifocal",
+  "parameter-homotopy",
+  "large-count",
+  "gpu-hc",
+]
+variables = [
+  "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8",
+  "x9", "x10", "x11", "x12", "x13", "x14", "x15", "x16",
+  "x17", "x18", "x19", "x20", "x21", "x22", "x23", "x24",
+  "x25", "x26", "x27", "x28", "x29", "x30",
+]
+parameters = [
+  "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8",
+  "c9", "c10", "c11", "c12", "c13", "c14", "c15", "c16",
+  "c17", "c18", "c19", "c20", "c21", "c22", "c23", "c24",
+  "c25", "c26", "c27", "c28", "c29", "c30", "c31", "c32",
+  "c33",
+]
+equations = [
+  "- c1*c31*x25^2 - 2*c2*c31*x25*x26 - 2*c31*x25*x27 + c1*c31*x26^2 - 2*c31*x26 + c1*c31*x27^2 + 2*c2*c31*x27 - x19 - c1*c31 + c3*x3",
+  "c2*c31*x25^2 - 2*c1*c31*x25*x26 + 2*c31*x25 - c2*c31*x26^2 - 2*c31*x26*x27 + c2*c31*x27^2 - 2*c1*c31*x27 - x20 - c2*c31 + c4*x3",
+  "c31*x25^2 - 2*c1*c31*x25*x27 - 2*c2*c31*x25 + c31*x26^2 - 2*c2*c31*x26*x27 + 2*c1*c31*x26 - c31*x27^2 - c31 + x3 - x21",
+  "- c7*x1*x25^2 - 2*c8*x1*x25*x26 - 2*x1*x25*x27 + c7*x1*x26^2 - 2*x1*x26 + c7*x1*x27^2 + 2*c8*x1*x27 - x19 - c7*x1 + c9*x4",
+  "c8*x1*x25^2 - 2*c7*x1*x25*x26 + 2*x1*x25 - c8*x1*x26^2 - 2*x1*x26*x27 + c8*x1*x27^2 - 2*c7*x1*x27 - x20 - c8*x1 + c10*x4",
+  "x1*x25^2 - 2*c7*x1*x25*x27 - 2*c8*x1*x25 + x1*x26^2 - 2*c8*x1*x26*x27 + 2*c7*x1*x26 - x1*x27^2 - x1 + x4 - x21",
+  "- c13*x2*x25^2 - 2*c14*x2*x25*x26 - 2*x2*x25*x27 + c13*x2*x26^2 - 2*x2*x26 + c13*x2*x27^2 + 2*c14*x2*x27 - x19 - c13*x2 + c15*x5",
+  "c14*x2*x25^2 - 2*c13*x2*x25*x26 + 2*x2*x25 - c14*x2*x26^2 - 2*x2*x26*x27 + c14*x2*x27^2 - 2*c13*x2*x27 - x20 - c14*x2 + c16*x5",
+  "x2*x25^2 - 2*c13*x2*x25*x27 - 2*c14*x2*x25 + x2*x26^2 - 2*c14*x2*x26*x27 + 2*c13*x2*x26 - x2*x27^2 - x2 + x5 - x21",
+  "- c1*c31*x28^2 - 2*c2*c31*x28*x29 - 2*c31*x28*x30 + c1*c31*x29^2 - 2*c31*x29 + c1*c31*x30^2 + 2*c2*c31*x30 - x22 - c1*c31 + c5*x6",
+  "c2*c31*x28^2 - 2*c1*c31*x28*x29 + 2*c31*x28 - c2*c31*x29^2 - 2*c31*x29*x30 + c2*c31*x30^2 - 2*c1*c31*x30 - x23 - c2*c31 + c6*x6",
+  "c31*x28^2 - 2*c1*c31*x28*x30 - 2*c2*c31*x28 + c31*x29^2 - 2*c2*c31*x29*x30 + 2*c1*c31*x29 - c31*x30^2 - c31 + x6 - x24",
+  "- c7*x1*x28^2 - 2*c8*x1*x28*x29 - 2*x1*x28*x30 + c7*x1*x29^2 - 2*x1*x29 + c7*x1*x30^2 + 2*c8*x1*x30 - x22 - c7*x1 + c11*x7",
+  "c8*x1*x28^2 - 2*c7*x1*x28*x29 + 2*x1*x28 - c8*x1*x29^2 - 2*x1*x29*x30 + c8*x1*x30^2 - 2*c7*x1*x30 - x23 - c8*x1 + c12*x7",
+  "x1*x28^2 - 2*c7*x1*x28*x30 - 2*c8*x1*x28 + x1*x29^2 - 2*c8*x1*x29*x30 + 2*c7*x1*x29 - x1*x30^2 - x1 + x7 - x24",
+  "- c13*x2*x28^2 - 2*c14*x2*x28*x29 - 2*x2*x28*x30 + c13*x2*x29^2 - 2*x2*x29 + c13*x2*x30^2 + 2*c14*x2*x30 - x22 - c13*x2 + c17*x8",
+  "c14*x2*x28^2 - 2*c13*x2*x28*x29 + 2*x2*x28 - c14*x2*x29^2 - 2*x2*x29*x30 + c14*x2*x30^2 - 2*c13*x2*x30 - x23 - c14*x2 + c18*x8",
+  "x2*x28^2 - 2*c13*x2*x28*x30 - 2*c14*x2*x28 + x2*x29^2 - 2*c14*x2*x29*x30 + 2*c13*x2*x29 - x2*x30^2 - x2 + x8 - x24",
+  "c3*x9 - c1*c32 - c19*x13 + c21*x14 - 2*c32*x26 - c1*c32*x25^2 + c1*c32*x26^2 + c1*c32*x27^2 - c19*x13*x25^2 + c19*x13*x26^2 + c19*x13*x27^2 + 2*c2*c32*x27 + 2*c20*x13*x27 - 2*c32*x25*x27 - 2*c2*c32*x25*x26 - 2*c20*x13*x25*x26",
+  "c4*x9 - c2*c32 - c20*x13 + c22*x14 + 2*c32*x25 + c2*c32*x25^2 - c2*c32*x26^2 + c2*c32*x27^2 + c20*x13*x25^2 - c20*x13*x26^2 + c20*x13*x27^2 - 2*c1*c32*x27 - 2*c19*x13*x27 - 2*c32*x26*x27 - 2*c1*c32*x25*x26 - 2*c19*x13*x25*x26",
+  "x9 - c32 + c32*x25^2 + c32*x26^2 - c32*x27^2 + 2*c1*c32*x26 - 2*c2*c32*x25 + 2*c19*x13*x26 - 2*c20*x13*x25 - 2*c1*c32*x25*x27 - 2*c2*c32*x26*x27 - 2*c19*x13*x25*x27 - 2*c20*x13*x26*x27",
+  "c9*x11 - c7*c33 - c25*x16 + c27*x17 - 2*c33*x26 - c7*c33*x25^2 + c7*c33*x26^2 + c7*c33*x27^2 - c25*x16*x25^2 + c25*x16*x26^2 + c25*x16*x27^2 + 2*c8*c33*x27 + 2*c26*x16*x27 - 2*c33*x25*x27 - 2*c8*c33*x25*x26 - 2*c26*x16*x25*x26",
+  "c10*x11 - c8*c33 - c26*x16 + c28*x17 + 2*c33*x25 + c8*c33*x25^2 - c8*c33*x26^2 + c8*c33*x27^2 + c26*x16*x25^2 - c26*x16*x26^2 + c26*x16*x27^2 - 2*c7*c33*x27 - 2*c25*x16*x27 - 2*c33*x26*x27 - 2*c7*c33*x25*x26 - 2*c25*x16*x25*x26",
+  "x11 - c33 + c33*x25^2 + c33*x26^2 - c33*x27^2 + 2*c7*c33*x26 - 2*c8*c33*x25 + 2*c25*x16*x26 - 2*c26*x16*x25 - 2*c7*c33*x25*x27 - 2*c8*c33*x26*x27 - 2*c25*x16*x25*x27 - 2*c26*x16*x26*x27",
+  "c5*x10 - c1*c32 - c19*x13 + c23*x15 - 2*c32*x29 - c1*c32*x28^2 + c1*c32*x29^2 + c1*c32*x30^2 - c19*x13*x28^2 + c19*x13*x29^2 + c19*x13*x30^2 + 2*c2*c32*x30 + 2*c20*x13*x30 - 2*c32*x28*x30 - 2*c2*c32*x28*x29 - 2*c20*x13*x28*x29",
+  "c6*x10 - c2*c32 - c20*x13 + c24*x15 + 2*c32*x28 + c2*c32*x28^2 - c2*c32*x29^2 + c2*c32*x30^2 + c20*x13*x28^2 - c20*x13*x29^2 + c20*x13*x30^2 - 2*c1*c32*x30 - 2*c19*x13*x30 - 2*c32*x29*x30 - 2*c1*c32*x28*x29 - 2*c19*x13*x28*x29",
+  "x10 - c32 + c32*x28^2 + c32*x29^2 - c32*x30^2 + 2*c1*c32*x29 - 2*c2*c32*x28 + 2*c19*x13*x29 - 2*c20*x13*x28 - 2*c1*c32*x28*x30 - 2*c2*c32*x29*x30 - 2*c19*x13*x28*x30 - 2*c20*x13*x29*x30",
+  "c11*x12 - c7*c33 - c25*x16 + c29*x18 - 2*c33*x29 - c7*c33*x28^2 + c7*c33*x29^2 + c7*c33*x30^2 - c25*x16*x28^2 + c25*x16*x29^2 + c25*x16*x30^2 + 2*c8*c33*x30 + 2*c26*x16*x30 - 2*c33*x28*x30 - 2*c8*c33*x28*x29 - 2*c26*x16*x28*x29",
+  "c12*x12 - c8*c33 - c26*x16 + c30*x18 + 2*c33*x28 + c8*c33*x28^2 - c8*c33*x29^2 + c8*c33*x30^2 + c26*x16*x28^2 - c26*x16*x29^2 + c26*x16*x30^2 - 2*c7*c33*x30 - 2*c25*x16*x30 - 2*c33*x29*x30 - 2*c7*c33*x28*x29 - 2*c25*x16*x28*x29",
+  "x12 - c33 + c33*x28^2 + c33*x29^2 - c33*x30^2 + 2*c7*c33*x29 - 2*c8*c33*x28 + 2*c25*x16*x29 - 2*c26*x16*x28 - 2*c7*c33*x28*x30 - 2*c8*c33*x29*x30 - 2*c25*x16*x28*x30 - 2*c26*x16*x29*x30",
+]
+
+[source]
+citation = "R. Fabbri, T. Duff, H. Fan, M. Regan, D. da Costa de Pinho, E. Tsigaridas, C. Wampler, J. Hauenstein, P. Giblin, B. Kimia, A. Leykin, T. Pajdla, 'Trifocal Relative Pose from Lines at Points', IEEE TPAMI 45(6), 2022 (CVPR 2020 version: 'TRPLP'); T. Duff, K. Kohn, A. Leykin, T. Pajdla, 'PLMP - Point-Line Minimal Problems in Complete Multi-View Visibility', ICCV 2019. Equations copied from GPU-HC sys_trifocal_2op1p_30x30.m. The original 'MINUS' C++ solver is github.com/rfabbri/minus."
+url = "https://github.com/Brown-LEMS/Homotopy-Continuation-Tracker-on-GPU/blob/67df2ab3582eef0ee2aa8e6d3a1c2274ab5105b5/auto-data-gen-tools/p2c-problems/sys_trifocal_2op1p_30x30.m"
+file = "Homotopy-Continuation-Tracker-on-GPU@67df2ab3582eef0ee2aa8e6d3a1c2274ab5105b5:auto-data-gen-tools/p2c-problems/sys_trifocal_2op1p_30x30.m; start/target data in GPU-HC/problems/trifocal_2op1p_30x30/"
+
+[solutions]
+generic_nonsingular = 312
+count_source = "Duff-Kohn-Leykin-Pajdla ICCV 2019 and Fabbri et al. TPAMI 2022: degree 312; GPU-HC gpuhc_settings.yaml Num_Of_Tracks 312 (start_sols.txt holds 312 x 30 values)."
+
+[parametrization]
+kind = "explicit"
+notes = "Full equations are small enough to store (30 equations, <= 20 terms each). Larger GPU-HC/MINUS variants (e.g. the 312-solution 14x14 formulation in MINUS, generalized_3views_6lines with 600 solutions) are pointer-only: see the GPU-HC p2c-problems directory."
+
+[start_data]
+format = "GPU-HC text: one complex number per line as 'real<TAB>imag'; start_sols.txt lists all solutions consecutively (num_vars lines each)."
+start_parameters = "GPU-HC/problems/trifocal_2op1p_30x30/start_params.txt"
+start_solutions = "GPU-HC/problems/trifocal_2op1p_30x30/start_sols.txt"
+target_parameters = "GPU-HC/problems/trifocal_2op1p_30x30/target_params.txt"
+
+[verification]
+status = "verified"
+method = "All 312 GPU-HC start solutions have residual <= 9.3e-12 at the GPU-HC start parameters; HC.jl monodromy_solve from the first one finds 312 (123 s)."
+hc_version = "2.22.4"
+verified_count = 312
+date = "2026-11-07"

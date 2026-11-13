@@ -1,0 +1,59 @@
+name = "cyclic7"
+tier = "B"
+description = "Cyclic 7-roots: elementary cyclic sums sum_j prod_{k=0..m} z_{(j+k) mod n} = 0 for m = 0..n-2 and z0*...*z6 = 1."
+tags = [
+  "stress",
+  "coefficient-parameter",
+  "symmetric",
+  "polyhedral",
+]
+variables = [
+  "z0", "z1", "z2", "z3", "z4", "z5", "z6",
+]
+parameters = []
+equations = [
+  "z0 + z1 + z2 + z3 + z4 + z5 + z6",
+  "z0*z1 + z1*z2 + z2*z3 + z3*z4 + z4*z5 + z5*z6 + z6*z0",
+  "z0*z1*z2 + z1*z2*z3 + z2*z3*z4 + z3*z4*z5 + z4*z5*z6 + z5*z6*z0 + z6*z0*z1",
+  "z0*z1*z2*z3 + z1*z2*z3*z4 + z2*z3*z4*z5 + z3*z4*z5*z6 + z4*z5*z6*z0 + z5*z6*z0*z1 + z6*z0*z1*z2",
+  "z0*z1*z2*z3*z4 + z1*z2*z3*z4*z5 + z2*z3*z4*z5*z6 + z3*z4*z5*z6*z0 + z4*z5*z6*z0*z1 + z5*z6*z0*z1*z2 + z6*z0*z1*z2*z3",
+  "z0*z1*z2*z3*z4*z5 + z1*z2*z3*z4*z5*z6 + z2*z3*z4*z5*z6*z0 + z3*z4*z5*z6*z0*z1 + z4*z5*z6*z0*z1*z2 + z5*z6*z0*z1*z2*z3 + z6*z0*z1*z2*z3*z4",
+  "z0*z1*z2*z3*z4*z5*z6 - 1",
+]
+
+[source]
+citation = "G. Bjorck, R. Froberg, 'A faster way to count the solutions of inhomogeneous systems of algebraic equations, with applications to cyclic n-roots', J. Symb. Comp. 12 (1991); J. Backelin, R. Froberg, 'How we proved that there are exactly 924 cyclic 7-roots', ISSAC 1991. Same system as HC.jl test/test_systems.jl cyclic(n) and PHCpack Demo/cyclic7."
+url = "https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/blob/0cbf1e27d062d7eb01d962c3b948c39444c9a62c/test/test_systems.jl#L72-L77"
+file = "HomotopyContinuation.jl@0cbf1e27d062d7eb01d962c3b948c39444c9a62c:test/test_systems.jl:72-77 (cyclic); PHCpack@ed77cc0234aec45099d1d587a90a1617d5bfdacd:src/Demo/cyclic7"
+
+[solutions]
+generic_nonsingular = 924
+count_source = "Backelin-Froberg 1991: exactly 924 cyclic 7-roots; mixed volume 924 (PHCpack Demo/cyclic7). HC.jl test/endgame_test.jl and test/solve_test.jl assert nsolutions == 924 (total degree 5040)."
+
+[parametrization]
+kind = "coefficients"
+description = "All coefficients are parameters (one per monomial), generic form below. Generic count = mixed volume = 924."
+generic_parameters = [
+  "c1_1", "c1_2", "c1_3", "c1_4", "c1_5", "c1_6", "c1_7", "c2_1",
+  "c2_2", "c2_3", "c2_4", "c2_5", "c2_6", "c2_7", "c3_1", "c3_2",
+  "c3_3", "c3_4", "c3_5", "c3_6", "c3_7", "c4_1", "c4_2", "c4_3",
+  "c4_4", "c4_5", "c4_6", "c4_7", "c5_1", "c5_2", "c5_3", "c5_4",
+  "c5_5", "c5_6", "c5_7", "c6_1", "c6_2", "c6_3", "c6_4", "c6_5",
+  "c6_6", "c6_7", "c7_1", "c7_2",
+]
+generic_equations = [
+  "c1_1*z0 + c1_2*z1 + c1_3*z2 + c1_4*z3 + c1_5*z4 + c1_6*z5 + c1_7*z6",
+  "c2_1*z0*z1 + c2_2*z1*z2 + c2_3*z2*z3 + c2_4*z3*z4 + c2_5*z4*z5 + c2_6*z5*z6 + c2_7*z6*z0",
+  "c3_1*z0*z1*z2 + c3_2*z1*z2*z3 + c3_3*z2*z3*z4 + c3_4*z3*z4*z5 + c3_5*z4*z5*z6 + c3_6*z5*z6*z0 + c3_7*z6*z0*z1",
+  "c4_1*z0*z1*z2*z3 + c4_2*z1*z2*z3*z4 + c4_3*z2*z3*z4*z5 + c4_4*z3*z4*z5*z6 + c4_5*z4*z5*z6*z0 + c4_6*z5*z6*z0*z1 + c4_7*z6*z0*z1*z2",
+  "c5_1*z0*z1*z2*z3*z4 + c5_2*z1*z2*z3*z4*z5 + c5_3*z2*z3*z4*z5*z6 + c5_4*z3*z4*z5*z6*z0 + c5_5*z4*z5*z6*z0*z1 + c5_6*z5*z6*z0*z1*z2 + c5_7*z6*z0*z1*z2*z3",
+  "c6_1*z0*z1*z2*z3*z4*z5 + c6_2*z1*z2*z3*z4*z5*z6 + c6_3*z2*z3*z4*z5*z6*z0 + c6_4*z3*z4*z5*z6*z0*z1 + c6_5*z4*z5*z6*z0*z1*z2 + c6_6*z5*z6*z0*z1*z2*z3 + c6_7*z6*z0*z1*z2*z3*z4",
+  "c7_1*z0*z1*z2*z3*z4*z5*z6 - c7_2",
+]
+
+[verification]
+status = "verified"
+method = "HC.jl solve (polyhedral): 924 nonsingular (8 s). Transcription equals HC.jl cyclic(7)."
+hc_version = "2.22.4"
+verified_count = 924
+date = "2026-11-07"
