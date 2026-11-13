@@ -419,8 +419,13 @@ function extended_interpreter(T::CompiledHomotopy)
     I
 end
 
-evaluate_and_jacobian!(u, U::AbstractMatrix{ComplexDF64}, T::CompiledSystem, x, p = nothing) =
-    evaluate_and_jacobian!(u, U, extended_interpreter(T), x, p)
+evaluate_and_jacobian!(
+    u,
+    U::AbstractMatrix{ComplexDF64},
+    T::CompiledSystem,
+    x,
+    p = nothing,
+) = evaluate_and_jacobian!(u, U, extended_interpreter(T), x, p)
 evaluate_and_jacobian!(
     u,
     U::AbstractMatrix{ComplexDF64},
