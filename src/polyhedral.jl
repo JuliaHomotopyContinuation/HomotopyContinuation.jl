@@ -19,9 +19,14 @@ struct PolyhedralStartSolutionsIterator{Iter}
         mixed_cells,
         ;
         show_progress::Bool = true,
+        threading::Bool = Threads.nthreads() > 1,
     )
         if isnothing(iterate(mixed_cells))
-            res = MixedSubdivisions.fine_mixed_cells(support; show_progress = show_progress)
+            res = MixedSubdivisions.fine_mixed_cells(
+                support;
+                show_progress = show_progress,
+                threads = threading,
+            )
             if isnothing(res) || isempty(res[1])
                 throw(OverflowError("Cannot compute a start system."))
             end
@@ -37,6 +42,7 @@ function PolyhedralStartSolutionsIterator(
     lifting = map(c -> zeros(Int32, length(c)), coeffs),
     mixed_cells = MixedCell[];
     show_progress::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
 )
     support = convert(Vector{Matrix{Int32}}, support)
     start_coefficients = convert(Vector{Vector{ComplexF64}}, coeffs)
@@ -48,6 +54,7 @@ function PolyhedralStartSolutionsIterator(
         lifting,
         mixed_cells;
         show_progress = show_progress,
+        threading = threading,
     )
 end
 
@@ -203,7 +210,8 @@ end
         only_non_zero = false,
         endgame_options = EndgameOptions(),
         tracker_options = TrackerOptions(),
-        show_progress = true)
+        show_progress = true,
+        threading = Threads.nthreads() > 1)
 
 Solve the system `F` in two steps: first solve a generic system derived from the support
 of `F` using a polyhedral homotopy as proposed in [^HS95], then perform a
@@ -220,6 +228,7 @@ mixed volume of the convex hulls of ``supp(F_i) ∪ \\{0\\}`` where ``supp(F_i)`
 of ``F_i``. See also [^LW96].
 
 Set `show_progress = false` to suppress progress output while computing mixed cells.
+With `threading = true` the mixed cells are computed on multiple threads.
 
 Coefficients are converted to `ComplexF64`. Nonfinite coefficients and
 coefficients that overflow or underflow to zero during conversion are rejected.
@@ -310,12 +319,14 @@ function has_zero_col(A)
     false
 end
 
-paths_to_track(f::AbstractSystem, val::Val{:polyhedral}) = paths_to_track(System(f), val)
+paths_to_track(f::AbstractSystem, val::Val{:polyhedral}; kwargs...) =
+    paths_to_track(System(f), val; kwargs...)
 function paths_to_track(
     f::System,
     ::Val{:polyhedral};
     only_torus::Bool = false,
     only_non_zero::Bool = only_torus,
+    threading::Bool = Threads.nthreads() > 1,
 )
     supp, coeffs = begin
         if is_homogeneous(f)
@@ -341,14 +352,16 @@ function paths_to_track(
     end
 
     if only_non_zero
-        MixedSubdivisions.mixed_volume(supp)
+        MixedSubdivisions.mixed_volume(supp; threads = threading)
     else
         supp′ = map(A -> has_zero_col(A) ? A : [A zeros(Int32, size(A, 1), 1)], supp)
-        MixedSubdivisions.mixed_volume(supp′)
+        MixedSubdivisions.mixed_volume(supp′; threads = threading)
     end
 end
-MixedSubdivisions.mixed_volume(f::Union{System,AbstractSystem}) =
-    paths_to_track(f; start_system = :polyhedral, only_torus = true)
+MixedSubdivisions.mixed_volume(
+    f::Union{System,AbstractSystem};
+    threading::Bool = Threads.nthreads() > 1,
+) = paths_to_track(f; start_system = :polyhedral, only_torus = true, threading = threading)
 
 function polyhedral(
     support::AbstractVector{<:AbstractMatrix},
@@ -403,6 +416,7 @@ function polyhedral(
     only_non_zero::Bool = only_torus,
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
     show_progress::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
     kwargs...,
 )
     unsupported_kwargs(kwargs)
@@ -450,6 +464,7 @@ function polyhedral(
         support,
         start_coeffs;
         show_progress = show_progress,
+        threading = threading,
     )
     tracker = PolyhedralTracker(toric_tracker, generic_tracker, S.support, S.lifting)
 
