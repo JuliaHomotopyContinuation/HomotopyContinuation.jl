@@ -129,6 +129,7 @@ function solver_startsolutions(
     target_subspace = nothing,
     intrinsic = nothing,
     show_progress::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
@@ -166,6 +167,7 @@ function solver_startsolutions(
                 compile = compile,
                 target_parameters = target_parameters,
                 show_progress = show_progress,
+                threading = threading,
                 kwargs...,
             )
         elseif start_system == :total_degree
@@ -203,6 +205,7 @@ function solver_startsolutions(
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(),
     show_progress::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
@@ -472,6 +475,7 @@ function solve(
             args...;
             target_subspace = first(target_subspaces),
             show_progress = show_progress,
+            threading = threading,
             kwargs...,
         )
         target_parameters = target_subspaces
@@ -483,6 +487,7 @@ function solve(
                 args...;
                 target_parameters = transform_parameters(first(target_parameters)),
                 show_progress = show_progress,
+                threading = threading,
                 kwargs...,
             )
         else
@@ -490,12 +495,17 @@ function solve(
                 args...;
                 target_parameters = target_parameters,
                 show_progress = show_progress,
+                threading = threading,
                 kwargs...,
             )
         end
     else
-        solver, starts =
-            solver_startsolutions(args...; show_progress = show_progress, kwargs...)
+        solver, starts = solver_startsolutions(
+            args...;
+            show_progress = show_progress,
+            threading = threading,
+            kwargs...,
+        )
     end
     if many_parameters
         if iterator_only
