@@ -500,6 +500,103 @@ end
         end
     end
 
+    @testset "Stall detection in extended precision" begin
+        opts = TrackerOptions()
+        @test opts.extended_precision_stall_steps == 100
+        @test opts.extended_precision_stall_progress == 1e-8
+        @test_throws ArgumentError TrackerOptions(extended_precision_stall_steps = -1)
+        @test_throws ArgumentError TrackerOptions(extended_precision_stall_progress = 1.0)
+
+        # The window logic. The segment goes from 1 to 0 and `s` is the distance to the target.
+        @var x t
+        T = Tracker(InterpretedHomotopy(Homotopy([x - t], [x], t)))
+        state = T.state
+        seg = state.segment_stepper
+        HC.init!(seg, 1.0, 0.0)
+        state.last_steps_failed = 0
+        options = TrackerOptions(
+            extended_precision_stall_steps = 3,
+            extended_precision_stall_progress = 0.1,
+        )
+
+        # no progress during three steps in extended precision
+        state.extended_prec = true
+        @test !HC.update_stall!(state, options)
+        @test !HC.update_stall!(state, options)
+        @test HC.update_stall!(state, options)
+
+        # enough progress: a new window starts
+        seg.s = 1.0
+        state.stall_steps = 0
+        @test !HC.update_stall!(state, options)
+        seg.s = 0.95
+        @test !HC.update_stall!(state, options)
+        seg.s = 0.8 # 20% of the initial distance covered
+        @test !HC.update_stall!(state, options)
+        @test state.stall_steps == 0
+        # the next window starts at s = 0.8, 5% of that is not enough
+        @test !HC.update_stall!(state, options)
+        seg.s = 0.78
+        @test !HC.update_stall!(state, options)
+        seg.s = 0.77
+        @test HC.update_stall!(state, options)
+
+        # rejected steps do not count
+        seg.s = 0.5
+        state.stall_steps = 0
+        state.last_steps_failed = 1
+        for _ = 1:10
+            @test !HC.update_stall!(state, options)
+        end
+        @test state.stall_steps == 0
+        state.last_steps_failed = 0
+
+        # no check outside of extended precision, which also ends the current window
+        state.extended_prec = true
+        @test !HC.update_stall!(state, options)
+        state.extended_prec = false
+        for _ = 1:10
+            @test !HC.update_stall!(state, options)
+        end
+        @test state.stall_steps == 0
+
+        # disabled
+        state.extended_prec = true
+        off = TrackerOptions(extended_precision_stall_steps = 0)
+        for _ = 1:10
+            @test !HC.update_stall!(state, off)
+        end
+
+        # The path of this system needs extended precision all the way, see above.
+        @var a b p q
+        F = System(
+            [a + b - 1, a + b - 1 + p * ((1 + q) * b - 1)];
+            variables = [a, b],
+            parameters = [p, q],
+        )
+        for compile in (false, :mixed)
+            H = ParameterHomotopy(F, [2.0^-60, 1], [2.0^-60, 0]; compile)
+            T = Tracker(H; options = TrackerOptions(max_step_size = 0.02))
+            @test is_success(track(T, [0.5, 0.5]))
+            # 5 steps cover only 10% of the distance, less than the 50% asked for
+            T = Tracker(
+                H;
+                options = TrackerOptions(
+                    max_step_size = 0.02,
+                    extended_precision_stall_steps = 5,
+                    extended_precision_stall_progress = 0.5,
+                ),
+            )
+            r = track(T, [0.5, 0.5])
+            @test !is_success(r)
+            @test r.return_code == :terminated_step_size_too_small
+            @test r.accepted_steps <= 10
+            # and it can be switched off
+            T.options.extended_precision_stall_steps = 0
+            @test is_success(track(T, [0.5, 0.5]))
+        end
+    end
+
     include("test_cases/steiner_higher_prec.jl")
     include("test_cases/four_bar.jl")
 end
