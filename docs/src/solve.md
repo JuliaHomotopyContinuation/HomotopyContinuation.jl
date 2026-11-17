@@ -8,3 +8,10 @@ solve
 solver_startsolutions
 Solver
 ```
+
+The function [`paths_to_track`](@ref) allows you to know beforehand how manys the you
+need to track:
+
+```@docs
+paths_to_track
+```
