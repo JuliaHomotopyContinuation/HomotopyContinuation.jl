@@ -1,5 +1,9 @@
-# Predictor-only Taylor storage. Unlike the ordinary interpreter, every
-# instruction retains its output, so lower coefficients survive the next pass.
+# Incremental Taylor evaluation for the predictor.
+#
+# The predictor evaluates a homotopy's Taylor series at orders k = 1, 2, 3 at the same point,
+# The standard interpreter overwrites its tape each time, so order 3 recomputes orders 0-2.
+# Here every instruction gets its own tape slot, so that lower-order coefficients can be reused.
+
 mutable struct IncrementalTaylorInterpreter{T}
     interpreter::Interpreter{Vector{TruncatedTaylorSeries{4,T}}}
     order::Int
@@ -50,8 +54,9 @@ function IncrementalTaylorInterpreter(::Type{T}, I::Interpreter) where {T}
     IncrementalTaylorInterpreter{T}(tape, 0)
 end
 
-# Reuse the existing Taylor operation generator. Only store the newly affected
-# coefficients; inlining lets LLVM discard the unused lower-order arithmetic.
+# Reuse the existing Taylor operation generator. 
+# L is the target order, K the first coefficient to (re)compute. Coefficients below K are copied from the old tape, those above L are zeroed 
+# Reuse is only valid if (a) the previous call had order K-1 and (b) (variables, parameters, t) are unchanged in coefficients 0..K-2.
 function partial_taylor_stores(ex, K, L)
     ex isa Expr || return ex
     if ex.head == :(=) && ex.args[1] == :(tape[i])
@@ -68,6 +73,7 @@ function partial_taylor_stores(ex, K, L)
     Expr(ex.head, map(a -> partial_taylor_stores(a, K, L), ex.args)...)
 end
 
+# computes Taylor coefficients L..K
 @generated function execute_incremental_taylor!(
     ::Val{K},
     ::Val{L},

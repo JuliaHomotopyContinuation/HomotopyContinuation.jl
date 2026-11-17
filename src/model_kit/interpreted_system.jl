@@ -68,8 +68,8 @@ end
 
 (F::InterpretedSystem)(x, p = nothing) = F.system(x, p)
 
-# Choose arithmetic from the inputs, not the output buffer: mixed-precision
-# refinement intentionally stores an accurate residual in a Float64 buffer.
+# Choose arithmetic from the inputs
+# mixed-precision refinement stores a Float64 residual
 _interpreter_precision(::Type) = ComplexF64
 _interpreter_precision(::Type{DoubleF64}) = ComplexDF64
 _interpreter_precision(::Type{ComplexDF64}) = ComplexDF64

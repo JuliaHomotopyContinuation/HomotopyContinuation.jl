@@ -1,7 +1,10 @@
-# Accumulate a short sum of double-double products before normalizing. Complex
-# operations otherwise normalize each real product and every subsequent sum.
-# The error is O(eps(Float64)^2) times the sum of term magnitudes, including in
-# cancellation; this is not a relative-error bound on the final result.
+# Accumulate a short sum of double-double products before normalizing.
+# Fused complex double-double ops:
+# * `op_muladd(x,y,z) = x*y + z`
+# * `op_mulsub = x*y - z`
+# * `op_submul = z - x*y`
+# * `op_mulmuladd(x,y,z,w) = x*y + z*w`
+# * `op_mulmulsub = x*y - z*w`.
 @inline function _dd_product_sum(
     a::NTuple{N,DoubleF64},
     b::NTuple{N,DoubleF64},
