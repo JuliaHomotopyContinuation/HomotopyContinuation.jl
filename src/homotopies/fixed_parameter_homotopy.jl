@@ -33,6 +33,9 @@ ModelKit.taylor!(u, v::Val, H::FixedParameterHomotopy, tx, t) =
     taylor!(u, v, H.homotopy, tx, t, H.parameters)
 
 function ModelKit.taylor!(u, v::Val, H::FixedParameterHomotopy, tx, t, incremental::Bool)
+    # Only these have an incremental method that takes parameters
+    # for all other homotopies the `incremental` flag is ignored.
+    # TODO: this should generalize better at some point
     if H.homotopy isa Union{InterpretedHomotopy,MixedHomotopy}
         taylor!(u, v, H.homotopy, tx, t, H.parameters, incremental)
     else

@@ -28,6 +28,7 @@ ModelKit.evaluate!(u, H::MixedHomotopy, x::AbstractVector, t, p = nothing) =
     evaluate!(u, H.compiled, x, t, p)
 ModelKit.evaluate_and_jacobian!(u, U, H::MixedHomotopy, x, t, p = nothing) =
     evaluate_and_jacobian!(u, U, H.compiled, x, t, p)
+# MixedHomotopy compiles the evaluation and Jacobian but interprets Taylor series.
 ModelKit.taylor!(
     u,
     v::Val,

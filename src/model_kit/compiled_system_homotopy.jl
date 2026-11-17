@@ -398,10 +398,11 @@ end
 ## DOUBLE-DOUBLE  ##
 ####################
 
-# Double-double Jacobians and Taylor series are only needed when Float64 linear
-# algebra fails. Generating compiled code for them takes tens of seconds for large
-# systems, so they are evaluated by an interpreter instead. Residuals in double-double
-# are evaluated often and stay compiled.
+# Double-double Jacobians and Taylor series are only needed when Float64 linear algebra fails. # Generating compiled code for them takes tens of seconds for large systems, so they are evaluated by an interpreter instead. 
+# Residuals in double-double are evaluated often and stay compiled.
+# The lazily built interpreter is stored in a plain `Ref` without a lock, so threads that call this simultaneously for the first time may each build one. 
+# That is harmless but wasteful.
+# TODO : should be less wasteful
 function extended_interpreter(T::CompiledSystem)
     I = T.extended[]
     if I === nothing

@@ -1,10 +1,5 @@
-# Accumulate a short sum of double-double products before normalizing.
-# Fused complex double-double ops:
-# * `op_muladd(x,y,z) = x*y + z`
-# * `op_mulsub = x*y - z`
-# * `op_submul = z - x*y`
-# * `op_mulmuladd(x,y,z,w) = x*y + z*w`
-# * `op_mulmulsub = x*y - z*w`.
+# Accumulate a short sum of double-double products before normalizing. 
+# Complex perations otherwise normalize each real product and every subsequent sum.
 @inline function _dd_product_sum(
     a::NTuple{N,DoubleF64},
     b::NTuple{N,DoubleF64},
@@ -26,6 +21,13 @@
     DoubleF64(hi, lo)
 end
 
+# Fused complex double-double operations. Real and imaginary part are each computed
+# as one sum of products with `_dd_product_sum`:
+# * `op_muladd(x, y, z) = x*y + z`
+# * `op_mulsub(x, y, z) = x*y - z`
+# * `op_submul(x, y, z) = z - x*y`
+# * `op_mulmuladd(x, y, z, w) = x*y + z*w`
+# * `op_mulmulsub(x, y, z, w) = x*y - z*w`
 @inline function op_muladd(x::ComplexDF64, y::ComplexDF64, z::ComplexDF64)
     a, b = reim(x)
     c, d = reim(y)

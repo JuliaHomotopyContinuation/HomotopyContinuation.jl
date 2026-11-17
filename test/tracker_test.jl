@@ -439,8 +439,8 @@ end
             @test T.state.used_extended_prec
             HC.init!(T, 0.0)
             @test T.corrector.full_extended_precision[]
-            W = T.corrector.extended_workspace[]
             P = T.predictor.extended_workspace
+            W = T.corrector.extended_workspace[]
 
             # Supplying initial estimates bypasses Newton initialization, so
             # here the predictor discovers the need for escalation first.
@@ -458,7 +458,9 @@ end
             @test HC.init!(T, [0.5, 0.5])
             @test !T.corrector.full_extended_precision[]
             @test !T.predictor.used_extended_precision
+            # the workspaces are kept, the per-path state of the corrector is reset
             @test T.corrector.extended_workspace[] === W
+            @test !T.corrector.extended_attempted[]
             @test T.predictor.extended_workspace === P
 
             HC.parameters!(H.homotopy, [2.0^-60, 1], [2.0^-60, 0])

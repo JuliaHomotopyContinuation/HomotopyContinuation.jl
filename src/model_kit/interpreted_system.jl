@@ -68,8 +68,8 @@ end
 
 (F::InterpretedSystem)(x, p = nothing) = F.system(x, p)
 
-# Choose arithmetic from the inputs
-# mixed-precision refinement stores a Float64 residual
+# Choose the arithmetic from the inputs, not from the output buffer.
+# Mixed-precision refinement stores an accurate residual in a Float64 buffer.
 _interpreter_precision(::Type) = ComplexF64
 _interpreter_precision(::Type{DoubleF64}) = ComplexDF64
 _interpreter_precision(::Type{ComplexDF64}) = ComplexDF64
@@ -95,6 +95,7 @@ function _predictor_taylor_interpreter!(obj, ::Type{T}) where {T}
     I
 end
 
+# Systems without an incremental implementation ignore `incremental`.
 predictor_taylor!(u, v, F::AbstractSystem, x, p, incremental::Bool) = taylor!(u, v, F, x, p)
 function predictor_taylor!(
     u,
@@ -104,11 +105,13 @@ function predictor_taylor!(
     p,
     incremental::Bool,
 ) where {K}
+    # the incremental interpreter only supports the orders 1-3
     K > 3 && return taylor!(u, v, F, x, p)
     I = _predictor_taylor_interpreter!(F, _interpreter_precision(x, p))
     predictor_taylor!(u, v, I, x, nothing, p, incremental)
 end
 _jacobian_interpreter!(obj, ::Type{ComplexF64}) = obj.jac_ComplexF64
+# Built lazily from the Float64 Jacobian interpreter (same instructions, double-double slots).
 function _jacobian_interpreter!(obj, ::Type{ComplexDF64})
     I = obj.jac_ComplexDF64
     if isnothing(I)

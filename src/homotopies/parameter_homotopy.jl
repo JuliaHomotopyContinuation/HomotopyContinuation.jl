@@ -16,7 +16,7 @@ struct ParameterHomotopy{T<:AbstractSystem} <: AbstractHomotopy
     pt::Vector{ComplexF64}
     taylor_pt::TaylorVector{2,ComplexF64}
     t_cache_extended::Base.RefValue{ComplexDF64}
-    #double-double counterparts of the cache
+    # double-double counterparts of `t_cache`, `pt` and `taylor_pt`
     pt_extended::Vector{ComplexDF64}
     taylor_pt_extended::TaylorVector{2,ComplexDF64}
 end
@@ -135,6 +135,7 @@ tp!(H::ParameterHomotopy, t, ::Type{ComplexF64}) = tp!(H, ComplexF64(t))
 function tp!(H::ParameterHomotopy, t, ::Type{ComplexDF64})
     τ = ComplexDF64(t)
     τ == H.t_cache_extended[] && return H.taylor_pt_extended
+    # evaluate from the nearer endpoint (q near t = 0, p near t = 1)
     from_target = abs2(ComplexF64(t)) <= abs2(ComplexF64(t) - 1)
     @inbounds for i in eachindex(H.p)
         p, q = ComplexDF64(H.p[i]), ComplexDF64(H.q[i])

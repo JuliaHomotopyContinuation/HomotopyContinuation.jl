@@ -1,8 +1,10 @@
 # Incremental Taylor evaluation for the predictor.
 #
-# The predictor evaluates a homotopy's Taylor series at orders k = 1, 2, 3 at the same point,
-# The standard interpreter overwrites its tape each time, so order 3 recomputes orders 0-2.
-# Here every instruction gets its own tape slot, so that lower-order coefficients can be reused.
+# The predictor evaluates a homotopy's Taylor series at orders k = 1, 2, 3 at the same point, 
+# where the call of order k only changes coefficient k-1 of the input.
+# The standard interpreter overwrites its tape each time, so order 3 recomputes orders 0-2. 
+# Here every instruction gets its own tape slot (no slot is reused), so the lower-order coefficients computed by the previous call survive and only the coefficients L..K are computed by `execute_incremental_taylor!`.
+# Only orders K = 1, 2, 3 are supported.
 
 mutable struct IncrementalTaylorInterpreter{T}
     interpreter::Interpreter{Vector{TruncatedTaylorSeries{4,T}}}
@@ -12,6 +14,8 @@ end
 function IncrementalTaylorInterpreter(::Type{T}, I::Interpreter) where {T}
     s = I.sequence
     n = last(s.variables_range)
+    # slots[a] is the new tape position of the value that was at position a.
+    # Variables, parameters and constants keep their positions.
     slots = zeros(Int32, max(n, s.tape_space_needed))
     slots[1:n] .= 1:n
     instructions = Instruction[]
@@ -22,11 +26,14 @@ function IncrementalTaylorInterpreter(::Type{T}, I::Interpreter) where {T}
             j > arity(instr.op) || should_use_index_not_reference(instr.op, j) ? a :
             slots[a]
         end
+        # every instruction gets a fresh tape slot
         n += 1
         slots[instr.output] = n
         push!(instructions, Instruction(args, instr.op, n))
     end
+    # terminator expected by the instruction loop
     push!(instructions, Instruction((n, n, n, n), OP_STOP, n))
+    # the output assignments point to the new slots
     assignments = [(i, Int(slots[k])) for (i, k) in s.assignments]
     ua = [(i, Int(slots[k])) for (i, k) in s.u_assignments]
     ja = [(i, Int(slots[k])) for (i, k) in s.U_assignments]
@@ -55,8 +62,9 @@ function IncrementalTaylorInterpreter(::Type{T}, I::Interpreter) where {T}
 end
 
 # Reuse the existing Taylor operation generator. 
-# L is the target order, K the first coefficient to (re)compute. Coefficients below K are copied from the old tape, those above L are zeroed 
-# Reuse is only valid if (a) the previous call had order K-1 and (b) (variables, parameters, t) are unchanged in coefficients 0..K-2.
+# Only store the newly affected coefficients.
+# K is the target order and L the first coefficient to (re)compute.
+# The coefficients k < L are kept from the old tape, L ≤ k ≤ K are computed and k > K are set to zero.
 function partial_taylor_stores(ex, K, L)
     ex isa Expr || return ex
     if ex.head == :(=) && ex.args[1] == :(tape[i])
@@ -100,9 +108,9 @@ function predictor_taylor!(
     checkbounds(u, 1:s.output_dim)
     checkbounds(x, 1:length(s.variables_range))
     p === nothing || checkbounds(p, 1:length(s.parameters_range))
+    # Reuse the tape of the previous call only if (a) that call had order K-1 and (b) the variables, parameters and t are unchanged in the coefficients 0..K-2.
     # Only coefficients below the new order survive incremental execution.
-    # Compare values before overwriting the input slots, including mutations of
-    # an existing TaylorVector; object identity alone cannot establish validity.
+    # Compare values before overwriting the input slots, including mutations of an existing TaylorVector.
     reuse = incremental && K > 1 && cache.order == K - 1
     @inbounds for (i, k) in enumerate(s.variables_range)
         previous = tape[k]
@@ -120,12 +128,14 @@ function predictor_taylor!(
         tape[k] = t
         reuse &= all(j -> isequal(previous[j], tape[k][j]), 0:K-2)
     end
+    # Val(K-1): recompute the coefficients K-1 and K only; Val(0): recompute all.
     if reuse
         execute_incremental_taylor!(Val(K), Val(K - 1), x, p, tape, s)
     else
         execute_incremental_taylor!(Val(K), Val(0), x, p, tape, s)
     end
     cache.order = K
+    # output entries without an assignment have coefficient K equal to zero
     fill!(u, 0)
     @inbounds for (i, k) in s.u_assignments
         u[i] = tape[k][K]

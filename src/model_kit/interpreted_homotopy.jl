@@ -101,9 +101,11 @@ end
 
 # Acb
 function taylor!(u, v::Val{K}, H::InterpretedHomotopy, x, t, p, incremental::Bool) where {K}
+    # the incremental interpreter only supports the orders 1-3
     K > 3 && return taylor!(u, v, H, x, t, p)
     T = promote_type(_interpreter_precision(x, p), _interpreter_precision(t))
     I = _predictor_taylor_interpreter!(H, T)
+    # t enters as the series t + 1·ε
     predictor_taylor!(u, v, I, x, (t, 1), p, incremental)
 end
 taylor!(u, v::Val, H::InterpretedHomotopy, x, t, incremental::Bool) =

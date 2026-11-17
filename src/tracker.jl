@@ -234,9 +234,8 @@ Containing the result of tracking a path with a [`Tracker`](@ref).
 * `accuracy::Float64`: Estimate of the relative accuracy of the `solution`.
 * `accepted_steps::Int`: Number of steps that got accepted.
 * `rejected_steps::Int`: Number of steps that got rejected.
-* `extended_precision::Bool`: Indicate whether extended precision is necessary to achieve the accuracy of the `solution`. This is also set tor `true` when only the predictor used extended precision.
-* `extended_precision_used::Bool`: This is `true` if during the tracking at any point
-  extended precision was used.
+* `extended_precision::Bool`: Indicate whether extended precision is necessary to achieve the accuracy of the `solution`.
+* `extended_precision_used::Bool`: This is `true` if during the tracking at any point extended precision was used, in the predictor or in the Newton corrector.
 """
 struct TrackerResult
     return_code::Symbol
@@ -637,11 +636,16 @@ function update_predictor!(tracker::Tracker, x̂ = nothing, Δs = nothing, t_pre
         extended_precision = tracker.options.extended_precision,
         full_extended_precision = tracker.corrector.full_extended_precision[],
     )
+    # If the predictor needed double-double, so will the corrector. 
+    # switch both to full extended precision. 
+    # This lasts until `update_precision!` finds that Float64 suffices again, or until the next path is initialized.
     if tracker.options.extended_precision && predictor.used_extended_precision
         tracker.corrector.full_extended_precision[] = true
         state.extended_prec = true
     end
     state.used_extended_prec |= predictor.used_extended_precision
+    # Non-finite coefficients mean that even the extended solve failed. 
+    # Terminate the path, unless it has just reached its end.
     if !is_done(state.segment_stepper) && !(
         predictor.winding_number > 1 ? all(isfinite, predictor.xtemp) :
         all(isfinite, predictor.tx³.data)
@@ -680,7 +684,11 @@ function init!(
     @unpack x, x̄, norm, jacobian = state
 
     # intialize state
+    # the precision state of the previous path must not carry over to this one
     corrector.full_extended_precision[] = false
+    # the allocated workspace is kept, but it has not been used on this path yet
+    corrector.extended_attempted[] = false
+    # the option has the last word
     extended_precision &= options.extended_precision
     set_solution!(x, homotopy, x₁, t₁)
     init!(state.segment_stepper, t₁, t₀)
@@ -713,6 +721,7 @@ function init!(
             a = a,
             extended_precision = extended_precision,
         )
+        # retry the initial Newton iteration in extended precision, if allowed
         if !valid && !extended_precision && options.extended_precision
             extended_precision = true
             valid, ω, μ = init_newton!(
@@ -773,6 +782,7 @@ function init!(
     updated!(jacobian)
     init!(tracker.predictor)
     update_predictor!(tracker)
+    # update_predictor! may have terminated the path
     is_tracking(state.code) || return false
     state.τ = trust_region(predictor)
     # compute initial step size
@@ -915,6 +925,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         norm;
         ω = state.ω,
         μ = state.μ,
+        # never use extended precision if the user disabled it
         extended_precision = options.extended_precision && state.extended_prec,
         first_correction = state.accepted_steps == 0,
     )
@@ -946,6 +957,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         state.τ = trust_region(predictor)
 
         state.accepted_steps += 1
+        # a step counts as extended if the corrector or the predictor used it
         state.ext_accepted_steps += state.extended_prec || predictor.used_extended_precision
         state.last_steps_failed = 0
     else
@@ -955,6 +967,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         state.last_steps_failed += 1
     end
     state.norm_Δx₀ = result.norm_Δx₀
+    # update_predictor! terminated the path (ill-conditioned): skip the step size update
     is_tracking(state.code) || return !state.last_step_failed
     update_stepsize!(state, result, options, predictor; ad_for_error_estimate = false)
 
