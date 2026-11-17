@@ -3,6 +3,11 @@
 
 This is a data structure for the efficient repeated solution of a square or
 overdetermined linear system `Ax=b`.
+
+For square matrices the LU factorization and the solves do not operate on `A` directly
+but on separate real and imaginary parts of the matrix (`lu_re`, `lu_im`) and of the
+right-hand side. This is what makes them fast, see the section "Split LU" below.
+`lu.factors` is only filled on demand by [`synced_lu`](@ref).
 """
 struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF64}
     A::M # Matrix
@@ -19,7 +24,8 @@ struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF
     δx::Vector{ComplexF64}
     inf_norm_est_work::Vector{ComplexF64}
     inf_norm_est_rwork::Vector{Float64}
-    # real and imaginary parts of the LU factors and of a solve (square matrices)
+    # Real and imaginary parts of the LU factors and of a solve (square matrices),
+    # stored as separate Float64 arrays so that the LU code can vectorize, see "Split LU".
     lu_re::Matrix{Float64}
     lu_im::Matrix{Float64}
     x_re::Vector{Float64}
@@ -209,11 +215,25 @@ end
 ######################
 # Split LU (ComplexF64)
 ######################
-# The factorization and solves of square workspaces work on separate real and
-# imaginary parts, so that the inner loops vectorize over rows (ported from wndr's
-# SplitLU). Pivots are chosen as in `lu_pivot!`. `lu.factors` receives the factors
-# only when a routine reads them directly (condition estimates, inverses), see
-# `synced_lu`.
+# The factorization and the solves of square workspaces work on separate real and
+# imaginary parts. Pivots are chosen as in `lu_pivot!`.
+#
+# Why: Julia stores a `Matrix{ComplexF64}` interleaved in memory (re, im, re, im, ...).
+# The hot loops of an LU factorization are column updates `A[i,j] -= L[i,k] * U[k,j]` over the rows i. 
+# For interleaved complex numbers a SIMD unit has to shuffle the real and imaginary parts of each register to form the cross terms of a complex product, and such loops are rarely vectorized well. 
+# With the real and the imaginary part in two separate `Float64` arrays, each column is contiguous per part, and the complex update
+#     R -= lr·br − li·bi,    I -= lr·bi + li·br
+# becomes four fused multiply-adds on packed `Float64` data, without any shuffles.
+# The loops are annotated with `@simd ivdep` (no loop-carried dependency over i) so that LLVM does vectorize them. 
+# Complex divisions are avoided in the inner loops. Each pivot is inverted once and the multipliers are computed by multiplication.
+#
+# Cost: the split copy is made when factorizing (`split_lu!`, which replaces the copy into `lu.factors` made before) and for each solve (`split_lu_ldiv!`, O(n) per solve).
+# This is negligible compared to the O(n³) factorization and the O(n²) solve.
+# `benchmarks/lu_factorization.jl` times the factorization and the solve.
+#
+# Consequence: after `factorize!` the factors only live in `lu_re` and `lu_im`.
+# `lu.factors` is stale until `synced_lu` is called. All code that reads `lu` directly (condition estimates, inverses) has to go through `synced_lu`. 
+# This is only done for square matrices; non-square workspaces still use the QR factorization.
 
 # Matrices of at least this size (n ≥ 20) are factored with `split_lu_rank2!`, which eliminates two pivots per sweep over the trailing matrix, instead of with `split_lu_rank1!` (one pivot per sweep). This halves the memory traffic, but it only pays off for larger matrices. The value was chosen from benchmarks/lu_factorization.jl.
 const SPLIT_LU_RANK2_MIN = 20
