@@ -64,6 +64,9 @@ function NewtonCorrector(a::Float64, x::AbstractVector{ComplexF64}, m::Int)
     )
 end
 
+# One Newton correction Δx = H_x⁻¹ H computed in extended precision. 
+# NC.Δx = NaN first so that a failed solve can never be mistaken for a correction.
+# On success also sets `full_extended_precision[] = true`, so that the corrector stays in this mode until the tracker resets it
 function extended_newton_correction!(NC, H, x, t)
     # Never leave a correction from a failed lower-precision solve available.
     fill!(NC.Δx, NaN)
@@ -97,6 +100,7 @@ function full_precision_correction!(NC, H, x, t, J)
     end
     ok
 end
+
 
 function refine_newton_correction!(NC, H, x, t, J, norm; tol)
     if NC.full_extended_precision[]
@@ -173,7 +177,7 @@ function newton!(
         else
             evaluate_and_jacobian!(r, matrix(J), H, xᵢ, t)
             if extended_precision
-                copyto!(r̄, r)
+                copyto!(r̄, r) # r̄ keeps the Float64 residual so μ_low can be computed from the same Jacobian without a re-evaluation
                 x_extended .= xᵢ
                 evaluate!(r, H, x_extended, t)
             end
