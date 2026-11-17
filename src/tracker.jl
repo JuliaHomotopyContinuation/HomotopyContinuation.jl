@@ -803,19 +803,21 @@ function update_precision!(tracker::Tracker, μ_low)
 
     options.extended_precision || return false
 
-    if corrector.full_extended_precision[]
-        state.extended_prec = state.used_extended_prec = true
-        return true
-    end
-
     if state.extended_prec && !state.keep_extended_prec && !isnan(μ_low) && μ_low > μ
         # check if we can go low again
         if μ_low * ω < a^7 * _h(a)
             state.extended_prec = false
+            # also leave full extended precision (Jacobian and predictor)
+            corrector.full_extended_precision[] = false
             state.μ = μ_low
         end
     elseif μ * ω > a^5 * _h(a)
         use_extended_precision!(tracker)
+    end
+
+    # In full extended precision, μ_low is the size of the correction that a Float64 Newton step would have produced (see `newton!`). Unless it allowed us to use lower precision, we stay in extended precision.
+    if corrector.full_extended_precision[]
+        state.extended_prec = state.used_extended_prec = true
     end
 
     state.extended_prec

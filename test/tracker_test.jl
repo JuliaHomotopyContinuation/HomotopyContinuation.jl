@@ -468,6 +468,34 @@ end
         end
     end
 
+    @testset "Precision is lowered again when the path allows it" begin
+        # The Jacobian is singular in Float64 at the start (p = 2^-60) but
+        # well-conditioned at the end (p = 1), so full extended precision must be
+        # left again along the path.
+        @var x y p q
+        F = System(
+            [x + y - 1, x + y - 1 + p * ((1 + q) * y - 1)];
+            variables = [x, y],
+            parameters = [p, q],
+        )
+        for compile in (false, true, :mixed)
+            H = ParameterHomotopy(F, [2.0^-60, 1], [1.0, 0]; compile)
+            T = Tracker(H)
+            @test HC.init!(T, [0.5, 0.5])
+            @test T.corrector.full_extended_precision[]
+            went_low = false
+            while HC.is_tracking(T.state.code)
+                HC.step!(T)
+                went_low |= !T.corrector.full_extended_precision[]
+            end
+            @test T.state.code == TrackerCode.success
+            @test went_low
+            @test !T.corrector.full_extended_precision[]
+            @test T.state.used_extended_prec
+            @test T.state.x ≈ [0.0, 1.0] atol = 1e-12
+        end
+    end
+
     include("test_cases/steiner_higher_prec.jl")
     include("test_cases/four_bar.jl")
 end

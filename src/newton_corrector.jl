@@ -228,8 +228,13 @@ function newton!(
             )
         elseif ω * norm_Δxᵢ^2 < 2 * μ * sqrt(1 - 2 * h_a)
             if extended_precision && NC.full_extended_precision[]
-                μ_low = Inf
-                unchanged || full_precision_correction!(NC, H, xᵢ, t, J)
+                # Test whether we can downgrade to using Float64 precision.
+                # μ_low is the correction a Float64 step would give at this point. If its Jacobian is (numerically) singular μ_low is non-finite, and `update_precision!` keeps the extended precision. `J` is overwritten here, so the extended correction must be recomputed.
+                evaluate_and_jacobian!(r̄, matrix(J), H, xᵢ, t)
+                LA.ldiv!(Δxᵢ, updated!(J), r̄)
+                μ_low = norm(Δxᵢ)
+                isfinite(μ_low) || (μ_low = Inf)
+                full_precision_correction!(NC, H, xᵢ, t, J)
             else
                 if !unchanged
                     evaluate_and_jacobian!(r, matrix(J), H, xᵢ, t)
