@@ -215,7 +215,7 @@ end
 # only when a routine reads them directly (condition estimates, inverses), see
 # `synced_lu`.
 
-# From this size on, two pivots are eliminated per pass over the trailing matrix.
+# the constant was chosen from benchmarks/lu_factorization.jl
 const SPLIT_LU_RANK2_MIN = 20
 
 @inline function split_lu_pivot!(R, I, ipiv, k, n)
