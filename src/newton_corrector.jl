@@ -78,6 +78,7 @@ function extended_newton_correction!(NC, H, x, t)
     # Never leave a correction from a failed lower-precision solve available.
     fill!(NC.Δx, NaN)
     n = length(x)
+    # TODO: also support overdetermined systems
     size(H) == (n, n) && extended_jacobian_supported(H) || return false
     W = NC.extended_workspace[]
     if W === nothing

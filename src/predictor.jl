@@ -112,6 +112,7 @@ end
 # `max_order` is 1 if the winding number is > 1 (only a Hermite predictor is used, which needs just x¹) and 3 otherwise; see `update!`.
 function extended_predictor!(P::Predictor, H, x, t, max_order)
     n = length(x)
+    # TODO: also support overdetermined systems
     size(H) == (n, n) && extended_jacobian_supported(H) || return false
     W = P.extended_workspace
     if W === nothing

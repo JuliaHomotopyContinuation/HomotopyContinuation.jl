@@ -74,6 +74,9 @@ end
 ExtendedPredictorWorkspace(n) =
     ExtendedPredictorWorkspace(ExtendedLinearWorkspace(n), TaylorVector{4}(ComplexDF64, n))
 
+# TODO: Extended precision is only implemented for square systems. For overdetermined systems only the residual is evaluated in double-double 
+
+
 # Helper function that decides whether extended precision for the Jacobian is available for this homotopy.
 # By default, this returns false for user-defined AbstractHomotopys, since their evaluate_and_jacobian! need not accept ComplexDF64. 
 extended_jacobian_supported(::AbstractHomotopy) = false
