@@ -8,6 +8,8 @@ For square matrices the LU factorization and the solves do not operate on `A` di
 but on separate real and imaginary parts of the matrix (`lu_re`, `lu_im`) and of the
 right-hand side. This is what makes them fast, see the section "Split LU" below.
 `lu.factors` is only filled on demand by [`synced_lu`](@ref).
+The same is done for the QR factorization of overdetermined matrices (`qr_re`,
+`qr_im`, see "Split QR"), where `qr.factors` is only filled by [`synced_qr`](@ref).
 """
 struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF64}
     A::M # Matrix
@@ -30,8 +32,18 @@ struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF
     lu_im::Matrix{Float64}
     x_re::Vector{Float64}
     x_im::Vector{Float64}
-    # whether `lu.factors` holds the current split factors
+    # whether `lu.factors` holds the current split factors.
     lu_synced::Base.RefValue{Bool}
+    # The same for overdetermined matrices: real and imaginary parts of the QR factors
+    # (R and the Householder vectors), of τ and of the right-hand side. These are empty
+    # for square workspaces.
+    qr_re::Matrix{Float64}
+    qr_im::Matrix{Float64}
+    τ_re::Vector{Float64}
+    τ_im::Vector{Float64}
+    b_re::Vector{Float64}
+    b_im::Vector{Float64}
+    qr_synced::Base.RefValue{Bool}
 end
 
 MatrixWorkspace(m::Integer, n::Integer; kwargs...) =
@@ -61,6 +73,8 @@ function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure = true)
     inf_norm_est_work = Vector{ComplexF64}(undef, n)
     inf_norm_est_rwork = Vector{Float64}(undef, n)
     k = m == n ? n : 0
+    kq = m == n ? 0 : n # columns of the overdetermined (QR) storage
+    mq = m == n ? 0 : m # rows of the overdetermined (QR) storage
 
     MatrixWorkspace(
         A,
@@ -80,6 +94,13 @@ function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure = true)
         zeros(k, k),
         zeros(k),
         zeros(k),
+        Ref(true),
+        zeros(mq, kq),
+        zeros(mq, kq),
+        zeros(kq),
+        zeros(kq),
+        zeros(mq),
+        zeros(mq),
         Ref(true),
     )
 end
@@ -107,9 +128,7 @@ Indicate that the matrix `MW` got updated.
 function updated!(MW::MatrixWorkspace)
     MW.factorized[] = false
     MW.scaled[] = false
-    m, n = size(MW)
-    # square matrices are read from `A` by `split_lu!`
-    m == n || @inbounds copyto!(MW.qr.factors, MW.A)
+    # the factorizations (`split_lu!`, `split_qr!`) read from `A`
     MW
 end
 updated!(M::AbstractMatrix) = M
@@ -233,7 +252,7 @@ end
 #
 # Consequence: after `factorize!` the factors only live in `lu_re` and `lu_im`.
 # `lu.factors` is stale until `synced_lu` is called. All code that reads `lu` directly (condition estimates, inverses) has to go through `synced_lu`. 
-# This is only done for square matrices; non-square workspaces still use the QR factorization.
+# Overdetermined workspaces use the split QR below instead of the LU.
 
 # Matrices of at least this size (n ≥ 20) are factored with `split_lu_rank2!`, which eliminates two pivots per sweep over the trailing matrix, instead of with `split_lu_rank1!` (one pivot per sweep). This halves the memory traffic, but it only pays off for larger matrices. The value was chosen from benchmarks/lu_factorization.jl.
 const SPLIT_LU_RANK2_MIN = 20
@@ -389,6 +408,37 @@ end
     (br * ar + bi * ai) / d, (bi * ar - br * ai) / d
 end
 
+# Solve U y = x in place for the upper triangle U = (R + iI)[1:n, 1:n], processing two
+# columns per pass (the right-hand side is `xr + i xi`).
+function split_upper_solve!(xr, xi, R, I, n)
+    @inbounds begin
+        j = n
+        while j ≥ 1
+            yr, yi = split_cdiv(xr[j], xi[j], R[j, j], I[j, j])
+            xr[j], xi[j] = yr, yi
+            j == 1 && break
+            ur, ui = R[j-1, j], I[j-1, j]
+            zr, zi = split_cdiv(
+                muladd(-ur, yr, muladd(ui, yi, xr[j-1])),
+                muladd(-ur, yi, muladd(-ui, yr, xi[j-1])),
+                R[j-1, j-1],
+                I[j-1, j-1],
+            )
+            xr[j-1], xi[j-1] = zr, zi
+            @simd ivdep for i = 1:j-2
+                ur, ui = R[i, j], I[i, j]
+                vr, vi = R[i, j-1], I[i, j-1]
+                sr = muladd(-ur, yr, muladd(ui, yi, xr[i]))
+                si = muladd(-ur, yi, muladd(-ui, yr, xi[i]))
+                xr[i] = muladd(-vr, zr, muladd(vi, zi, sr))
+                xi[i] = muladd(-vr, zi, muladd(-vi, zr, si))
+            end
+            j -= 2
+        end
+    end
+    nothing
+end
+
 # Solve with the split factors. `b` is multiplied by `scaling` if given.
 function split_lu_ldiv!(x, WS::MatrixWorkspace, b, scaling = nothing)
     R, I, ipiv, xr, xi = WS.lu_re, WS.lu_im, WS.lu.ipiv, WS.x_re, WS.x_im
@@ -423,30 +473,7 @@ function split_lu_ldiv!(x, WS::MatrixWorkspace, b, scaling = nothing)
             end
             j += 2
         end
-        # upper triangular, columns j and j-1 per pass
-        j = n
-        while j ≥ 1
-            yr, yi = split_cdiv(xr[j], xi[j], R[j, j], I[j, j])
-            xr[j], xi[j] = yr, yi
-            j == 1 && break
-            ur, ui = R[j-1, j], I[j-1, j]
-            zr, zi = split_cdiv(
-                muladd(-ur, yr, muladd(ui, yi, xr[j-1])),
-                muladd(-ur, yi, muladd(-ui, yr, xi[j-1])),
-                R[j-1, j-1],
-                I[j-1, j-1],
-            )
-            xr[j-1], xi[j-1] = zr, zi
-            @simd ivdep for i = 1:j-2
-                ur, ui = R[i, j], I[i, j]
-                vr, vi = R[i, j-1], I[i, j-1]
-                sr = muladd(-ur, yr, muladd(ui, yi, xr[i]))
-                si = muladd(-ur, yi, muladd(-ui, yr, xi[i]))
-                xr[i] = muladd(-vr, zr, muladd(vi, zi, sr))
-                xi[i] = muladd(-vr, zi, muladd(-vi, zr, si))
-            end
-            j -= 2
-        end
+        split_upper_solve!(xr, xi, R, I, n)
         for i = 1:n
             x[i] = complex(xr[i], xi[i])
         end
@@ -455,70 +482,158 @@ function split_lu_ldiv!(x, WS::MatrixWorkspace, b, scaling = nothing)
 end
 
 
-####################
-# QR Factorization #
-####################
-# This is the generic base implementation with the small change that we introduce
-# a @fastmath for the division step since results in an approx 50% speedup
+######################
+# Split QR (ComplexF64)
+######################
+# Householder QR of the overdetermined workspaces (m > n) on separate real and imaginary parts, for the same reason as the split LU above. 
+# The algorithm and the storage convention are those of LAPACK's unblocked QR (`qrfactUnblocked!`, see lawn72):
+# R is stored in the upper triangle, below the diagonal are the Householder vectors
+# v = [1; x₂, …] and `τ` holds the scalars, such that H_k = I - τ_k v v'. 
+# The reflector is not Hermitian but makes the diagonal of R real.
+# The two loops of a reflector are the same as for the LU:
+# * the dot product  s = a_k + Σᵢ conj(xᵢ) aᵢ  is a reduction, and
+# * the update       aᵢ -= xᵢ · conj(τ) · s    is an axpy, with complex products written out in their real and imaginary parts.
+# Dividing the Householder vector by its first entry is done by multiplying with the reciprocal.
+#
+# As for the LU, `qr.factors` and `qr.τ` are only filled when needed, see `synced_qr`.
 
-# Elementary reflection similar to LAPACK. The reflector is not Hermitian but
-# ensures that tridiagonalization of Hermitian matrices become real. See lawn72
-@inline function reflector!(x::AbstractVector)
-    n = length(x)
+function split_qr!(WS::MatrixWorkspace)
+    A, R, I, τr, τi = WS.A, WS.qr_re, WS.qr_im, WS.τ_re, WS.τ_im
+    m, n = size(R)
     @inbounds begin
-        ξ1 = x[1]
-        normu = abs2(ξ1)
-        for i = 2:n
-            normu += abs2(x[i])
+        for j = 1:n, i = 1:m
+            R[i, j], I[i, j] = reim(A[i, j])
         end
-        if iszero(normu)
-            return zero(ξ1 / normu)
-        end
-        normu = sqrt(normu)
-        ν = copysign(normu, real(ξ1))
-        ξ1 += ν
-        x[1] = -ν
-        for i = 2:n
-            @fastmath x[i] = x[i] / ξ1
+        for k = 1:n
+            # Reflector for the column k
+            ξr, ξi = R[k, k], I[k, k]
+            normu = ξr^2 + ξi^2
+            @simd for i = k+1:m
+                normu += R[i, k]^2 + I[i, k]^2
+            end
+            if iszero(normu)
+                # nothing to eliminate, H_k = I
+                τr[k] = 0.0
+                τi[k] = 0.0
+                continue
+            end
+            ν = copysign(sqrt(normu), ξr)
+            ξr += ν
+            R[k, k] = -ν
+            I[k, k] = 0.0
+            # v = x / ξ with ξ = x₁ + ν: multiply with conj(ξ) / |ξ|²
+            d = ξr^2 + ξi^2
+            ir, ii = ξr / d, -ξi / d
+            @simd ivdep for i = k+1:m
+                r, s = R[i, k], I[i, k]
+                R[i, k] = r * ir - s * ii
+                I[i, k] = r * ii + s * ir
+            end
+            τr[k] = ξr / ν
+            τi[k] = ξi / ν
+            # Apply the reflector to the remaining columns, two columns per pass so that
+            # the Householder vector is only loaded once for both.
+            j = k + 1
+            while j < n
+                s1r, s1i = R[k, j], I[k, j]
+                s2r, s2i = R[k, j+1], I[k, j+1]
+                @simd for i = k+1:m
+                    xr, xi = R[i, k], I[i, k]
+                    s1r = muladd(xr, R[i, j], muladd(xi, I[i, j], s1r))
+                    s1i = muladd(xr, I[i, j], muladd(-xi, R[i, j], s1i))
+                    s2r = muladd(xr, R[i, j+1], muladd(xi, I[i, j+1], s2r))
+                    s2i = muladd(xr, I[i, j+1], muladd(-xi, R[i, j+1], s2i))
+                end
+                # conj(τ) · s
+                v1r = muladd(τr[k], s1r, τi[k] * s1i)
+                v1i = muladd(τr[k], s1i, -τi[k] * s1r)
+                v2r = muladd(τr[k], s2r, τi[k] * s2i)
+                v2i = muladd(τr[k], s2i, -τi[k] * s2r)
+                R[k, j] -= v1r
+                I[k, j] -= v1i
+                R[k, j+1] -= v2r
+                I[k, j+1] -= v2i
+                @simd ivdep for i = k+1:m
+                    xr, xi = R[i, k], I[i, k]
+                    R[i, j] = muladd(-xr, v1r, muladd(xi, v1i, R[i, j]))
+                    I[i, j] = muladd(-xr, v1i, muladd(-xi, v1r, I[i, j]))
+                    R[i, j+1] = muladd(-xr, v2r, muladd(xi, v2i, R[i, j+1]))
+                    I[i, j+1] = muladd(-xr, v2i, muladd(-xi, v2r, I[i, j+1]))
+                end
+                j += 2
+            end
+            if j == n # one column left
+                sr, si = R[k, j], I[k, j]
+                @simd for i = k+1:m
+                    xr, xi = R[i, k], I[i, k]
+                    sr = muladd(xr, R[i, j], muladd(xi, I[i, j], sr))
+                    si = muladd(xr, I[i, j], muladd(-xi, R[i, j], si))
+                end
+                vr = muladd(τr[k], sr, τi[k] * si)
+                vi = muladd(τr[k], si, -τi[k] * sr)
+                R[k, j] -= vr
+                I[k, j] -= vi
+                @simd ivdep for i = k+1:m
+                    xr, xi = R[i, k], I[i, k]
+                    R[i, j] = muladd(-xr, vr, muladd(xi, vi, R[i, j]))
+                    I[i, j] = muladd(-xr, vi, muladd(-xi, vr, I[i, j]))
+                end
+            end
         end
     end
-    ξ1 / ν
+    WS.qr_synced[] = false
+    WS
 end
 
-# apply reflector from left
-@inline function reflectorApply!(x::AbstractVector, τ::Number, A::StridedMatrix)
-    m, n = size(A)
-    @inbounds begin
-        for j = 1:n
-            # dot
-            vAj = A[1, j]
-            for i = 2:m
-                vAj += x[i]' * A[i, j]
-            end
-
-            vAj = conj(τ) * vAj
-
-            # ger
-            A[1, j] -= vAj
-            for i = 2:m
-                A[i, j] -= x[i] * vAj
-            end
+# The QR factorization with its factors in `qr.factors` and `qr.τ`.
+function synced_qr(WS::MatrixWorkspace)
+    WS.factorized[] || factorize!(WS)
+    if !WS.qr_synced[]
+        F, R, I = WS.qr.factors, WS.qr_re, WS.qr_im
+        m, n = size(R)
+        @inbounds for j = 1:n, i = 1:m
+            F[i, j] = complex(R[i, j], I[i, j])
         end
+        @inbounds for k = 1:n
+            WS.qr.τ[k] = complex(WS.τ_re[k], WS.τ_im[k])
+        end
+        WS.qr_synced[] = true
     end
-    return A
+    WS.qr
 end
 
-function qr!(qr::LA.QR{T}) where {T}
-    A = qr.factors
-    τ = qr.τ
-    m, n = size(A)
-    for k = 1:min(m - 1 + !(T <: Real), n)
-        x = view(A, k:m, k)
-        τk = reflector!(x)
-        τ[k] = τk
-        reflectorApply!(x, τk, view(A, k:m, k+1:n))
+# Least squares solve with the split QR factors: x = R⁻¹ (Q' b)[1:n]. `b` is not modified.
+function split_qr_ldiv!(x, WS::MatrixWorkspace, b)
+    R, I, τr, τi, br, bi = WS.qr_re, WS.qr_im, WS.τ_re, WS.τ_im, WS.b_re, WS.b_im
+    m, n = size(R)
+    @inbounds begin
+        for i = 1:m
+            br[i], bi[i] = reim(b[i])
+        end
+        # b ← Q' b, one reflector at a time
+        for k = 1:n
+            sr, si = br[k], bi[k]
+            @simd for i = k+1:m
+                xr, xi = R[i, k], I[i, k]
+                sr = muladd(xr, br[i], muladd(xi, bi[i], sr))
+                si = muladd(xr, bi[i], muladd(-xi, br[i], si))
+            end
+            vr = muladd(τr[k], sr, τi[k] * si)
+            vi = muladd(τr[k], si, -τi[k] * sr)
+            br[k] -= vr
+            bi[k] -= vi
+            @simd ivdep for i = k+1:m
+                xr, xi = R[i, k], I[i, k]
+                br[i] = muladd(-xr, vr, muladd(xi, vi, br[i]))
+                bi[i] = muladd(-xr, vi, muladd(-xi, vr, bi[i]))
+            end
+        end
+        split_upper_solve!(br, bi, R, I, n)
+        for i = 1:n
+            x[i] = complex(br[i], bi[i])
+        end
     end
-    qr
+    x
 end
 
 
@@ -527,7 +642,7 @@ function factorize!(WS::MatrixWorkspace)
     if m == n
         split_lu!(WS)
     else
-        qr!(WS.qr)
+        split_qr!(WS)
     end
     WS.factorized[] = true
     WS
@@ -644,38 +759,6 @@ function lu_ldiv_adj!(x, LU::LA.LU, b::AbstractVector; check::Bool = false)
 end
 
 
-# QR
-# adaption of base implementation
-function lmul_Q_adj!(A::LA.QR, b::AbstractVector)
-    mA, nA = size(A.factors)
-    mB = length(b)
-    Afactors = A.factors
-    @inbounds begin
-        for k = 1:min(mA, nA)
-            vBj = b[k]
-            for i = k+1:mB
-                vBj += conj(Afactors[i, k]) * b[i]
-            end
-            vBj = conj(A.τ[k]) * vBj
-            b[k] -= vBj
-            for i = k+1:mB
-                b[i] -= Afactors[i, k] * vBj
-            end
-        end
-    end
-    b
-end
-function qr_ldiv!(x, QR::LA.QR, b::AbstractVector)
-    # overwrites b
-    # assumes QR is a tall matrix
-    lmul_Q_adj!(QR, b)
-    @inbounds for i = 1:length(x)
-        x[i] = b[i]
-    end
-    ldiv_upper!(QR.factors, x)
-    return x
-end
-
 function LA.ldiv!(x::AbstractVector, WS::MatrixWorkspace, b::AbstractVector)
     m, n = size(WS)
     if (m, n) == (1, 1)
@@ -686,8 +769,7 @@ function LA.ldiv!(x::AbstractVector, WS::MatrixWorkspace, b::AbstractVector)
     if m == n
         split_lu_ldiv!(x, WS, b, WS.scaled[] ? WS.row_scaling : nothing)
     else
-        WS.r .= b
-        qr_ldiv!(x, WS.qr, WS.r)
+        split_qr_ldiv!(x, WS, b)
     end
     x
 end
@@ -1050,7 +1132,7 @@ function LA.cond(
         WS.factorized[] || factorize!(WS)
         rmax, rmin = -Inf, Inf
         for i = 1:n
-            rᵢ = fast_abs(WS.qr.factors[i, i]) * d_r[i]
+            rᵢ = fast_abs(complex(WS.qr_re[i, i], WS.qr_im[i, i])) * d_r[i]
             rmax = max(rmax, rᵢ)
             rmin = min(rmin, rᵢ)
         end
@@ -1080,7 +1162,7 @@ function egcond(
         WS.factorized[] || factorize!(WS)
         rmax, rmin = -Inf, Inf
         for i = 1:n
-            rᵢ = abs(WS.qr.factors[i, i]) * d_r[i]
+            rᵢ = abs(complex(WS.qr_re[i, i], WS.qr_im[i, i])) * d_r[i]
             rmax = max(rmax, rᵢ)
             rmin = min(rmin, rᵢ)
         end

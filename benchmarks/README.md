@@ -15,6 +15,7 @@ The following scripts measure backend kernels without changing solver options:
 ```sh
 julia --project=. benchmarks/linear_algebra_kernels.jl
 julia --project=. benchmarks/lu_factorization.jl
+julia --project=. benchmarks/qr_factorization.jl
 julia --project=. benchmarks/double_double_kernels.jl
 julia --project=. benchmarks/modelkit_extended.jl
 julia --project=. benchmarks/modelkit_extended.jl --unfused
@@ -22,10 +23,14 @@ julia --project=. benchmarks/modelkit_extended.jl --unfused
 
 - `linear_algebra_kernels.jl` compares the paired-column triangular solves
   `ldiv_upper!` and `ldiv_unit_lower!` with a scalar-column baseline. They are
-  used by the condition estimates and the QR solves of overdetermined systems.
+  used by the condition estimates.
 - `lu_factorization.jl` times the LU factorization and solve of square
   `MatrixWorkspace`s, which hold the Jacobians during path tracking and store the
   real and imaginary parts of their factors separately.
+- `qr_factorization.jl` times the QR factorization and the least-squares solve of
+  overdetermined `MatrixWorkspace`s, which hold the Jacobians of overdetermined
+  systems (for example in the monodromy loops of the numerical irreducible
+  decomposition). The real and imaginary parts of their factors are stored separately.
 - `double_double_kernels.jl` compares ModelKit's fused double-double operations
 with ordinary complex double-double arithmetic.
 - `modelkit_extended.jl` measures double-double evaluation, Jacobians, and
