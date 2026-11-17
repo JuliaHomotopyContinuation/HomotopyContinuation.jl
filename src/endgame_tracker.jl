@@ -697,7 +697,11 @@ function tracking_stopped!(endgame_tracker::EndgameTracker)
 
     state.accuracy = tracker.state.accuracy
     if is_success(state.code) && state.accuracy > 1e-14
-        refine_current_solution!(tracker; min_tol = 1e-14, nsteps = options.refine_steps)
+        state.accuracy = refine_current_solution!(
+            tracker;
+            min_tol = 1e-14,
+            nsteps = options.refine_steps,
+        )
     end
     state.solution .= tracker.state.x
     state.winding_number = nothing
