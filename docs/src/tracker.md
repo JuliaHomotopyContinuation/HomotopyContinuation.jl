@@ -67,3 +67,13 @@ The Jacobian and the Taylor coefficients can only be computed in double-double f
 mixed), including parameter homotopies of such systems. For other [`AbstractHomotopy`](@ref)s, only the residual is evaluated in double-double.
 
 Whether extended precision was used on a path can be read off the [`TrackerResult`](@ref), see the fields `extended_precision` and `extended_precision_used`.
+
+### Paths that get stuck in extended precision
+
+Close to a (numerically) singular point a path can get stuck: the steps are accepted, but they are so small, for example `1e-13`, that the path hardly advances, and neither extended precision nor smaller steps help. Such a path would only end after `max_steps` steps. 
+To avoid this, the tracker terminates a path if, during `extended_precision_stall_steps` (default `100`) consecutive accepted steps in extended precision, the remaining distance to the target is reduced by less
+than the fraction `extended_precision_stall_progress` (default `1e-8`). 
+The tracking code is then `TrackerCode.terminated_step_size_too_small`. 
+The distance is measured relative to the remaining distance, so
+that paths approaching a singular endpoint geometrically are not affected. The check is disabled with `extended_precision_stall_steps = 0`.
+
