@@ -127,9 +127,8 @@ function TrackerOptions(;
 )
     extended_precision_stall_steps ≥ 0 ||
         throw(ArgumentError("`extended_precision_stall_steps` has to be non-negative."))
-    0 ≤ extended_precision_stall_progress < 1 || throw(
-        ArgumentError("`extended_precision_stall_progress` has to be in [0, 1)."),
-    )
+    0 ≤ extended_precision_stall_progress < 1 ||
+        throw(ArgumentError("`extended_precision_stall_progress` has to be in [0, 1)."))
 
     if parameters isa Symbol
         if parameters == :default
@@ -353,7 +352,7 @@ mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
     last_steps_failed::Int
     ext_accepted_steps::Int
     ext_rejected_steps::Int
-    stall_steps::Int 
+    stall_steps::Int
     stall_dist::Float64
 end
 
