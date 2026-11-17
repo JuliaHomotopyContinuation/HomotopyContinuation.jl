@@ -767,7 +767,11 @@ function LA.ldiv!(x::AbstractVector, WS::MatrixWorkspace, b::AbstractVector)
     end
     WS.factorized[] || factorize!(WS)
     if m == n
-        split_lu_ldiv!(x, WS, b, WS.scaled[] ? WS.row_scaling : nothing)
+        if WS.scaled[]
+            split_lu_ldiv!(x, WS, b, WS.row_scaling)
+        else
+            split_lu_ldiv!(x, WS, b, nothing)
+        end
     else
         split_qr_ldiv!(x, WS, b)
     end

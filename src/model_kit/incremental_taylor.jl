@@ -93,6 +93,15 @@ end
     partial_taylor_stores(execute_taylor_instructions!_impl(K), K, L)
 end
 
+# Whether the coefficients 0..K-2 of two series agree. `isequal`, so NaN equals NaN.
+# This is a function instead of an `all(j -> ..., 0:K-2)` closure on purpose: the closure captures variables that are mutated, which boxes them and allocates on each call.
+@inline function same_lower_coefficients(a, b, ::Val{K}) where {K}
+    for j = 0:K-2
+        isequal(a[j], b[j]) || return false
+    end
+    true
+end
+
 function predictor_taylor!(
     u,
     ::Val{K},
@@ -115,18 +124,18 @@ function predictor_taylor!(
     @inbounds for (i, k) in enumerate(s.variables_range)
         previous = tape[k]
         tape[k] = x[i]
-        reuse &= all(j -> isequal(previous[j], tape[k][j]), 0:K-2)
+        reuse &= same_lower_coefficients(previous, tape[k], Val(K))
     end
     @inbounds for (i, k) in enumerate(s.parameters_range)
         previous = tape[k]
         tape[k] = p[i]
-        reuse &= all(j -> isequal(previous[j], tape[k][j]), 0:K-2)
+        reuse &= same_lower_coefficients(previous, tape[k], Val(K))
     end
     if s.continuation_parameter_index !== nothing
         k = s.continuation_parameter_index
         previous = tape[k]
         tape[k] = t
-        reuse &= all(j -> isequal(previous[j], tape[k][j]), 0:K-2)
+        reuse &= same_lower_coefficients(previous, tape[k], Val(K))
     end
     # Val(K-1): recompute the coefficients K-1 and K only; Val(0): recompute all.
     if reuse
