@@ -49,3 +49,7 @@ is_invalid_startvalue(::TrackerCode.codes)
 is_terminated(::TrackerCode.codes)
 
 ```
+
+## Extended precision
+
+How it works: Newton method first uses a double-double residual with Float64 solves. If iterative refinement fails (not converged, diverged or non-finite), it does a full double-double Jacobian and LU. Once that happens, the rest of the path stays in full extended precision until `update_precision!` decides it can go back. `[init!(tracker::Tracker, ::TrackerResult, ::Number, ::Number)](@ref)` resets the extended precision flag per path.

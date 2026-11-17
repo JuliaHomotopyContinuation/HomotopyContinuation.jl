@@ -79,9 +79,15 @@ The set of options for a [`Tracker`](@ref).
 * `max_initial_step_size = Inf`: The maximal size of the first step
 * `min_step_size = 1e-48`: The minimal step size. If a smaller step size would
   be necessary, then the tracking gets terminated.
-* `extended_precision = true`: Whether to allow for the use of extended precision,
-  if necessary, in some computations. This can greatly improve the ability to track
-  numerically difficult paths. The path coordinates and returned solutions remain `ComplexF64`.
+* `extended_precision = true`: Allow the tracker to switch to double-double
+  (≈32 digits) arithmetic where Float64 is not accurate enough: residuals in the
+  Newton corrector, and, if the Float64 Jacobian is too ill-conditioned to be
+  solved accurately, the Jacobian, its LU factorization and the Taylor
+  coefficients of the predictor. Coordinates, `t` and returned solutions always
+  remain `ComplexF64`. If `false`, only Float64 arithmetic is used.
+  Extended precision in the Jacobian is only available for systems and
+  homotopies built from `System`/`Homotopy` (compiled, interpreted or mixed);
+  custom `AbstractHomotopy`s fall back to Float64.
 * `terminate_cond = 1e13`: If the relative component-wise condition number
   `cond(H_x, ẋ)` is larger than `terminate_cond` then the path is terminated as too
   ill-conditioned.
@@ -156,7 +162,8 @@ The possible states a `CoreTracker` can have are of type `TrackerCode.codes` and
 * `TrackerCode.tracking`: The tracking is still in progress.
 * `TrackerCode.terminated_accuracy_limit`: Tracking terminaed since the accuracy was insufficient.
 * `TrackerCode.terminated_invalid_startvalue`: Tracking terminated since the provided start value was invalid.
-* `TrackerCode.terminated_ill_conditioned`: Tracking terminated since the path was too ill-conditioned.
+* `TrackerCode.terminated_ill_conditioned`: Tracking terminated since the path was too ill-conditioned. This includes the case where the predictor could not
+  compute finite Taylor coefficients, even in extended precision.
 * `TrackerCode.terminated_max_steps`: Tracking terminated since maximal number of steps is reached.
 * `TrackerCode.terminated_step_size_too_small`: Trackint terminated since the step size was too small.
 * `TrackerCode.terminated_unknown`: An unintended error occured. Please consider reporting an issue.
@@ -227,8 +234,7 @@ Containing the result of tracking a path with a [`Tracker`](@ref).
 * `accuracy::Float64`: Estimate of the relative accuracy of the `solution`.
 * `accepted_steps::Int`: Number of steps that got accepted.
 * `rejected_steps::Int`: Number of steps that got rejected.
-* `extended_precision::Bool`: Indicate whether extended precision is necessary to achieve
-  the accuracy of the `solution`.
+* `extended_precision::Bool`: Indicate whether extended precision is necessary to achieve the accuracy of the `solution`. This is also set tor `true` when only the predictor used extended precision.
 * `extended_precision_used::Bool`: This is `true` if during the tracking at any point
   extended precision was used.
 """
