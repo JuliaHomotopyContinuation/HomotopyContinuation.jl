@@ -88,3 +88,7 @@ extended_jacobian_supported(H::FixedParameterHomotopy) =
     extended_jacobian_supported(H.homotopy)
 extended_jacobian_supported(H::AffineChartHomotopy) =
     extended_jacobian_supported(H.homotopy)
+
+# Check if extended precision is implemented for `H` with `n` variables.
+# If this is false, the tracker behaves as without extended precision for the Jacobian and the linear algebra and only the residual is evaluated in double-double.
+extended_supported(H, n::Integer) = size(H) == (n, n) && extended_jacobian_supported(H)

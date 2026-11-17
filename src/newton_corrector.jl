@@ -79,7 +79,7 @@ function extended_newton_correction!(NC, H, x, t)
     fill!(NC.Δx, NaN)
     n = length(x)
     # TODO: also support overdetermined systems
-    size(H) == (n, n) && extended_jacobian_supported(H) || return false
+    extended_supported(H, n) || return false
     W = NC.extended_workspace[]
     if W === nothing
         W = ExtendedLinearWorkspace(n)
@@ -120,6 +120,7 @@ function refine_newton_correction!(NC, H, x, t, J, norm; tol)
         return nothing
     end
     result = iterative_refinement!(NC.Δx, J, NC.r, norm; tol, max_iters = 3)
+    extended_supported(H, length(x)) || return nothing
     if (result.diverged || !isfinite(result.accuracy) || result.accuracy > tol) &&
        (!all(iszero, NC.r) || !all(isfinite, NC.Δx))
         full_precision_correction!(NC, H, x, t, J)
@@ -356,7 +357,7 @@ function init_newton!(
     v = norm(Δx) + eps()
     # The Float64 solve failed outright (e.g. rounded Jacobian is singular):
     # escalate through refine_newton_correction! instead of giving up.
-    if extended_precision && !isfinite(v)
+    if extended_precision && !isfinite(v) && extended_supported(H, length(x₀))
         refine_newton_correction!(NC, H, x₀, t, J, norm; tol = 1e-8)
         v = norm(Δx) + eps()
     end
@@ -377,7 +378,7 @@ function init_newton!(
             LA.ldiv!(Δx, updated!(J), r, norm)
         end
 
-        if extended_precision && !all(isfinite, Δx)
+        if extended_precision && !all(isfinite, Δx) && extended_supported(H, length(x₀))
             refine_newton_correction!(NC, H, x̄, t, J, norm; tol = 1e-8)
         end
 
@@ -394,7 +395,7 @@ function init_newton!(
             end
             LA.ldiv!(Δx, J, r, norm)
         end
-        if extended_precision && !all(isfinite, Δx)
+        if extended_precision && !all(isfinite, Δx) && extended_supported(H, length(x₀))
             refine_newton_correction!(NC, H, x₁, t, J, norm; tol = 1e-8)
         end
         x₂ .= x₁ .- Δx

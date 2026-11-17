@@ -113,7 +113,7 @@ end
 function extended_predictor!(P::Predictor, H, x, t, max_order)
     n = length(x)
     # TODO: also support overdetermined systems
-    size(H) == (n, n) && extended_jacobian_supported(H) || return false
+    extended_supported(H, n) || return false
     W = P.extended_workspace
     if W === nothing
         W = ExtendedPredictorWorkspace(n)
