@@ -432,7 +432,9 @@ end
             high = H.extended_jacobians[]
             @test HC.step!(T)
             @test H.extended_jacobians[] > high
-            @test H.jacobians[] - H.extended_jacobians[] == low
+            # one Float64 Jacobian per step
+            # testing probe if Float64 suffices
+            @test H.jacobians[] - H.extended_jacobians[] == low + 1
             @test T.corrector.full_extended_precision[]
             @test T.state.used_extended_prec
             HC.init!(T, 0.0)
@@ -449,7 +451,7 @@ end
             @test T2.corrector.extended_workspace[] === nothing
             low = H.jacobians[] - H.extended_jacobians[]
             @test HC.step!(T2)
-            @test H.jacobians[] - H.extended_jacobians[] == low
+            @test H.jacobians[] - H.extended_jacobians[] == low + 1
             @test T2.corrector.extended_workspace[] !== nothing
 
             HC.parameters!(H.homotopy, [1, 1], [1, 0])
