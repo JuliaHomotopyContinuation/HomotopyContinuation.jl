@@ -54,7 +54,8 @@
     end
 
     @testset "split QR (overdetermined)" begin
-        for (m, n) in [(2, 1), (3, 1), (3, 2), (5, 4), (6, 5), (12, 7), (21, 20), (40, 17), (41, 40)]
+        for (m, n) in
+            [(2, 1), (3, 1), (3, 2), (5, 4), (6, 5), (12, 7), (21, 20), (40, 17), (41, 40)]
             A = randn(ComplexF64, m, n)
             b = randn(ComplexF64, m)
             x = zeros(ComplexF64, n)
