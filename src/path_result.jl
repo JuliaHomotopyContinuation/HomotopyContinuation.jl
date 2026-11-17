@@ -127,7 +127,22 @@ solution(r::PathResult) = r.solution
     accuracy(r::PathResult)
 
 Get the accuracy of the solution. This is an estimate of the (relative) distance to the
-true solution.
+true solution, measured in the weighted infinity norm used by the tracker.
+
+The estimate depends on how the path ended:
+
+* **Regular endpoints.** The accuracy is the size of the last Newton update, ``‖Δx‖``,
+  from the final Newton correction. For a nonsingular solution this is an estimate
+  of the forward error. 
+* **Singular endpoints (endgame).** The accuracy is an extrapolation error estimate. The
+  endpoint is predicted twice from successive samples via Hermite interpolation and the difference of the two predictions is scaled as in [^MSW92]:
+  ``‖x_new - x_old‖ / |p⁴ - 1|``, where ``p`` is the ratio of the last two sample
+  parameters. If ``‖x_new‖ > 1e-8`` this is divided by ``‖x_new‖`` to make it relative.
+  This estimates the error of the extrapolation, not a Newton residual.
+
+[^MSW92]: Morgan, A. P., Sommese, A. J., & Wampler, C. W. (1992). A power series method
+    for computing singular solutions to nonlinear analytic systems. *Numerische Mathematik*,
+    63(1), 391–409.
 """
 accuracy(r::PathResult) = r.accuracy
 
