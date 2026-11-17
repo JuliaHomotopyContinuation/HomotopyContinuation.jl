@@ -40,7 +40,11 @@ struct NewtonCorrector
     r::Vector{ComplexF64}
     r̄::Vector{ComplexF64}
     x_extended::Vector{ComplexDF64}
+    # allocated on the first extended solve and kept for later paths
     extended_workspace::Base.RefValue{Union{Nothing,ExtendedLinearWorkspace}}
+    # whether an extended solve was attempted on the current path. Reset by `init!`.
+    # Unlike the workspace this is per path, so that a reused tracker behaves like a  fresh one on paths that do not need extended precision.
+    extended_attempted::Base.RefValue{Bool}
     # Shared with the predictor through Tracker; reset when a new path starts.
     full_extended_precision::Base.RefValue{Bool}
 end
@@ -61,12 +65,15 @@ function NewtonCorrector(a::Float64, x::AbstractVector{ComplexF64}, m::Int)
         x_extended,
         Ref{Union{Nothing,ExtendedLinearWorkspace}}(nothing),
         Ref(false),
+        Ref(false),
     )
 end
 
-# One Newton correction Δx = H_x⁻¹ H computed in extended precision. 
-# NC.Δx = NaN first so that a failed solve can never be mistaken for a correction.
-# On success also sets `full_extended_precision[] = true`, so that the corrector stays in this mode until the tracker resets it
+# One Newton correction Δx = H_x⁻¹ H computed entirely in double-double precision.
+# NC.Δx is set to NaN first so that a failed solve can never be mistaken for a correction. Returns false if `H` is not square or has no double-double Jacobian.
+# On success also sets `full_extended_precision[] = true`, so that the corrector stays in this mode until `update_precision!` finds that Float64 suffices again or the next path is initialized.
+# The workspace is allocated on the first call and kept for all later paths of this corrector, so extended precision allocates at most once. 
+# `extended_attempted` records that this path has used it. `init!` resets that flag, not the workspace.
 function extended_newton_correction!(NC, H, x, t)
     # Never leave a correction from a failed lower-precision solve available.
     fill!(NC.Δx, NaN)
@@ -77,6 +84,7 @@ function extended_newton_correction!(NC, H, x, t)
         W = ExtendedLinearWorkspace(n)
         NC.extended_workspace[] = W
     end
+    NC.extended_attempted[] = true
     NC.x_extended .= x
     evaluate_and_jacobian!(W.residual, W.A, H, NC.x_extended, t)
     extended_factorize!(W)
@@ -86,8 +94,10 @@ function extended_newton_correction!(NC, H, x, t)
     true
 end
 
+# `extended_newton_correction!` plus bookkeeping for the Float64 code. On success, the double-double Jacobian (rounded to Float64) and the residual are handed to `J` and `NC.r`, so that the Float64 routines used later in the same step have access the Jacobian that produced Δx. On failure Δx is NaN.
 function full_precision_correction!(NC, H, x, t, J)
     ok = extended_newton_correction!(NC, H, x, t)
+    # statistics: this counts as one factorization and one solve
     J.factorizations[] += 1
     J.ldivs[] += 1
     if ok
@@ -101,7 +111,8 @@ function full_precision_correction!(NC, H, x, t, J)
     ok
 end
 
-
+# Residual-only refinement of NC.Δx. If it does not reach `tol` (or diverges), or if Δx is non-finite while the residual is non-zero, escalate to `full_precision_correction!`. 
+# A zero residual with finite Δx counts as success.
 function refine_newton_correction!(NC, H, x, t, J, norm; tol)
     if NC.full_extended_precision[]
         full_precision_correction!(NC, H, x, t, J)
@@ -143,7 +154,9 @@ function extended_prec_refinement_step!(
             x_extended .= x̄
             evaluate!(r, H, x_extended, t)
             LA.ldiv!(Δx, J, r, norm)
-            NC.extended_workspace[] === nothing ||
+            # Refine only if an extended solve has been attempted on this path.
+            # Vefore that this is the plain Float64 solve.
+            NC.extended_attempted[] ||
                 refine_newton_correction!(NC, H, x̄, t, J, norm; tol = 1e-8)
         end
     end
@@ -340,6 +353,8 @@ function init_newton!(
         LA.ldiv!(Δx, updated!(J), r, norm)
     end
     v = norm(Δx) + eps()
+    # The Float64 solve failed outright (e.g. rounded Jacobian is singular):
+    # escalate through refine_newton_correction! instead of giving up.
     if extended_precision && !isfinite(v)
         refine_newton_correction!(NC, H, x₀, t, J, norm; tol = 1e-8)
         v = norm(Δx) + eps()

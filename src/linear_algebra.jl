@@ -215,7 +215,7 @@ end
 # only when a routine reads them directly (condition estimates, inverses), see
 # `synced_lu`.
 
-# the constant was chosen from benchmarks/lu_factorization.jl
+# Matrices of at least this size (n ≥ 20) are factored with `split_lu_rank2!`, which eliminates two pivots per sweep over the trailing matrix, instead of with `split_lu_rank1!` (one pivot per sweep). This halves the memory traffic, but it only pays off for larger matrices. The value was chosen from benchmarks/lu_factorization.jl.
 const SPLIT_LU_RANK2_MIN = 20
 
 @inline function split_lu_pivot!(R, I, ipiv, k, n)
@@ -264,7 +264,8 @@ const SPLIT_LU_RANK2_MIN = 20
     true
 end
 
-# Update of column j (rows k+1:n) by pivot column k
+# Update of column j (rows k+1:n) by pivot column k:
+# (R + iI)[i,j] -= (lr + i·li)(br + i·bi), with the real and imaginary part written out with muladd so that the loop vectorizes: R -= lr·br − li·bi,    I -= lr·bi + li·br
 @inline function split_lu_update!(R, I, j, k, n)
     @inbounds begin
         br, bi = R[k, j], I[k, j]
@@ -313,6 +314,7 @@ function split_lu_rank2!(R, I, ipiv, n)
                 end
             end
         else
+            # a zero pivot column is skipped: update column by column, leaving out the column without a pivot
             for j = k+2:n
                 ok₁ && split_lu_update!(R, I, j, k, n)
             end
@@ -545,6 +547,7 @@ end
         end
         j -= 2
     end
+    # leftover column if n is odd
     if j == 1
         @inbounds x[1] = (@fastmath A[1, 1] \ b[1])
     end
@@ -567,6 +570,7 @@ end
         end
         j += 2
     end
+    # leftover column if n is odd
     if j == n
         @inbounds x[n] = b[n]
     end
@@ -1135,6 +1139,8 @@ function iterative_refinement!(
 )
     J.ldivs[] += 1
     δ = mixed_precision_iterative_refinement!(x, workspace(J), b, norm)
+    # already accurate after the first pass.
+    # same return type as at the end
     δ < tol && return (accuracy = δ, diverged = false)
     for i = 2:max_iters
         J.ldivs[] += 1

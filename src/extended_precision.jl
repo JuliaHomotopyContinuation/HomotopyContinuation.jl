@@ -3,8 +3,8 @@
 
 # Dense double-double storage for one n×n solve A·c = r.
 # `A` and `residual` are filled by evaluate_and_jacobian!,
-# `factors`/`pivots` hold the LU factorization
-# the solution is stored in `correction` .
+# `factors`/`pivots` hold the LU factorization and
+# the solution is stored in `correction`.
 struct ExtendedLinearWorkspace
     A::Matrix{ComplexDF64}
     factors::Matrix{ComplexDF64}
@@ -28,11 +28,15 @@ end
 
 # Solve using the factors from `extended_factorize!`, writing to `correction`.
 # Returns `false` if the solution is non-finite or fails a termwise backward-error
-# test |A c − r|ᵢ ≤ 1e-25 · (|r|ᵢ + Σⱼ|Aᵢⱼ cⱼ|). The check is termwise.
+# test |A c − r|ᵢ ≤ 1e-25 · (|r|ᵢ + Σⱼ|Aᵢⱼ cⱼ|). The check is termwise and not
+# normwise, so that cancellation in the right-hand side cannot pass unnoticed.
+# 1e-25 is about 1e7·eps(DoubleF64): it accepts the rounding errors of a good solve but rejects a Jacobian that is singular even in double-double.
 # The output `false` means "no usable correction".
 function extended_ldiv!(W::ExtendedLinearWorkspace)
     n = length(W.correction)
     copyto!(W.correction, W.residual)
+    # apply the row interchanges of lu_rank2! in order (pivots[k] is the row that was
+    # swapped with row k in step k), then solve L·y = P·r (unit lower) and U·c = y
     @inbounds for k = 1:n
         p = W.pivots[k]
         W.correction[k], W.correction[p] = W.correction[p], W.correction[k]
@@ -61,6 +65,8 @@ function extended_ldiv!(W::ExtendedLinearWorkspace)
     true
 end
 
+# Storage for the extended predictor: the linear solve and the double-double
+# Taylor coefficients (orders 0-3) of the path.
 struct ExtendedPredictorWorkspace
     linear::ExtendedLinearWorkspace
     tx::TaylorVector{4,ComplexDF64}
