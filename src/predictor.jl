@@ -76,6 +76,8 @@ Base.@kwdef mutable struct Predictor
     trust_region::Float64 = Inf
     local_error::Float64 = Inf
     cond_H_ẋ::Float64 = Inf
+    extended_workspace::Union{Nothing,ExtendedPredictorWorkspace} = nothing
+    used_extended_precision::Bool = false
 
     tx⁰::TaylorVector{1,ComplexF64}
     tx¹::TaylorVector{2,ComplexF64}
@@ -103,6 +105,46 @@ Base.@kwdef mutable struct Predictor
 end
 
 
+# Compute the Taylor coefficients x¹..x^max_order of the path through (x, t) in double-double, with a single factorization of the Jacobian for all orders. Reusing one factorization is especially valuable when the Float64 Jacobian is rounded to a singular matrix.
+# Returns `false` if `H` is not square or has no double-double Jacobian
+# (`extended_jacobian_supported`), or if any solve fails the check in
+# `extended_ldiv!`. 
+# `max_order` is 1 if the winding number is > 1 (only a Hermite predictor is used, which needs just x¹) and 3 otherwise; see `update!`.
+function extended_predictor!(P::Predictor, H, x, t, max_order)
+    n = length(x)
+    # TODO: also support overdetermined systems
+    extended_supported(H, n) || return false
+    W = P.extended_workspace
+    if W === nothing
+        W = ExtendedPredictorWorkspace(n)
+        P.extended_workspace = W
+    end
+    # Coefficients of order ≥ 1 must be zero: each Taylor evaluation below relies on the coefficient it solves for still being 0 in the input series.
+    fill!(W.tx.data, 0)
+    base = first(vectors(W.tx))
+    base .= x
+    L = W.linear
+    # H_x at the current point (the residual output is unused but required)
+    evaluate_and_jacobian!(L.residual, L.A, H, base, t)
+    extended_factorize!(L)
+    for k = 1:max_order
+        # With coefficient k of x still zero, the order-k Taylor coefficient of H(x(t), t) is exactly the part that does not involve x^k, so x^k solves H_x · x^k = -that. 
+        # `k > 1` tells the evaluation that the coefficients of
+        # order < k are unchanged since the previous call, so they can be reused.
+        taylor!(L.residual, Val(k), H, W.tx, t, k > 1)
+        extended_ldiv!(L) || return false
+        for i = 1:n
+            # index k+1, since index 1 holds the order-0 coefficient
+            W.tx[i, k+1] = -L.correction[i]
+        end
+    end
+    # Reached only if every solve passed its check.
+    for k = 1:max_order, i = 1:n
+        P.tx³[i, k+1] = W.tx[i, k+1]
+    end
+    true
+end
+
 function Predictor(H::AbstractHomotopy)
     m, n = size(H)
     tx³ = TaylorVector{4}(ComplexF64, n)
@@ -122,6 +164,7 @@ function Predictor(H::AbstractHomotopy)
 end
 
 function init!(predictor::Predictor)
+    predictor.used_extended_precision = false
     predictor.cond_H_ẋ = 1.0
     predictor.winding_number = 1
 
@@ -149,11 +192,16 @@ end
         t,
         jacobian::Jacobian,
         norm::AbstractNorm,
-        x̂ = nothing,
+        x̂ = nothing;
+        extended_precision = true,
+        full_extended_precision = false
     )
 
-Upadte the predictor with the new solution `(x,t)` of `H(x,t) = 0`.
-This computes new local derivatives and chooses an appriopriate prediction method.
+Update the predictor with the new solution `(x,t)` of `H(x,t) = 0`. This computes new local derivatives and chooses an appriopriate prediction method.
+
+## Options
+* `extended_precision`: allow falling back to double-double if iterative refinement of ẋ does not reach 1e-10.
+* `full_extended_precision`: if `true`, skip the Float64 attempt and go directly to double-double (set by the tracker once an earlier step required it).
 """
 function update!(
     predictor::Predictor,
@@ -162,7 +210,9 @@ function update!(
     t,
     J::Jacobian,
     norm::AbstractNorm,
-    x̂ = nothing, # the predicted value
+    x̂ = nothing; # the predicted value
+    extended_precision::Bool = true,
+    full_extended_precision::Bool = false,
 )
     # The general strategy is as follows:
     #
@@ -174,6 +224,7 @@ function update!(
     # api.
 
     @unpack u, tx⁰, tx¹, tx², tx³, ty¹, xtemp, tx_norm = predictor
+    predictor.used_extended_precision = false
 
     x⁰, x¹, x², x³ = vectors(tx³)
     y⁰, y¹ = vectors(ty¹)
@@ -205,16 +256,55 @@ function update!(
         y⁰ .= x
     end
 
-    # Compute ẋ always using AD
-    taylor!(u, Val(1), H, x, t)
-    u .= .-u
-    LA.ldiv!(xtemp, J, u)
-    # Check error made in the linear algebra
-    δ = fixed_precision_iterative_refinement!(xtemp, workspace(J), u, norm)
-    predictor.cond_H_ẋ = cond_H_ẋ = δ / eps()
-    tol_δ₁ = 1e-10
+    # `m` is the winding number. For m > 1 only a Hermite predictor is used, which needs just x¹, so the extended predictor computes max_order = 1 instead of 3.
+    # With `full_extended_precision` the tracker has already found Float64 linear algebra insufficient on this path, so the Float64 attempt is skipped.
+    extended = extended_precision && full_extended_precision
+    δ = 0.0
+    if extended
+        # the Float64 condition estimate is not computed in this mode
+        predictor.cond_H_ẋ = NaN
+        if extended_predictor!(predictor, H, x, t, m > 1 ? 1 : 3)
+            predictor.used_extended_precision = true
+            # keep the solver statistics comparable: one factorization and one  solve per computed order
+            J.factorizations[] += 1
+            J.ldivs[] += m > 1 ? 1 : 3
+            xtemp .= x¹
+        else
+            # No usable coefficients. 
+            fill!(xtemp, NaN)
+            fill!(x², NaN)
+            fill!(x³, NaN)
+        end
+    else
+        # Compute ẋ always using AD
+        taylor!(u, Val(1), H, x, t, false)
+        u .= .-u
+        LA.ldiv!(xtemp, J, u)
+        # Check error made in the linear algebra
+        δ = fixed_precision_iterative_refinement!(xtemp, workspace(J), u, norm)
+        predictor.cond_H_ẋ = cond_H_ẋ = δ / eps()
+        tol_δ₁ = 1e-10
 
-    δ > tol_δ₁ && iterative_refinement!(xtemp, J, u, InfNorm(); tol = tol_δ₁, max_iters = 5)
+        # A rounded, singular Jacobian can give Inf/NaN without δ exceeding the tolerance, hence the extra finiteness test.
+        if δ > tol_δ₁ || !all(isfinite, xtemp)
+            refinement =
+                iterative_refinement!(xtemp, J, u, InfNorm(); tol = tol_δ₁, max_iters = 5)
+            if extended_precision && (
+                refinement.diverged ||
+                !isfinite(refinement.accuracy) ||
+                refinement.accuracy > tol_δ₁
+            )
+                # Float64 refinement did not reach tol_δ₁: redo this step in double-double. If that fails too, keep the Float64 result and continue with the Float64 path below.
+                extended = extended_predictor!(predictor, H, x, t, m > 1 ? 1 : 3)
+                if extended
+                    predictor.used_extended_precision = true
+                    J.factorizations[] += 1
+                    J.ldivs[] += m > 1 ? 1 : 3
+                    xtemp .= x¹
+                end
+            end
+        end
+    end
     tx_norm[2] = norm(xtemp)
 
     x¹ .= xtemp
@@ -235,21 +325,28 @@ function update!(
         return predictor
     end
 
-    taylor!(u, Val(2), H, tx¹, t, true)
-    u .= .-u
-    LA.ldiv!(xtemp, J, u)
-    tol_δ₂ = 1e-10
-    δ > tol_δ₂ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₂, max_iters = 4)
-    tx_norm[3] = norm(xtemp)
-    x² .= xtemp
+    if !extended
+        taylor!(u, Val(2), H, tx¹, t, true)
+        u .= .-u
+        LA.ldiv!(xtemp, J, u)
+        tol_δ₂ = 1e-10
+        δ > tol_δ₂ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₂, max_iters = 4)
+        tx_norm[3] = norm(xtemp)
+        x² .= xtemp
 
-    taylor!(u, Val(3), H, tx², t, true)
-    u .= .-u
-    LA.ldiv!(xtemp, J, u)
-    tol_δ₃ = 1e-4
-    δ > tol_δ₃ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₃, max_iters = 3)
-    tx_norm[4] = norm(xtemp)
-    x³ .= xtemp
+        taylor!(u, Val(3), H, tx², t, true)
+        u .= .-u
+        LA.ldiv!(xtemp, J, u)
+        tol_δ₃ = 1e-4
+        δ > tol_δ₃ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₃, max_iters = 3)
+        tx_norm[4] = norm(xtemp)
+        x³ .= xtemp
+    else
+        # x², x³ were computed by extended_predictor!
+        # only their norms are needed
+        tx_norm[3] = norm(x²)
+        tx_norm[4] = norm(x³)
+    end
 
     τ = Inf
     for (i, (x, x¹, x², x³)) in enumerate(tx³)
@@ -294,10 +391,12 @@ function predict!(x̂, pred::Predictor, method::PredictionMethod.methods, H, x, 
         λ³ = λ^3
         tol = 1e-12
         for (i, (x, x¹, x², x³)) in enumerate(pred.tx³)
-            c, c¹, c², c³ = fast_abs.((x, x¹, x², x³))
             # check if only taylor series is used
-            τ = tol * √(c^2 + (c¹ * λ)^2 + (c² * λ²)^2 + (c³ * λ³)^2)
-            if c³ * λ³ ≤ τ || c² * λ² ≤ τ
+            # c², c³ and τ² are squared to avoid sqrt
+            c² = abs2(x² * λ²)
+            c³ = abs2(x³ * λ³)
+            τ² = tol^2 * (abs2(x) + abs2(x¹ * λ) + c² + c³)
+            if c³ ≤ τ² || c² ≤ τ²
                 x̂[i] = x + Δt * (x¹ + Δt * x²)
             else
                 δᵢ = 1 - Δt * x³ / x²

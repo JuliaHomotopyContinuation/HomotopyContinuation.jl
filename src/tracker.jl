@@ -79,9 +79,17 @@ The set of options for a [`Tracker`](@ref).
 * `max_initial_step_size = Inf`: The maximal size of the first step
 * `min_step_size = 1e-48`: The minimal step size. If a smaller step size would
   be necessary, then the tracking gets terminated.
-* `extended_precision = true`: Whether to allow for the use of extended precision,
-  if necessary, in some computations. This can greatly improve the ability to track
-  numerically difficult paths.
+* `extended_precision = true`: Allow the tracker to switch to double-double
+  (≈32 digits) arithmetic where Float64 is not accurate enough: residuals in the
+  Newton corrector, and, if the Float64 Jacobian is too ill-conditioned to be
+  solved accurately, the Jacobian, its LU factorization and the Taylor
+  coefficients of the predictor. Coordinates, `t` and returned solutions always
+  remain `ComplexF64`. If `false`, only Float64 arithmetic is used.
+  Extended precision in the Jacobian is only available for systems and
+  homotopies built from `System`/`Homotopy` (compiled, interpreted or mixed);
+  custom `AbstractHomotopy`s fall back to Float64.
+* `extended_precision_stall_steps = 100`: A path that is tracked in extended precision can get stuck close to a (numerically) singular point: the steps are accepted, but they are so small that the path makes no progress. If, during `extended_precision_stall_steps` consecutive accepted steps in extended precision, the remaining distance to the target is reduced by less than the fraction `extended_precision_stall_progress`, the path is terminated with `TrackerCode.terminated_step_size_too_small`. Set it to `0` to disable the check.
+* `extended_precision_stall_progress = 1e-8`: The minimal fraction of the remaining distance to the target that has to be covered during `extended_precision_stall_steps` consecutive steps in extended precision, see above.
 * `terminate_cond = 1e13`: If the relative component-wise condition number
   `cond(H_x, ẋ)` is larger than `terminate_cond` then the path is terminated as too
   ill-conditioned.
@@ -101,6 +109,8 @@ mutable struct TrackerOptions
     min_rel_step_size::Float64
     terminate_cond::Float64
     parameters::TrackerParameters
+    extended_precision_stall_steps::Int
+    extended_precision_stall_progress::Float64
 end
 function TrackerOptions(;
     automatic_differentiation::Int = 1,
@@ -112,7 +122,13 @@ function TrackerOptions(;
     min_rel_step_size::Float64 = 0.0,
     terminate_cond::Float64 = 1e13,
     parameters::Union{Symbol,TrackerParameters} = :default,
+    extended_precision_stall_steps::Int = 100,
+    extended_precision_stall_progress::Float64 = 1e-8,
 )
+    extended_precision_stall_steps ≥ 0 ||
+        throw(ArgumentError("`extended_precision_stall_steps` has to be non-negative."))
+    0 ≤ extended_precision_stall_progress < 1 ||
+        throw(ArgumentError("`extended_precision_stall_progress` has to be in [0, 1)."))
 
     if parameters isa Symbol
         if parameters == :default
@@ -136,6 +152,8 @@ function TrackerOptions(;
         min_rel_step_size,
         terminate_cond,
         parameters,
+        extended_precision_stall_steps,
+        extended_precision_stall_progress,
     )
 end
 
@@ -156,9 +174,10 @@ The possible states a `CoreTracker` can have are of type `TrackerCode.codes` and
 * `TrackerCode.tracking`: The tracking is still in progress.
 * `TrackerCode.terminated_accuracy_limit`: Tracking terminaed since the accuracy was insufficient.
 * `TrackerCode.terminated_invalid_startvalue`: Tracking terminated since the provided start value was invalid.
-* `TrackerCode.terminated_ill_conditioned`: Tracking terminated since the path was too ill-conditioned.
+* `TrackerCode.terminated_ill_conditioned`: Tracking terminated since the path was too ill-conditioned. This includes the case where the predictor could not
+  compute finite Taylor coefficients, even in extended precision.
 * `TrackerCode.terminated_max_steps`: Tracking terminated since maximal number of steps is reached.
-* `TrackerCode.terminated_step_size_too_small`: Trackint terminated since the step size was too small.
+* `TrackerCode.terminated_step_size_too_small`: Tracking terminated since the step size was too small. This includes paths in extended precision that make no progress, see the options `extended_precision_stall_steps` and `extended_precision_stall_progress` of [`TrackerOptions`](@ref).
 * `TrackerCode.terminated_unknown`: An unintended error occured. Please consider reporting an issue.
 """
 module TrackerCode
@@ -227,10 +246,8 @@ Containing the result of tracking a path with a [`Tracker`](@ref).
 * `accuracy::Float64`: Estimate of the relative accuracy of the `solution`.
 * `accepted_steps::Int`: Number of steps that got accepted.
 * `rejected_steps::Int`: Number of steps that got rejected.
-* `extended_precision::Bool`: Indicate whether extended precision is necessary to achieve
-  the accuracy of the `solution`.
-* `extended_precision_used::Bool`: This is `true` if during the tracking at any point
-  extended precision was used.
+* `extended_precision::Bool`: Indicate whether extended precision is necessary to achieve the accuracy of the `solution`.
+* `extended_precision_used::Bool`: This is `true` if during the tracking at any point extended precision was used, in the predictor or in the Newton corrector.
 """
 struct TrackerResult
     return_code::Symbol
@@ -335,6 +352,8 @@ mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
     last_steps_failed::Int
     ext_accepted_steps::Int
     ext_rejected_steps::Int
+    stall_steps::Int
+    stall_dist::Float64
 end
 
 function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
@@ -358,6 +377,8 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
     u = zeros(ComplexF64, size(H, 1))
     accepted_steps = rejected_steps = ext_accepted_steps = ext_rejected_steps = 0
     last_steps_failed = 0
+    stall_steps = 0
+    stall_dist = Inf
 
     TrackerState(
         x,
@@ -385,6 +406,8 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
         last_steps_failed,
         ext_accepted_steps,
         ext_rejected_steps,
+        stall_steps,
+        stall_dist,
     )
 end
 
@@ -598,6 +621,7 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
 
     t′ = state.segment_stepper.t′
     t = state.segment_stepper.t
+    stalled = update_stall!(state, options)
     if is_done(state.segment_stepper)
         state.code = TrackerCode.success
     elseif steps(state) ≥ options.max_steps
@@ -614,13 +638,66 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
            t′ != state.segment_stepper.target &&
            fast_abs(t′ - t) < fast_abs(t) * options.min_rel_step_size
         state.code = TrackerCode.terminated_step_size_too_small
+    elseif stalled
+        state.code = TrackerCode.terminated_step_size_too_small
     end
     nothing
 end
 
+# Detect a path that is stuck in extended precision: the steps are accepted, but so small that the path makes no progress. This happens close to a (numerically) singular point, where the Lipschitz estimate ω explodes and the step size controller shrinks the steps further and further, and neither extended precision nor smaller steps help. This is not caught by `min_step_size`, since the steps stay far above it, and it is not caught by the rejection of steps, since the steps are accepted. Without this check such a path only ends after `max_steps` steps.
+#
+# We count the consecutive accepted steps in extended precision. After `extended_precision_stall_steps` of them, we check that the distance to the target has  been reduced by at least the fraction `extended_precision_stall_progress`. 
+# If yes we start a new window, otherwise we report a stall. A relative progress is used, since paths to singular endpoints get close to the target geometrically.
+function update_stall!(state::TrackerState, options::TrackerOptions)
+    m = options.extended_precision_stall_steps
+    if m == 0 || !state.extended_prec
+        state.stall_steps = 0
+        return false
+    end
+    state.last_step_failed && return false # only accepted steps count
+    dist = dist_to_target(state.segment_stepper)
+    if state.stall_steps == 0
+        state.stall_dist = dist
+    end
+    state.stall_steps += 1
+    if state.stall_steps < m
+        return false
+    end
+    progress = (state.stall_dist - dist) / state.stall_dist
+    state.stall_steps = 0
+    return !(progress ≥ options.extended_precision_stall_progress)
+end
+
 function update_predictor!(tracker::Tracker, x̂ = nothing, Δs = nothing, t_prev = NaN)
     @unpack predictor, homotopy, state = tracker
-    update!(predictor, homotopy, state.x, state.t, state.jacobian, state.norm, x̂)
+    update!(
+        predictor,
+        homotopy,
+        state.x,
+        state.t,
+        state.jacobian,
+        state.norm,
+        x̂;
+        extended_precision = tracker.options.extended_precision,
+        full_extended_precision = tracker.corrector.full_extended_precision[],
+    )
+    # If the predictor needed double-double, so will the corrector. 
+    # switch both to full extended precision. 
+    # This lasts until `update_precision!` finds that Float64 suffices again, or until the next path is initialized.
+    if tracker.options.extended_precision && predictor.used_extended_precision
+        tracker.corrector.full_extended_precision[] = true
+        state.extended_prec = true
+    end
+    state.used_extended_prec |= predictor.used_extended_precision
+    # Non-finite coefficients mean that even the extended solve failed. 
+    # Terminate the path, unless it has just reached its end.
+    if !is_done(state.segment_stepper) && !(
+        predictor.winding_number > 1 ? all(isfinite, predictor.xtemp) :
+        all(isfinite, predictor.tx³.data)
+    )
+        state.code = TrackerCode.terminated_ill_conditioned
+    end
+    predictor
 end
 
 """
@@ -652,6 +729,12 @@ function init!(
     @unpack x, x̄, norm, jacobian = state
 
     # intialize state
+    # the precision state of the previous path must not carry over to this one
+    corrector.full_extended_precision[] = false
+    # the allocated workspace is kept, but it has not been used on this path yet
+    corrector.extended_attempted[] = false
+    # the option has the last word
+    extended_precision &= options.extended_precision
     set_solution!(x, homotopy, x₁, t₁)
     init!(state.segment_stepper, t₁, t₀)
     state.Δs_prev = 0.0
@@ -667,6 +750,7 @@ function init!(
         state.ext_accepted_steps = state.ext_rejected_steps = 0
     end
     state.last_steps_failed = 0
+    state.stall_steps = 0
 
     # compute ω and limit accuracy μ for the start value
     t = state.t
@@ -683,7 +767,8 @@ function init!(
             a = a,
             extended_precision = extended_precision,
         )
-        if !valid && !extended_precision
+        # retry the initial Newton iteration in extended precision, if allowed
+        if !valid && !extended_precision && options.extended_precision
             extended_precision = true
             valid, ω, μ = init_newton!(
                 x̄,
@@ -743,6 +828,8 @@ function init!(
     updated!(jacobian)
     init!(tracker.predictor)
     update_predictor!(tracker)
+    # update_predictor! may have terminated the path
+    is_tracking(state.code) || return false
     state.τ = trust_region(predictor)
     # compute initial step size
     Δs = initial_step_size(state, predictor, tracker.options)
@@ -756,6 +843,7 @@ end
 function init!(tracker::Tracker, t₀::Number; max_initial_step_size::Float64 = Inf)
     @unpack state, predictor, options = tracker
     state.code = TrackerCode.tracking
+    state.stall_steps = 0
     init!(state.segment_stepper, state.t, t₀)
     Δs = initial_step_size(state, predictor, tracker.options)
     Δs = min(Δs, max_initial_step_size)
@@ -776,10 +864,17 @@ function update_precision!(tracker::Tracker, μ_low)
         # check if we can go low again
         if μ_low * ω < a^7 * _h(a)
             state.extended_prec = false
+            # also leave full extended precision (Jacobian and predictor)
+            corrector.full_extended_precision[] = false
             state.μ = μ_low
         end
     elseif μ * ω > a^5 * _h(a)
         use_extended_precision!(tracker)
+    end
+
+    # In full extended precision, μ_low is the size of the correction that a Float64 Newton step would have produced (see `newton!`). Unless it allowed us to use lower precision, we stay in extended precision.
+    if corrector.full_extended_precision[]
+        state.extended_prec = state.used_extended_prec = true
     end
 
     state.extended_prec
@@ -877,7 +972,8 @@ function step!(tracker::Tracker, debug::Bool = false)
         norm;
         ω = state.ω,
         μ = state.μ,
-        extended_precision = state.extended_prec,
+        # never use extended precision if the user disabled it
+        extended_precision = options.extended_precision && state.extended_prec,
         first_correction = state.accepted_steps == 0,
     )
 
@@ -908,7 +1004,8 @@ function step!(tracker::Tracker, debug::Bool = false)
         state.τ = trust_region(predictor)
 
         state.accepted_steps += 1
-        state.ext_accepted_steps += state.extended_prec
+        # a step counts as extended if the corrector or the predictor used it
+        state.ext_accepted_steps += state.extended_prec || predictor.used_extended_precision
         state.last_steps_failed = 0
     else
         # Step failed, so we have to try with a new (smaller) step size
@@ -917,6 +1014,8 @@ function step!(tracker::Tracker, debug::Bool = false)
         state.last_steps_failed += 1
     end
     state.norm_Δx₀ = result.norm_Δx₀
+    # update_predictor! terminated the path (ill-conditioned): skip the step size update
+    is_tracking(state.code) || return !state.last_step_failed
     update_stepsize!(state, result, options, predictor; ad_for_error_estimate = false)
 
     check_terminated!(state, options)

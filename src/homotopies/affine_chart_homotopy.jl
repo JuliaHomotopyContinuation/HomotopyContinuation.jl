@@ -96,3 +96,9 @@ function ModelKit.taylor!(u, v::Val, H::AffineChartHomotopy, tx, t)
     # affine chart part is always zero since it is an affine linear form
     u
 end
+
+function ModelKit.taylor!(u, v::Val, H::AffineChartHomotopy, tx, t, incremental::Bool)
+    fill!(u, zero(eltype(u)))
+    taylor!(u, v, H.homotopy, tx, t, incremental)
+    u
+end

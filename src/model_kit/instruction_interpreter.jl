@@ -133,7 +133,7 @@ function nested_ifs(cond_body, elsebranch = nothing)
     return orig_expr
 end
 
-function execute_instructions_inner!_impl(level = 0)
+function execute_instructions_inner!_impl()
     op_types = [instances(OpType)...]
     arity1 = filter(op -> arity(op) == 1, op_types)
     arity2 = filter(op -> arity(op) == 2 && op !== OP_POW_INT, op_types)
@@ -142,17 +142,19 @@ function execute_instructions_inner!_impl(level = 0)
     # This should get compiled to a jump table by LLVM, so order doesn't matter
     branches = [
         map(arity1) do op
-            (:(op == $(op)), :(tape[i] = $(op_call(op))(t₁)))
+            (:(op == $(op)), :(tape[i] = $(op_call(op))(tape[arg₁])))
         end
-        [(:(op == OP_POW_INT), :(tape[i] = $(op_call(OP_POW_INT))(t₁, arg₂)))]
+        [(:(op == OP_POW_INT), :(tape[i] = $(op_call(OP_POW_INT))(tape[arg₁], arg₂)))]
         map(arity2) do op
             (:(op == $(op)), quote
+                t₁ = tape[arg₁]
                 t₂ = tape[arg₂]
                 tape[i] = $(op_call(op))(t₁, t₂)
             end)
         end
         map(arity3) do op
             (:(op == $(op)), quote
+                t₁ = tape[arg₁]
                 t₂ = tape[arg₂]
                 t₃ = tape[arg₃]
                 tape[i] = $(op_call(op))(t₁, t₂, t₃)
@@ -160,6 +162,7 @@ function execute_instructions_inner!_impl(level = 0)
         end
         map(arity4) do op
             (:(op == $(op)), quote
+                t₁ = tape[arg₁]
                 t₂ = tape[arg₂]
                 t₃ = tape[arg₃]
                 t₄ = tape[arg₄]
@@ -167,23 +170,15 @@ function execute_instructions_inner!_impl(level = 0)
             end)
         end
     ]
-    # Add one level of instruction recursion
-    # to speed up things
-    # More would help but are too prohibitiv in compile cost
-    if level < 1
-        branches = map(branches) do ((cond, code))
-            (cond, :($code; $(execute_instructions_inner!_impl(level + 1))))
-        end
-    end
-
-
+    # Dispatch once per instruction and load operands only in its branch. Avoid
+    # duplicating the dispatch tree: it increases generated code size and forces
+    # an operand load even for STOP (whose operands need not reference the tape).
     quote
         Base.@_propagate_inbounds_meta
         instr = instructions[k+=1]
         op = instr.op
         arg₁, arg₂, arg₃, arg₄ = instr.input
         i = instr.output
-        t₁ = tape[arg₁]
         $(nested_ifs([
             branches
             [(:(op == OP_STOP), :(break))]

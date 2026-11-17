@@ -32,3 +32,6 @@ ModelKit.evaluate_and_jacobian!(u, U, F::MixedSystem, x, p = nothing) =
     evaluate_and_jacobian!(u, U, F.compiled, x, p)
 ModelKit.taylor!(u, v::Val, F::MixedSystem, tx, p = nothing) =
     taylor!(u, v, F.interpreted, tx, p)
+# Taylor series of a MixedSystem are interpreted, so the predictor uses the interpreted half.
+ModelKit.predictor_taylor!(u, v, F::MixedSystem, tx, p, incremental::Bool) =
+    ModelKit.predictor_taylor!(u, v, F.interpreted, tx, p, incremental)

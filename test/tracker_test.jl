@@ -1,3 +1,25 @@
+struct CorrectorCountingHomotopy{H} <: HC.AbstractHomotopy
+    homotopy::H
+    evaluations::Base.RefValue{Int}
+    jacobians::Base.RefValue{Int}
+    extended_jacobians::Base.RefValue{Int}
+end
+CorrectorCountingHomotopy(H) = CorrectorCountingHomotopy(H, Ref(0), Ref(0), Ref(0))
+Base.size(H::CorrectorCountingHomotopy) = size(H.homotopy)
+HC.ModelKit.taylor!(u, v::Val, H::CorrectorCountingHomotopy, x, t, incremental::Bool) =
+    taylor!(u, v, H.homotopy, x, t, incremental)
+HC.extended_jacobian_supported(H::CorrectorCountingHomotopy) =
+    HC.extended_jacobian_supported(H.homotopy)
+function HC.ModelKit.evaluate!(u, H::CorrectorCountingHomotopy, x, t)
+    H.evaluations[] += 1
+    evaluate!(u, H.homotopy, x, t)
+end
+function HC.ModelKit.evaluate_and_jacobian!(u, U, H::CorrectorCountingHomotopy, x, t)
+    H.jacobians[] += 1
+    H.extended_jacobians[] += eltype(x) === HC.DoubleDouble.ComplexDF64
+    evaluate_and_jacobian!(u, U, H.homotopy, x, t)
+end
+
 @testset "Tracker" begin
     @testset "tracking $mode - AD: $AD" for mode in [InterpretedSystem, CompiledSystem],
         AD = 0:3
@@ -251,6 +273,328 @@
         result = track(tracker, startsolutions0, 1, 0)
         @test is_invalid_startvalue(result)
         @test result.return_code == :terminated_invalid_startvalue_singular_jacobian
+    end
+
+    @testset "Precision failure handling" begin
+        @var x t
+        H = CorrectorCountingHomotopy(InterpretedHomotopy(Homotopy([x - t], [x], t)))
+        T = Tracker(H)
+        T.corrector.full_extended_precision[] = true
+        z = ComplexF64[1]
+        HC.init_newton!(
+            similar(z),
+            T.corrector,
+            H,
+            z,
+            1.0,
+            T.state.jacobian,
+            T.state.norm;
+            a = 0.125,
+        )
+        @test H.jacobians[] == H.extended_jacobians[]
+
+        # A successful first escalation refreshes the ordinary workspace too.
+        regular = InterpretedHomotopy(Homotopy([x^2 - 1], [x], t))
+        NC = HC.NewtonCorrector(0.125, z, 1)
+        J = HC.Jacobian(zeros(ComplexF64, 1, 1))
+        NC.r .= 3
+        NC.Δx .= 0
+        HC.refine_newton_correction!(NC, regular, [2.0], 0.0, J, InfNorm(); tol = 1e-8)
+        @test NC.full_extended_precision[]
+        @test NC.Δx ≈ [0.75]
+        @test HC.matrix(J) == fill(4.0, 1, 1)
+        @test NC.r == [3.0]
+
+        singular = InterpretedHomotopy(Homotopy([x^2 - t], [x], t))
+        fill!(T.corrector.Δx, 1)
+        @test !HC.extended_newton_correction!(T.corrector, singular, [0.0], 0.0)
+        @test all(isnan, T.corrector.Δx)
+
+        T = Tracker(singular)
+        T.state.x .= 0
+        T.corrector.full_extended_precision[] = true
+        T.predictor.cond_H_ẋ = 123.0
+        HC.update_predictor!(T)
+        @test T.state.code == HC.TrackerCode.terminated_ill_conditioned
+        @test isnan(T.predictor.cond_H_ẋ)
+        @test all(isnan, T.predictor.tx³.data[2:4, :])
+        # A failed call must not contaminate a subsequent, regular expansion.
+        @test HC.extended_predictor!(T.predictor, singular, [1.0], 1.0, 3)
+        @test T.predictor.tx³[1, 2] ≈ 0.5
+    end
+
+    @testset "Newton correction at an unchanged point" begin
+        @var x y t
+        symbolic = Homotopy([x - 1 - t, 2 * (y - 1)], [x, y], t)
+        for mode in (InterpretedHomotopy, CompiledHomotopy, MixedHomotopy),
+            extended in (false, true),
+            weighted in (false, true),
+            δ in (0.0, 2.0^-60)
+
+            H = CorrectorCountingHomotopy(mode(symbolic))
+            start = ComplexF64[1, 1]
+            out = similar(start)
+            nc = HC.NewtonCorrector(0.125, start, 2)
+            J = HC.Jacobian(zeros(ComplexF64, 2, 2))
+            norm = weighted ? WeightedNorm(ones(2), InfNorm()) : InfNorm()
+            r = HC.newton!(
+                out,
+                nc,
+                H,
+                start,
+                δ,
+                J,
+                norm;
+                μ = eps(),
+                ω = 1.0,
+                extended_precision = extended,
+                first_correction = true,
+            )
+            @test HC.is_converged(r)
+            @test out == start
+            @test r.accuracy ≈ δ
+            @test r.iters == 2
+            @test H.jacobians[] == 1
+            @test J.factorizations[] == 1
+            @test H.evaluations[] == Int(extended)
+            extended && @test r.μ_low ≈ δ
+        end
+    end
+
+    @testset "Newton correction with changing iterates" begin
+        @var x y t
+        symbolic = Homotopy([x^2 - 2, y^2 - 3], [x, y], t)
+        for extended in (false, true), accurate in (false, true)
+            H = CorrectorCountingHomotopy(InterpretedHomotopy(symbolic))
+            start = ComplexF64[1.42, 1.74]
+            out = similar(start)
+            nc = HC.NewtonCorrector(0.125, start, 2)
+            J = HC.Jacobian(zeros(ComplexF64, 2, 2))
+            r = HC.newton!(
+                out,
+                nc,
+                H,
+                start,
+                0.0,
+                J,
+                InfNorm();
+                μ = eps(),
+                ω = 1.0,
+                extended_precision = extended,
+                accurate_μ = accurate,
+                first_correction = true,
+            )
+            @test HC.is_converged(r)
+            @test out ≈ [sqrt(2), sqrt(3)] atol = 1e-14
+            @test r.accuracy <= 1e-14
+            @test H.jacobians[] >= 2
+            @test all(isfinite, HC.matrix(J))
+        end
+
+        # Rejection and singularity must not become successful stagnation exits.
+        for H in (
+            InterpretedHomotopy(Homotopy([x^2 + 1, y^2 + 1], [x, y], t)),
+            InterpretedHomotopy(Homotopy([x + y - 1, x + y - 1], [x, y], t)),
+        )
+            start = ComplexF64[0.1, 0.1]
+            nc = HC.NewtonCorrector(0.125, start, 2)
+            r = HC.newton!(
+                similar(start),
+                nc,
+                H,
+                start,
+                0.0,
+                HC.Jacobian(zeros(ComplexF64, 2, 2)),
+                InfNorm();
+                μ = eps(),
+                ω = 1.0,
+            )
+            @test !HC.is_converged(r)
+        end
+    end
+
+    @testset "Persistent path precision" begin
+        @var x y p q
+        F = System(
+            [x + y - 1, x + y - 1 + p * ((1 + q) * y - 1)];
+            variables = [x, y],
+            parameters = [p, q],
+        )
+        for compile in (false, true, :mixed)
+            H = CorrectorCountingHomotopy(
+                ParameterHomotopy(F, [2.0^-60, 1], [2.0^-60, 0]; compile),
+            )
+            T = Tracker(H)
+            @test HC.init!(T, [0.5, 0.5])
+            @test T.corrector.full_extended_precision[]
+            @test T.predictor.used_extended_precision
+            low = H.jacobians[] - H.extended_jacobians[]
+            high = H.extended_jacobians[]
+            @test HC.step!(T)
+            @test H.extended_jacobians[] > high
+            # one Float64 Jacobian per step
+            # testing probe if Float64 suffices
+            @test H.jacobians[] - H.extended_jacobians[] == low + 1
+            @test T.corrector.full_extended_precision[]
+            @test T.state.used_extended_prec
+            HC.init!(T, 0.0)
+            @test T.corrector.full_extended_precision[]
+            P = T.predictor.extended_workspace
+            W = T.corrector.extended_workspace[]
+
+            # Supplying initial estimates bypasses Newton initialization, so
+            # here the predictor discovers the need for escalation first.
+            T2 = Tracker(H)
+            @test HC.init!(T2, [0.5, 0.5]; ω = 1.0, μ = eps())
+            @test T2.predictor.used_extended_precision
+            @test T2.corrector.full_extended_precision[]
+            @test T2.corrector.extended_workspace[] === nothing
+            low = H.jacobians[] - H.extended_jacobians[]
+            @test HC.step!(T2)
+            @test H.jacobians[] - H.extended_jacobians[] == low + 1
+            @test T2.corrector.extended_workspace[] !== nothing
+
+            HC.parameters!(H.homotopy, [1, 1], [1, 0])
+            @test HC.init!(T, [0.5, 0.5])
+            @test !T.corrector.full_extended_precision[]
+            @test !T.predictor.used_extended_precision
+            # the workspaces are kept, the per-path state of the corrector is reset
+            @test T.corrector.extended_workspace[] === W
+            @test !T.corrector.extended_attempted[]
+            @test T.predictor.extended_workspace === P
+
+            HC.parameters!(H.homotopy, [2.0^-60, 1], [2.0^-60, 0])
+            T.options.extended_precision = false
+            high = H.extended_jacobians[]
+            @test !HC.init!(T, [0.5, 0.5])
+            @test !T.corrector.full_extended_precision[]
+            @test H.extended_jacobians[] == high
+        end
+    end
+
+    @testset "Precision is lowered again when the path allows it" begin
+        # The Jacobian is singular in Float64 at the start (p = 2^-60) but
+        # well-conditioned at the end (p = 1), so full extended precision must be
+        # left again along the path.
+        @var x y p q
+        F = System(
+            [x + y - 1, x + y - 1 + p * ((1 + q) * y - 1)];
+            variables = [x, y],
+            parameters = [p, q],
+        )
+        for compile in (false, true, :mixed)
+            H = ParameterHomotopy(F, [2.0^-60, 1], [1.0, 0]; compile)
+            T = Tracker(H)
+            @test HC.init!(T, [0.5, 0.5])
+            @test T.corrector.full_extended_precision[]
+            went_low = false
+            while HC.is_tracking(T.state.code)
+                HC.step!(T)
+                went_low |= !T.corrector.full_extended_precision[]
+            end
+            @test T.state.code == TrackerCode.success
+            @test went_low
+            @test !T.corrector.full_extended_precision[]
+            @test T.state.used_extended_prec
+            @test T.state.x ≈ [0.0, 1.0] atol = 1e-12
+        end
+    end
+
+    @testset "Stall detection in extended precision" begin
+        opts = TrackerOptions()
+        @test opts.extended_precision_stall_steps == 100
+        @test opts.extended_precision_stall_progress == 1e-8
+        @test_throws ArgumentError TrackerOptions(extended_precision_stall_steps = -1)
+        @test_throws ArgumentError TrackerOptions(extended_precision_stall_progress = 1.0)
+
+        # The window logic. The segment goes from 1 to 0 and `s` is the distance to the target.
+        @var x t
+        T = Tracker(InterpretedHomotopy(Homotopy([x - t], [x], t)))
+        state = T.state
+        seg = state.segment_stepper
+        HC.init!(seg, 1.0, 0.0)
+        state.last_steps_failed = 0
+        options = TrackerOptions(
+            extended_precision_stall_steps = 3,
+            extended_precision_stall_progress = 0.1,
+        )
+
+        # no progress during three steps in extended precision
+        state.extended_prec = true
+        @test !HC.update_stall!(state, options)
+        @test !HC.update_stall!(state, options)
+        @test HC.update_stall!(state, options)
+
+        # enough progress: a new window starts
+        seg.s = 1.0
+        state.stall_steps = 0
+        @test !HC.update_stall!(state, options)
+        seg.s = 0.95
+        @test !HC.update_stall!(state, options)
+        seg.s = 0.8 # 20% of the initial distance covered
+        @test !HC.update_stall!(state, options)
+        @test state.stall_steps == 0
+        # the next window starts at s = 0.8, 5% of that is not enough
+        @test !HC.update_stall!(state, options)
+        seg.s = 0.78
+        @test !HC.update_stall!(state, options)
+        seg.s = 0.77
+        @test HC.update_stall!(state, options)
+
+        # rejected steps do not count
+        seg.s = 0.5
+        state.stall_steps = 0
+        state.last_steps_failed = 1
+        for _ = 1:10
+            @test !HC.update_stall!(state, options)
+        end
+        @test state.stall_steps == 0
+        state.last_steps_failed = 0
+
+        # no check outside of extended precision, which also ends the current window
+        state.extended_prec = true
+        @test !HC.update_stall!(state, options)
+        state.extended_prec = false
+        for _ = 1:10
+            @test !HC.update_stall!(state, options)
+        end
+        @test state.stall_steps == 0
+
+        # disabled
+        state.extended_prec = true
+        off = TrackerOptions(extended_precision_stall_steps = 0)
+        for _ = 1:10
+            @test !HC.update_stall!(state, off)
+        end
+
+        # The path of this system needs extended precision all the way, see above.
+        @var a b p q
+        F = System(
+            [a + b - 1, a + b - 1 + p * ((1 + q) * b - 1)];
+            variables = [a, b],
+            parameters = [p, q],
+        )
+        for compile in (false, :mixed)
+            H = ParameterHomotopy(F, [2.0^-60, 1], [2.0^-60, 0]; compile)
+            T = Tracker(H; options = TrackerOptions(max_step_size = 0.02))
+            @test is_success(track(T, [0.5, 0.5]))
+            # 5 steps cover only 10% of the distance, less than the 50% asked for
+            T = Tracker(
+                H;
+                options = TrackerOptions(
+                    max_step_size = 0.02,
+                    extended_precision_stall_steps = 5,
+                    extended_precision_stall_progress = 0.5,
+                ),
+            )
+            r = track(T, [0.5, 0.5])
+            @test !is_success(r)
+            @test r.return_code == :terminated_step_size_too_small
+            @test r.accepted_steps <= 10
+            # and it can be switched off
+            T.options.extended_precision_stall_steps = 0
+            @test is_success(track(T, [0.5, 0.5]))
+        end
     end
 
     include("test_cases/steiner_higher_prec.jl")

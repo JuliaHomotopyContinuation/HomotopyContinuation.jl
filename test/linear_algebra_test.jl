@@ -1,4 +1,5 @@
 @testset "LinearAlgebra" begin
+    include("linear_algebra_triangular_test.jl")
     @testset "Constructor + basics" begin
         A = rand(ComplexF32, 12, 12)
         WS = HC.MatrixWorkspace(A)
@@ -43,9 +44,61 @@
 
         ldiv!(x, MW, b)
 
-        @test norm(MW.qr.factors - true_qr.factors) / norm(MW.qr.factors) < 1e-14
+        # the QR factors are stored as separate real and imaginary parts and only
+        # assembled on demand
+        QR = HC.synced_qr(MW)
+        @test norm(QR.factors - true_qr.factors) / norm(QR.factors) < 1e-14
+        @test norm(QR.τ - true_qr.τ) / norm(QR.τ) < 1e-14
         @test norm(b2 - b) == 0
         @test norm(x - (B \ b2)) / norm(x) < 1e-14
+    end
+
+    @testset "split QR (overdetermined)" begin
+        for (m, n) in
+            [(2, 1), (3, 1), (3, 2), (5, 4), (6, 5), (12, 7), (21, 20), (40, 17), (41, 40)]
+            A = randn(ComplexF64, m, n)
+            b = randn(ComplexF64, m)
+            x = zeros(ComplexF64, n)
+            WS = HC.MatrixWorkspace(A)
+            HC.update!(WS, A)
+            b0 = copy(b)
+            ldiv!(x, WS, b)
+            @test b == b0
+            @test x ≈ A \ b rtol = cond(A) * 1e-13
+            # least squares solution: the residual is orthogonal to the range of A
+            @test norm(A' * (A * x - b)) <= 1e-10 * norm(A) * norm(b)
+            # no allocations
+            WS.factorized[] = false
+            ldiv!(x, WS, b)
+            WS.factorized[] = false
+            @test (@allocated ldiv!(x, WS, b)) == 0
+            # the factors do not depend on the right-hand side
+            x2 = zeros(ComplexF64, n)
+            ldiv!(x2, WS, b)
+            @test x2 == x
+            # a second matrix in the same workspace
+            A2 = randn(ComplexF64, m, n)
+            HC.update!(WS, A2)
+            ldiv!(x, WS, b)
+            @test x ≈ A2 \ b rtol = cond(A2) * 1e-13
+        end
+
+        # a zero column (zero Householder reflector) and a rank-one perturbation
+        A = randn(ComplexF64, 6, 4)
+        A[:, 2] .= 0
+        A[1, 1] = 0
+        WS = HC.MatrixWorkspace(A)
+        HC.update!(WS, A)
+        HC.factorize!(WS)
+        @test iszero(HC.synced_qr(WS).τ[2])
+        @test cond(WS, nothing, ones(4)) == Inf
+
+        # the condition numbers read the diagonal of R
+        B = randn(ComplexF64, 9, 5)
+        WS = HC.MatrixWorkspace(B)
+        HC.update!(WS, B)
+        d = abs.(diag(HC.synced_qr(WS).factors))
+        @test cond(WS, nothing, ones(5)) ≈ maximum(d) / minimum(d)
     end
 
     @testset "ldiv" begin
