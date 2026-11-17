@@ -52,4 +52,18 @@ is_terminated(::TrackerCode.codes)
 
 ## Extended precision
 
-How it works: Newton method first uses a double-double residual with Float64 solves. If iterative refinement fails (not converged, diverged or non-finite), it does a full double-double Jacobian and LU. Once that happens, the rest of the path stays in full extended precision until `update_precision!` decides it can go back. `[init!(tracker::Tracker, ::TrackerResult, ::Number, ::Number)](@ref)` resets the extended precision flag per path.
+If the option `extended_precision` of [`TrackerOptions`](@ref) is `true` (the default), the tracker switches to double-double arithmetic (about 32 digits), if iterative refinement with Float64 precision fails. 
+The path coordinates, `t` and the returned solutions always remain `ComplexF64`. If the option is `false`, only `Float64` arithmetic is used.
+
+The precision is increased in two stages:
+
+1. Newton's method evaluates the residual in double-double, but still solves with the `Float64` Jacobian and refines the solution iteratively.
+2. If this refinement does not converge (it stagnates, diverges or gives non-finite values), the Jacobian, its LU factorization and the Taylor coefficients of the predictor are computed in double-double, too. This is called *full extended precision*. The tracker also enters it if the predictor needs double-double.
+
+In full extended precision, each step additionally checks with a `Float64` step whether `Float64` suffices again. If so, the tracker leaves full extended precision. Otherwise the
+path stays in extended precision. `init!` resets this state for each new path. The memory needed for full extended precision is allocated the first time it is used and reused for all later paths of the same tracker.
+
+The Jacobian and the Taylor coefficients can only be computed in double-double for homotopies built from [`System`](@ref) or [`Homotopy`](@ref) (compiled, interpreted or
+mixed), including parameter homotopies of such systems. For other [`AbstractHomotopy`](@ref)s, only the residual is evaluated in double-double.
+
+Whether extended precision was used on a path can be read off the [`TrackerResult`](@ref), see the fields `extended_precision` and `extended_precision_used`.

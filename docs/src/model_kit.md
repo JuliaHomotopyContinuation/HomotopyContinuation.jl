@@ -86,3 +86,11 @@ nvariables(::Homotopy)
 parameters(::Homotopy)
 variables(::Homotopy)
 ```
+
+## Evaluation in extended precision
+
+`evaluate!`, `evaluate_and_jacobian!` and `taylor!` of interpreted and compiled systems and
+homotopies choose their arithmetic from the type of the *input*. If the variables (or
+parameters) are `ComplexDF64`, the computation is carried out in double-double, even if the output buffer is a `Float64` array. The double-double interpreters are created on demand when they are first needed. For compiled systems, the double-double Jacobian and Taylor series are
+evaluated with an interpreter.
+
