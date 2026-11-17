@@ -105,9 +105,9 @@ Base.@kwdef mutable struct Predictor
 end
 
 
-# Retain all Taylor coefficients in double-double until the last solve. Reusing
-# one factorization is especially valuable when the Float64 Jacobian is rounded
-# to a singular matrix. Commit coefficients only if every solve passes its check.
+# Compute Taylor coefficients x¹..x^max_order in extended precision with a single factorization of the Jacobian. 
+# Returns false if a homotopy is not supported, or if any solve
+# `max_order` is 3 for square systems and, 1 for non-square systems (m > 1) (the higher-order coefficients are skipped for overdetermined systems).
 function extended_predictor!(P::Predictor, H, x, t, max_order)
     n = length(x)
     size(H) == (n, n) && extended_jacobian_supported(H) || return false
@@ -183,11 +183,16 @@ end
         t,
         jacobian::Jacobian,
         norm::AbstractNorm,
-        x̂ = nothing,
+        x̂ = nothing;
+        extended_precision = true,
+        full_extended_precision = false
     )
 
-Upadte the predictor with the new solution `(x,t)` of `H(x,t) = 0`.
-This computes new local derivatives and chooses an appriopriate prediction method.
+Update the predictor with the new solution `(x,t)` of `H(x,t) = 0`. This computes new local derivatives and chooses an appriopriate prediction method.
+
+## Options
+* `extended_precision`: allow falling back to double-double if iterative refinement of ẋ does not reach 1e-10.
+* `full_extended_precision`: if `true`, skip the Float64 attempt and go directly to double-double (set by the tracker once an earlier step required it).
 """
 function update!(
     predictor::Predictor,
@@ -242,6 +247,9 @@ function update!(
         y⁰ .= x
     end
 
+    # in the block below "m > 1 ? 1 : 3" means this:
+    # `max_order` is 3 for square systems and, 1 for non-square systems (m > 1).
+    # (the higher-order coefficients are skipped for overdetermined systems)
     extended = extended_precision && full_extended_precision
     δ = 0.0
     if extended
@@ -369,6 +377,7 @@ function predict!(x̂, pred::Predictor, method::PredictionMethod.methods, H, x, 
         tol = 1e-12
         for (i, (x, x¹, x², x³)) in enumerate(pred.tx³)
             # check if only taylor series is used
+            # c², c³ and τ² are squared to avoid sqrt
             c² = abs2(x² * λ²)
             c³ = abs2(x³ * λ³)
             τ² = tol^2 * (abs2(x) + abs2(x¹ * λ) + c² + c³)
