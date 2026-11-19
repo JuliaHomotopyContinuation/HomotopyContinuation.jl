@@ -659,6 +659,7 @@ function initialize_hypersurfaces(
             res = solve(
                 System([pᵢ; L_eqs], variables = xvars);
                 start_system = :total_degree,
+                compile = false,
                 show_progress = false,
                 threading = threading,
             )
@@ -667,6 +668,7 @@ function initialize_hypersurfaces(
                 System([pᵢ], variables = vars),
                 target_subspace = L;
                 start_system = :total_degree,
+                compile = false,
                 show_progress = false,
                 threading = threading,
             )
@@ -747,32 +749,44 @@ function fill_up!(
     for W in out
         if !isnothing(W) && dim(W) > 0 && degree(W) > 0
             update_progress_monodromy_witness!(progress, W)
-            res = monodromy_solve(
+            L = linear_subspace(W)
+            MS = MonodromySolver(
                 Fᵢ,
-                W.R,
-                linear_subspace(W);
+                L;
                 options = regeneration_monodromy_options(
                     monodromy_options,
                     W;
                     atol = atol,
                     rtol = rtol,
                 ),
-                show_progress = show_monodromy_progress,
-                progress = show_monodromy_progress ? nothing : progress,
-                threading = threading,
-                warning = false,
             )
-            # check if solutions remain
-            if nsolutions(res) == 0
-                W.R = Vector{Vector{ComplexF64}}()
-            else
-                sols = solution.(results(res))
-                # Near-singular solutions tracked in monodromy loops can have
-                # poor accuracy (~1e-10 error). If they evade monodromy's
-                # internal deduplication tolerance,
-                # remove near-duplicates here before continuing
+            # the witness sets are usually complete already: certify this with the trace before running a full monodromy loop
+            if trace_precheck!(MS, W.R, L, threading)
+                sols = W.R
                 W.R =
                     length(sols) > 1 ? unique_points(sols; atol = atol, rtol = rtol) : sols
+            else
+                res = monodromy_solve(
+                    MS,
+                    W.R,
+                    L,
+                    rand(UInt32);
+                    show_progress = show_monodromy_progress,
+                    progress = show_monodromy_progress ? nothing : progress,
+                    threading = threading,
+                    warning = false,
+                )
+                # check if solutions remain
+                if nsolutions(res) == 0
+                    W.R = Vector{Vector{ComplexF64}}()
+                else
+                    sols = solution.(results(res))
+                    # Near-singular solutions tracked in monodromy loops can have poor accuracy (~1e-10 error).
+                    # If they evade monodromy's internal deduplication tolerance, remove near-duplicates here before continuing
+                    W.R =
+                        length(sols) > 1 ? unique_points(sols; atol = atol, rtol = rtol) :
+                        sols
+                end
             end
             update_progress!(progress, W)
         end
@@ -981,7 +995,8 @@ function track_intersection!(
 )
     l_start = length(P) * length(roots)
     P1 = Vector{Vector{ComplexF64}}(undef, l_start)
-    accepted = falses(l_start)
+    # Vector{Bool} rather than BitVector: the threaded Hom1 sweep writes entries from several threads, and BitVector writes are read-modify-writes of shared chunks.
+    accepted = fill(false, l_start)
 
     ntrials = max(cache.max_trials_u_homotopy, 1)
     for trial = 1:ntrials
@@ -1495,6 +1510,44 @@ end
         seed) 
 
 The core function for decomposing a witness set into irreducible components.
+
+## Strategy
+
+The witness points of `W` are grouped into the witness sets of the irreducible components using two kinds of evidence:
+
+* **Monodromy**: moving the points around a loop of slices permutes the points of each irreducible component among themselves.
+  Points that are connected by these permutations (an *orbit*) lie on the same component, unless a path jumped between components.
+* **The trace test**: the trace of a set of witness points vanishes if and only if the set is a union of complete components (see the comment above [`PointTraces`](@ref)).
+
+The algorithm proceeds as follows.
+
+1. **Completing `W`.** Duplicates are removed and the trace test ([`trace_precheck!`](@ref)) checks whether `W` is complete.
+   If not, a monodromy run tries to find the missing points.
+2. **Iterations.** As long as there are points that are not certified:
+   1. *Traces.* One monodromy loop is run for all remaining points.
+      Every new point is tracked once along a fixed pencil of parallel slices `L → L₀₁ → L₁` and its contribution to the trace is cached ([`update_traces!`](@ref)).
+      The displacement is the same for all points of `W`, so the trace of every set of points is a sum of cached values ([`cached_trace`](@ref)) and no further path tracking is necessary.
+   2. *Orbits.* The permutations of the loop are merged with the orbits of the previous iterations ([`get_orbits_from_monodromy_permutations`](@ref)).
+      A link between a small-trace point (whose own trace vanishes) and another point is only used after it was seen in two different loops, so that a single path jump cannot join components.
+   3. *Splitting.* Orbits whose trace vanishes but that contain a smaller set of at least 2 points with vanishing trace are split ([`split_nonminimal_orbits`](@ref)).
+      Such an orbit contains several components, e.g., after a path jumped.
+   4. *Single orbits.* Every orbit that satisfies the certification policy [`is_certifiable`](@ref) is certified.
+      If a point of an orbit has no cached trace, its trace is computed by a separate monodromy run instead (fallback).
+   5. *Unions of orbits.* A component can consist of several orbits that the loops have not connected yet.
+      The combinatorial trace test ([`certify_orbit_unions!`](@ref)) certifies the smallest unions of the remaining orbits with vanishing trace.
+   6. The certified points are removed, the orbits are re-indexed, and the iteration stops once the degrees of the certified components add up to the number of points.
+3. Points that could not be certified after `max_iters` iterations are returned in witness sets with `is_irreducible = nothing`.
+
+## Certification policy
+
+All certifications (steps 2.4 and 2.5) use [`is_certifiable`](@ref):
+* the trace of the set must vanish,
+* sets with at least 2 points must be trace-minimal: no subset with at least 2 points (and at least 2 points outside of it) may have a vanishing trace,
+* a single point is only certified as a component of degree 1 after `DEGREE1_ITERATIONS` iterations in which all orbits consist of single points and no new points or new links of small-trace points were found (*degree 1 rule*).
+  The trace of a single point is only weak evidence, since a single point on a component of degree > 1 can have a small trace.
+  It is therefore never used to reject or split larger sets; instead, links of small-trace points need to be confirmed by a second loop (step 2.2).
+
+Phantom points (new points of a monodromy run that coincide with points of an already certified component) are removed from the orbits before certification.
 """
 function decompose_with_monodromy!(
     W,
@@ -1536,27 +1589,35 @@ function decompose_with_monodromy!(
 
         MS =
             MonodromySolver(G, L; compile = false, options = options, intrinsic = intrinsic)
+        # Cache of per-point traces for this witness set.
+        # The random displacement for the trace test is chosen here, once, and used for all points of this witness set, so that traces of different points can be added.
+        point_traces = PointTraces(L, options)
+        # How often a link between a small-trace point and another point was observed in a monodromy loop, see `get_orbits_from_monodromy_permutations`.
+        small_trace_links = SmallTraceLinks()
         initial_points = check_start_solutions(MS, P, L)
-        res = monodromy_solve(
-            MS,
-            solution.(initial_points),
-            L,
-            seed;
-            threading = threading,
-            show_progress = show_monodromy_progress,
-            progress = show_monodromy_progress ? nothing : progress,
-        )
-
-        update_progress!(progress; is_monodromy = false)
-        update_progress_npts!(progress, nindexed_solutions(res))
-
-        if warning && (trace(res) > options.trace_test_tol)
-            @warn "Trying to decompose non-complete set of witness points for codimension $(dim(L)) (trace test failed). Will try to compute the missing points. The output will contain all components, for which the trace test was successfull."
+        # complete the witness set; the permutations of this call are not used
+        if trace_precheck!(MS, solution.(initial_points), L, threading)
+            non_complete_points = solution.(initial_points)
+        else
+            res = monodromy_solve(
+                MS,
+                solution.(initial_points),
+                L,
+                seed;
+                threading = threading,
+                show_progress = show_monodromy_progress,
+                progress = show_monodromy_progress ? nothing : progress,
+            )
+            non_complete_points = indexed_solutions(res)
+            if warning && (trace(res) > options.trace_test_tol)
+                @warn "Trying to decompose non-complete set of witness points for codimension $(dim(L)) (trace test failed). Will try to compute the missing points. The output will contain all components, for which the trace test was successfull."
+            end
         end
+        update_progress!(progress; is_monodromy = false)
+        update_progress_npts!(progress, length(non_complete_points))
 
         iter = 0
         allow_degree1_iter = 0
-        non_complete_points = indexed_solutions(res)
         d = length(non_complete_points) # the total degree (i.e., number of points on all irreducible components)
         non_complete_orbits = Vector{Set{Int}}()
         trace_certified_all = false
@@ -1612,15 +1673,38 @@ function decompose_with_monodromy!(
                 allow_degree1_iter = 0
             end
 
-            # Get orbits from monodromy result
-            orbits = get_orbits_from_monodromy_permutations(
-                res;
-                initial_orbits = non_complete_orbits,
+            # Track every point that is new in this iteration once along the fixed pencil L → L₀₁ → L₁.
+            # Points from earlier iterations are already cached.
+            update_traces!(point_traces, non_complete_points, MS, threading)
+
+            # Orbits from the permutations of this loop and the orbits of the previous iterations.
+            # Links involving small-trace points (potential degree 1 points) are only used once they are confirmed by a second loop.
+            orbits, new_links = get_orbits_from_monodromy_permutations(
+                permutations(res),
+                non_complete_orbits,
+                non_complete_points,
+                small_trace_points(
+                    point_traces,
+                    non_complete_points,
+                    options.trace_test_tol,
+                ),
+                small_trace_links,
+            )
+            # Something happened to the potential degree 1 points: restart the waiting period of the degree 1 rule.
+            new_links > 0 && (allow_degree1_iter = 0)
+
+            # An orbit can contain points of several components if a monodromy path jumped between components (e.g. close to an intersection point).
+            # Split such orbits along subsets with vanishing trace.
+            orbits = split_nonminimal_orbits(
+                orbits,
+                non_complete_points,
+                point_traces,
+                phantom_indices,
+                options.trace_test_tol,
             )
 
-            # update the degree1 check only if there are no orbits of degree > 1
-            # we want to check degree 1 component 
-            # only if there is nothing else to classify
+            # Degree 1 rule (see `is_certifiable`): single points are only certified after DEGREE1_ITERATIONS iterations in which all orbits consist of single points, i.e., when there is nothing else to classify.
+            # The counter is reset when new points are found or a new link of a small-trace point is observed.
             if all(o -> length(o) == 1, orbits)
                 allow_degree1_iter += 1
             end
@@ -1641,66 +1725,93 @@ function decompose_with_monodromy!(
                 end
 
                 P_orbit = non_complete_points[sort!(collect(clean_orbit))]
-                res_orbit = monodromy_solve(
-                    MS,
-                    P_orbit,
-                    L,
-                    seed;
-                    threading = threading,
-                    show_progress = show_monodromy_progress,
-                    progress = show_monodromy_progress ? nothing : progress,
-                )
+                # The trace of the orbit is computed from the cached per-point traces, no path tracking is needed.
+                # Only if a point has no cached trace (one of its trace paths failed) we fall back to a monodromy run for this orbit, which computes the trace with a new random loop.
+                orbit_trace = cached_trace(point_traces, P_orbit)
+                if isnothing(orbit_trace)
+                    res_orbit = monodromy_solve(
+                        MS,
+                        P_orbit,
+                        L,
+                        seed;
+                        threading = threading,
+                        show_progress = show_monodromy_progress,
+                        progress = show_monodromy_progress ? nothing : progress,
+                    )
+                    orbit_trace = trace(res_orbit)
+                    P_orbit = indexed_solutions(res_orbit)
+                end
                 update_progress!(progress; is_monodromy = false)
 
-                # only continue when trace test succeeds
-                if trace(res_orbit) < options.trace_test_tol
+                # certify the orbit if it satisfies the certification policy, see `is_certifiable` (this includes the degree 1 rule)
+                if is_certifiable(
+                    point_traces,
+                    P_orbit,
+                    orbit_trace,
+                    options.trace_test_tol;
+                    single_point = length(clean_orbit) == 1,
+                    allow_single_point = allow_degree1_iter ≥ DEGREE1_ITERATIONS ||
+                                         iter ≥ max_iters - 1,
+                )
+                    P_certified = P_orbit
+                    W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
 
-                    # We do not want to add orbits of degree 1 as long as allow_degree1_iter < 15.
-                    # Single orbits tend to have small trace, even if their points are on an irreducible component of degree > 1.
-                    # allow_degree1_iter is reset once we find new points.
-                    if length(clean_orbit) > 1 ||
-                       allow_degree1_iter ≥ 15 ||
-                       iter ≥ max_iters - 1
-                        P_certified = indexed_solutions(res_orbit)
-                        W_new = WitnessSet(G, L, P_certified; is_irreducible = true)
-
-                        if length(P_certified) > length(clean_orbit)
-                            # Inner monodromy found new points beyond the starting orbit.
-                            # Match them against non_complete_points to detect orbit merging
-                            # and path-jumping phantoms.
-                            matched = setdiff(
-                                Set(
-                                    matching_indices(
-                                        non_complete_points,
-                                        P_certified;
-                                        atol = atol,
-                                        rtol = rtol,
-                                    ),
+                    if length(P_certified) > length(clean_orbit)
+                        # Inner monodromy found new points beyond the starting orbit.
+                        # Match them against non_complete_points to detect orbit merging and path-jumping phantoms.
+                        matched = setdiff(
+                            Set(
+                                matching_indices(
+                                    non_complete_points,
+                                    P_certified;
+                                    atol = atol,
+                                    rtol = rtol,
                                 ),
-                                phantom_indices,
-                            )
-                            # If not all P_certified points are accounted for in non_complete_points,
-                            # the result is unreliable (phantom or genuine new point) — skip.
-                            if length(matched) < length(P_certified)
-                                continue
-                            end
-                            complete_orbit = matched
-                        else
-                            complete_orbit = clean_orbit
+                            ),
+                            phantom_indices,
+                        )
+                        # If not all P_certified points are accounted for in non_complete_points, the result is unreliable (phantom or genuine new point) — skip.
+                        if length(matched) < length(P_certified)
+                            continue
                         end
-
-                        push!(complete_orbits, complete_orbit)
-                        k -= length(complete_orbit)
-                        update_progress_npts!(progress, k)
-
-                        push!(decomposition, W_new)
-                        for p in solutions(W_new)
-                            add!(certified_up, p, 1; atol = atol, rtol = rtol)
-                        end
-                        d += length(P_certified) - length(complete_orbit)
-                        update_progress!(progress, W_new)
+                        complete_orbit = matched
+                    else
+                        complete_orbit = clean_orbit
                     end
+
+                    push!(complete_orbits, complete_orbit)
+                    k -= length(complete_orbit)
+                    update_progress_npts!(progress, k)
+
+                    push!(decomposition, W_new)
+                    for p in solutions(W_new)
+                        add!(certified_up, p, 1; atol = atol, rtol = rtol)
+                    end
+                    d += length(P_certified) - length(complete_orbit)
+                    update_progress!(progress, W_new)
                 end
+            end
+
+            # Combinatorial trace test: certify unions of the remaining orbits whose trace vanishes.
+            # This finds a component as soon as all its points are in some orbits, even if the loops have not merged them into a single orbit yet.
+            # See `certify_orbit_unions!`.
+            certify_orbit_unions!(
+                complete_orbits,
+                decomposition,
+                certified_up,
+                orbits,
+                phantom_indices,
+                non_complete_points,
+                point_traces,
+                G,
+                L,
+                options.trace_test_tol;
+                atol = atol,
+                rtol = rtol,
+            ) do orbit, W_new
+                k -= length(orbit)
+                update_progress_npts!(progress, k)
+                update_progress!(progress, W_new)
             end
 
             # Check if we are done
@@ -1754,9 +1865,10 @@ function decompose_with_monodromy!(
                 i += 1
             end
 
-            # Skip phantom indices when shifting — they have been removed from non_complete_points.
-            shift_orbit(orbit) =
-                Set(orbit_indices_mapping[i] for i in orbit if i ∉ phantom_indices)
+            # Skip removed indices (complete orbits and phantoms) when shifting.
+            shift_orbit(orbit) = Set(
+                orbit_indices_mapping[i] for i in orbit if haskey(orbit_indices_mapping, i)
+            )
             # 1. shift existing non complete orbits to new mapping
             non_complete_orbits =
                 shift_orbit.(
@@ -1767,7 +1879,10 @@ function decompose_with_monodromy!(
                                 all(co -> isdisjoint(co, o), complete_orbits) &&
                                     isdisjoint(o, phantom_indices)
                             end
-                            setdiff(orbits, complete_orbits)
+                            # A complete orbit can differ from the orbit it came from (phantoms removed, matched points, unions of orbits), so remove all orbits that overlap a complete orbit.
+                            filter(orbits) do o
+                                all(co -> isdisjoint(co, o), complete_orbits)
+                            end
                         ],
                     ),
                 )
@@ -1814,6 +1929,485 @@ function decompose_with_monodromy!(
     update_progress!(progress)
 
     decomposition
+end
+
+##
+## Trace test with cached per-point traces
+##
+## Background.
+## Let W be a witness set on the slice L and let L(s) = L + s⋅v, s ∈ ℂ, be a family of parallel slices.
+## Every witness point x moves along a path x(s) with x(0) = x.
+## For a set S of witness points let s_S(s) = Σ_{x ∈ S} x(s).
+## Then:
+
+## S is a union of complete irreducible components  ⟺  s_S(s) is affine-linear in s
+##
+## (for generic L and v).
+## We evaluate s_S at s = 0, 1, 2, i.e. on the slices L, L₀₁ = L + v and L₁ = L + 2v, and measure how far the three points s_S(0), s_S(1), s_S(2) are from lying on a line.
+## This is the trace test of `monodromy_solve`, see `trace_colinearity`.
+##
+## Since s_S is a sum over the points of S, each point only has to be tracked once along L → L₀₁ → L₁.
+## Afterwards the trace of every subset S is a sum of cached values and no path tracking is needed.
+## This is used in `decompose_with_monodromy!` to test orbits and unions of orbits (`certify_orbit_unions!`).
+
+"""
+    trace_precheck!(MS::MonodromySolver, X, L::LinearSubspace, threading::Bool)
+
+Check with the trace test whether the witness points `X` on the slice `L` are complete, without running a monodromy loop.
+For this the points are only tracked along the part of a loop that collects the trace, `L → L₀₁ → L₁`.
+Returns `true` if the trace test succeeds.
+Then no monodromy is necessary to complete the witness points.
+The state of `MS` is reset afterwards, so `monodromy_solve(MS, ...)` can be called directly.
+Returns `false` if some path failed, the trace test fails, or no point of `X` is a valid start solution.
+"""
+function trace_precheck!(
+    MS::MonodromySolver,
+    X::AbstractVector{<:AbstractVector{<:Number}},
+    L::LinearSubspace,
+    threading::Bool,
+)
+    reset!() = begin
+        MS.statistics = MonodromyStatistics()
+        empty!(MS.unique_points)
+        duplicate_check_is_certified(MS) && empty!(MS.certified_solutions)
+        reset_trace!(MS)
+        reset_loops!(MS)
+    end
+    reset!()
+    cL = convert(LinearSubspace{ComplexF64}, L)
+    results =
+        MS.options.check_startsolutions ? check_start_solutions(MS, X, cL) :
+        initialize_start_solutions(MS, X)
+    isempty(results) && return false
+    add_loop!(MS, cL)
+    ℓ = loop(MS, 1)
+    ok = Threads.Atomic{Bool}(true)
+    nthr = threading ? min(Threads.nthreads(), length(results)) : 1
+    if nthr > 1
+        for i = length(MS.trackers)+1:nthr
+            push!(MS.trackers, deepcopy(MS.trackers[1]))
+        end
+        next_idx = Threads.Atomic{Int}(1)
+        Threads.@sync for tid = 1:nthr
+            let tracker = MS.trackers[tid].tracker
+                Threads.@spawn while ok[]
+                    i = Threads.atomic_add!(next_idx, 1)
+                    i > length(results) && break
+                    x₁ = track_trace_legs!(tracker, results[i], ℓ, MS.trace, MS.trace_lock)
+                    isnothing(x₁) && (ok[] = false)
+                end
+            end
+        end
+    else
+        tracker = MS.trackers[1].tracker
+        for r in results
+            x₁ = track_trace_legs!(tracker, r, ℓ, MS.trace, MS.trace_lock)
+            isnothing(x₁) && (ok[] = false; break)
+        end
+    end
+    success = ok[] && trace_colinearity(MS) < MS.options.trace_test_tol
+    reset!()
+    success
+end
+
+"""
+    PointTraces(L::LinearSubspace, options::MonodromyOptions)
+
+Cache for the trace test in [`decompose`](@ref) for one witness set with slice `L`.
+
+On construction a random displacement `v` is drawn once (via `MonodromyLoop(L, options)`, which sets `L₀₁ = L + v` and `L₁ = L + 2v`).
+It is never changed afterwards: the field `loop` is immutable and every trace in the cache is computed with this same `loop`.
+This is essential, since traces of different points may only be added if they are computed for the same displacement.
+
+* `data[x]` is an `n × 3` matrix with the positions of the witness point `x` on `L`, `L₀₁` and `L₁` (columns 1, 2, 3), or `nothing` if one of the two paths failed.
+
+A `PointTraces` must only be used for points on the slice `L` of the witness set it was created for.
+In `decompose_with_monodromy!` it is a local variable, created once per witness set, so different witness sets never share a cache.
+"""
+struct PointTraces
+    loop::MonodromyLoop{LinearSubspace{ComplexF64}}
+    data::Dict{Vector{ComplexF64},Union{Nothing,Matrix{ComplexF64}}}
+end
+PointTraces(L::LinearSubspace, options::MonodromyOptions) = PointTraces(
+    MonodromyLoop(L, options),
+    Dict{Vector{ComplexF64},Union{Nothing,Matrix{ComplexF64}}}(),
+)
+
+"""
+    point_trace(tracker::Tracker, x, loop::MonodromyLoop)
+
+Track `x` from `loop.p` over `loop.p₀₁` to `loop.p₁` and return the `n × 3` matrix of the three positions, or `nothing` if a path failed.
+"""
+function point_trace(tracker::Tracker, x::Vector{ComplexF64}, loop::MonodromyLoop)
+    T = zeros(ComplexF64, length(x), 3)
+    x₁ = track_trace_legs!(tracker, x, loop, T, nothing)
+    isnothing(x₁) ? nothing : T
+end
+
+"""
+    update_traces!(PT::PointTraces, P, MS::MonodromySolver, threading::Bool)
+
+Compute and cache the traces of all points in `P` that are not cached yet.
+The paths are tracked with the trackers of `MS` (one per thread), always along `PT.loop`.
+"""
+function update_traces!(PT::PointTraces, P, MS::MonodromySolver, threading::Bool)
+    # copy the points, since they are used as keys of the cache
+    new_points = [copy(p) for p in P if !haskey(PT.data, p)]
+    isempty(new_points) && return PT
+    traces = Vector{Union{Nothing,Matrix{ComplexF64}}}(undef, length(new_points))
+    nthr = threading ? min(Threads.nthreads(), length(new_points)) : 1
+    if nthr > 1
+        for i = length(MS.trackers)+1:nthr
+            push!(MS.trackers, deepcopy(MS.trackers[1]))
+        end
+        next_idx = Threads.Atomic{Int}(1)
+        Threads.@sync for tid = 1:nthr
+            let tracker = MS.trackers[tid].tracker
+                Threads.@spawn while true
+                    i = Threads.atomic_add!(next_idx, 1)
+                    i > length(new_points) && break
+                    traces[i] = point_trace(tracker, new_points[i], PT.loop)
+                end
+            end
+        end
+    else
+        tracker = MS.trackers[1].tracker
+        for (i, p) in enumerate(new_points)
+            traces[i] = point_trace(tracker, p, PT.loop)
+        end
+    end
+    for (p, T) in zip(new_points, traces)
+        PT.data[p] = T
+    end
+    PT
+end
+
+"""
+    cached_trace(PT::PointTraces, S)
+
+The trace of the set of witness points `S`, computed from the cached traces in `PT`: with `s₀, s₀₁, s₁` the sums of the positions of the points of `S` on `L, L₀₁, L₁`, this is `σ₃ / σ₁` for the singular values of the `(n+1) × 3` matrix `[s₀ s₀₁ s₁; 1 1 1]`.
+It is (numerically) zero if and only if the three sums lie on a line, i.e., if `S` is a union of complete components.
+This is exactly the value that `monodromy_solve` reports as `trace`.
+
+Returns `nothing` if `S` is empty or a point of `S` has no cached trace (not computed yet, or a path failed).
+"""
+function cached_trace(PT::PointTraces, S)
+    isempty(S) && return nothing
+    n = length(first(S))
+    M = zeros(ComplexF64, n + 1, 3)
+    M[end, :] .= 1
+    for p in S
+        T = get(PT.data, p, nothing)
+        isnothing(T) && return nothing
+        for j = 1:3, i = 1:n
+            M[i, j] += T[i, j]
+        end
+    end
+    σ = LA.svdvals(M)
+    σ[3] / σ[1]
+end
+
+##
+## Certification policy
+##
+## `decompose_with_monodromy!` certifies a set of witness points as one irreducible component in three places: single orbits, unions of orbits (`certify_orbit_unions!`), and the points of a fallback monodromy run.
+## All of them use `is_certifiable`, so that the rules below are applied consistently.
+##
+## The evidence comes from monodromy (an orbit lies on one component, unless a path jumped) and from the trace test.
+## The trace of a single point is only *weak* evidence: a single point on a component of degree > 1 can have a small trace (e.g. where the component is almost linear).
+## The trace of a set with at least 2 points is *strong* evidence.
+## Accordingly, a single point's trace is never used to reject or split a larger set.
+##
+## Points with a small trace of their own (*small-trace points*, potential degree 1 points) are ambiguous: they are a component of degree 1, or a point on a larger component.
+## The degree 1 rule resolves this with monodromy:
+## * a link (a path of a loop) between a small-trace point and another point is only used to form orbits after it was observed in 2 different loops (`get_orbits_from_monodromy_permutations`).
+##   A single path jump therefore does not join two components, while the points of a larger component are connected repeatedly;
+## * a small-trace point that is not linked to other points is certified as a component of degree 1 only after `DEGREE1_ITERATIONS` iterations without new points and without new links of small-trace points, see `is_certifiable`.
+
+# Number of iterations (in which all orbits consist of single points) before a single point is certified as a component of degree 1.
+const DEGREE1_ITERATIONS = 15
+
+# Sets with at most this many points are checked for trace-minimality using all subsets, larger sets only using subsets with 2 points.
+const MAX_MINIMALITY_CHECK_POINTS = 12
+
+"""
+    is_certifiable(PT::PointTraces, S, trace_S, tol;
+        single_point = length(S) == 1, allow_single_point = false)
+
+The certification policy of [`decompose`](@ref): decide whether the witness points `S` with trace `trace_S` are certified as the witness points of one irreducible component.
+
+1. The trace must vanish: `trace_S < tol` (`trace_S = nothing` means that the trace is not known, then `S` is not certified).
+2. Degree 1 rule: if the evidence is a single point (`single_point`), it is only certified if `allow_single_point`.
+   In `decompose_with_monodromy!` this is the case after `DEGREE1_ITERATIONS` iterations in which all orbits are single points and no new points and no new links of small-trace points were found, i.e., when the monodromy loops had enough chances to connect the point to other points.
+   Links of small-trace points need a confirmation by a second loop before a small-trace point joins a larger orbit (see [`get_orbits_from_monodromy_permutations`](@ref)), so a small-trace point cannot escape this rule by a single path jump.
+3. Trace-minimality: if `S` has at least 2 points, no proper subset of `S` with at least 2 points may have a vanishing trace (see [`passing_proper_subset`](@ref)).
+   A union of complete components has a vanishing trace, so a passing proper subset shows that `S` consists of several components.
+   Subsets with a single point are not used here, since their trace is only weak evidence (see 2.).
+
+Rule 3 cannot separate components of degree 1 from other components (for example two lines joined by a path jump), since this would require the weak evidence of single points.
+These cases are handled by rule 2 together with the confirmation of links in [`get_orbits_from_monodromy_permutations`](@ref).
+"""
+function is_certifiable(
+    PT::PointTraces,
+    S,
+    trace_S,
+    tol;
+    single_point::Bool = length(S) == 1,
+    allow_single_point::Bool = false,
+)
+    (isnothing(trace_S) || trace_S ≥ tol) && return false
+    single_point && return allow_single_point
+    isnothing(passing_proper_subset(PT, S, tol))
+end
+
+"""
+    passing_proper_subset(PT::PointTraces, S, tol)
+
+Return the positions (in `S`) of a proper subset of the witness points `S` with at least 2 points (and at least 2 points outside of it) whose cached trace is smaller than `tol`, or `nothing` if there is none.
+Subsets are tested by increasing size, so a smallest one is returned.
+
+This is only meaningful if the trace of `S` vanishes.
+Then the trace of the complement of a passing subset vanishes as well, so only subsets with at most `length(S) ÷ 2` points are tested.
+Points without a cached trace never belong to a passing subset.
+If `S` has more than `MAX_MINIMALITY_CHECK_POINTS` points, only subsets with 2 points are tested.
+"""
+function passing_proper_subset(PT::PointTraces, S, tol)
+    k = length(S)
+    k ≤ 3 && return nothing
+    if k ≤ MAX_MINIMALITY_CHECK_POINTS
+        masks = filter(m -> 2 ≤ count_ones(m) ≤ k ÷ 2, collect(1:(1<<k)-2))
+        sort!(masks; by = count_ones)
+        subsets = ([j for j = 1:k if (m >> (j - 1)) & 1 == 1] for m in masks)
+    else
+        subsets = ([i, j] for i = 1:k for j = i+1:k)
+    end
+    for sub in subsets
+        t = cached_trace(PT, S[sub])
+        !isnothing(t) && t < tol && return sub
+    end
+    nothing
+end
+
+"""
+    split_nonminimal_orbits(orbits, P, PT::PointTraces, phantom_indices, tol)
+
+Split every orbit whose trace vanishes but that is not trace-minimal (it has a passing proper subset, see [`passing_proper_subset`](@ref)) into that subset and the rest, and repeat this for the parts.
+Such an orbit contains points of several components, e.g., after a path jumped between components.
+The parts can then be certified separately.
+Orbits with a phantom point, without cached traces or with a non-vanishing trace are kept as they are.
+"""
+function split_nonminimal_orbits(orbits, P, PT::PointTraces, phantom_indices, tol)
+    out = Vector{Set{Int}}()
+    queue = collect(Set{Int}, orbits)
+    while !isempty(queue)
+        orbit = pop!(queue)
+        if length(orbit) > 3 && isdisjoint(orbit, phantom_indices)
+            idx = sort!(collect(orbit))
+            t = cached_trace(PT, P[idx])
+            if !isnothing(t) && t < tol
+                sub = passing_proper_subset(PT, P[idx], tol)
+                if !isnothing(sub)
+                    A = Set(idx[sub])
+                    push!(queue, A, setdiff(orbit, A))
+                    continue
+                end
+            end
+        end
+        push!(out, orbit)
+    end
+    sort!(out; by = length, rev = true)
+end
+
+"""
+    small_trace_points(PT::PointTraces, P, tol)
+
+The indices of the points of `P` whose own cached trace is smaller than `tol`.
+These are the *potential degree 1 points*: the point is either a component of degree 1 by itself or a point on a larger component whose trace happens to be small.
+Points without a cached trace are not included.
+"""
+function small_trace_points(PT::PointTraces, P, tol)
+    small = Set{Int}()
+    for (i, p) in pairs(P)
+        t = cached_trace(PT, (p,))
+        !isnothing(t) && t < tol && push!(small, i)
+    end
+    small
+end
+
+"""
+    SmallTraceLinks()
+
+For each pair of witness points `{p, q}` where at least one of them is a small-trace point, the number of monodromy loops in which a path connected `p` and `q`.
+The pairs are stored by the coordinates of the points, so the counts are independent of the re-indexing of the points between iterations.
+"""
+const SmallTraceLinks = Dict{Set{Vector{ComplexF64}},Int}
+
+# Number of different loops that have to connect a small-trace point to another point before this link is used to form an orbit.
+const SMALL_TRACE_LINK_CONFIRMATIONS = 2
+
+"""
+    get_orbits_from_monodromy_permutations(perms, initial_orbits, P, small, links::SmallTraceLinks)
+
+Compute the orbits of the witness points `P` from the permutations `perms` (one column per loop, `0` marks a failed path) and the orbits of the previous iterations `initial_orbits`.
+Returns the orbits (sorted by decreasing size) and the number of links involving small-trace points that were observed for the first time.
+
+Two points are in the same orbit if they are connected by links, where a link is either
+* a remembered orbit from `initial_orbits`, or
+* a path of a loop from `i` to `perms[i]`.
+
+A link of a path that involves a small-trace point (`i ∈ small` or `perms[i] ∈ small`) is only used if it was observed in at least `SMALL_TRACE_LINK_CONFIRMATIONS` different loops (counted in `links`, which is updated).
+A single observation can be a path jump, and a small-trace point in a larger orbit escapes the degree 1 rule (see [`is_certifiable`](@ref)).
+Requiring a confirmation by an independent loop separates two components that were joined by a single jump (e.g. two lines), while the points of a component of higher degree are connected repeatedly.
+
+Since the returned orbits are remembered as `initial_orbits` in the next iteration, a small-trace point is only remembered in an orbit with other points via confirmed links.
+"""
+function get_orbits_from_monodromy_permutations(
+    perms::AbstractMatrix,
+    initial_orbits,
+    P,
+    small::Set{Int},
+    links::SmallTraceLinks,
+)
+    parent = Dict{Int,Int}()
+    rank = Dict{Int,Int}()
+    add!(i) = haskey(parent, i) || (parent[i] = i; rank[i] = 0)
+
+    for orbit in initial_orbits
+        isempty(orbit) && continue
+        r = first(orbit)
+        add!(r)
+        for i in orbit
+            add!(i)
+            merge_sets_union(parent, rank, i, r)
+        end
+    end
+
+    new_links = 0
+    for col in eachcol(perms)
+        # every pair is counted at most once per loop
+        observed = Set{Set{Vector{ComplexF64}}}()
+        for (i, j) in enumerate(col)
+            j == 0 && continue
+            add!(i)
+            add!(j)
+            i == j && continue
+            if i in small || j in small
+                key = Set([P[i], P[j]])
+                if !(key in observed)
+                    push!(observed, key)
+                    links[key] = get(links, key, 0) + 1
+                    links[key] == 1 && (new_links += 1)
+                end
+                links[key] ≥ SMALL_TRACE_LINK_CONFIRMATIONS || continue
+            end
+            merge_sets_union(parent, rank, i, j)
+        end
+    end
+
+    groups = Dict{Int,Set{Int}}()
+    for i in keys(parent)
+        push!(get!(groups, merge_sets_find(parent, i), Set{Int}()), i)
+    end
+    sort!(collect(values(groups)); by = length, rev = true), new_links
+end
+
+# The combinatorial trace test tests up to 2^MAX_COMBINATORIAL_ORBITS unions of orbits.
+const MAX_COMBINATORIAL_ORBITS = 10
+
+"""
+    certify_orbit_unions!(on_certified, complete_orbits, decomposition, certified_up,
+        orbits, phantom_indices, P, point_traces, G, L, tol; atol, rtol)
+
+Combinatorial trace test: find unions of monodromy orbits that are exactly the witness points of one irreducible component, and certify them.
+
+### Why this works
+1. A monodromy loop moves a witness point only to points on the *same* irreducible component, so every orbit lies in a single component.
+   But a component can consist of several orbits, as long as the loops have not connected them yet.
+2. The trace of a set of witness points vanishes if and only if the set is a union of complete components (see the comment above `PointTraces`).
+
+Let `U` be a union of orbits whose trace vanishes, such that no union of fewer of these orbits has a vanishing trace.
+If `U` contained points of two components `A` and `B`, then `A ∩ U` would be a union of fewer orbits (by 1.) with vanishing trace (by 2.), a contradiction.
+So `U` is the set of witness points of one irreducible component.
+
+### Algorithm
+1. Candidates are the orbits (without the indices in `phantom_indices`) that
+   * do not overlap an orbit in `complete_orbits` (already certified),
+   * have a cached trace for every point (see [`cached_trace`](@ref)),
+   * do **not** have a vanishing trace themselves.
+     The last condition is needed for the minimality argument above: an orbit with vanishing trace is a candidate for a component on its own (for example a single point on a line) and is handled by the single-orbit certification, including the degree 1 rule (see [`is_certifiable`](@ref)).
+     If two such orbits were candidates here, their union would have a vanishing trace as well and could be certified as one component.
+2. If there are fewer than 2 or more than `MAX_COMBINATORIAL_ORBITS` candidates nothing is done.
+3. All unions of at least 2 candidates are enumerated as bit masks, sorted by the number of orbits they contain (all pairs, then all triples, ...).
+   A union that shares an orbit with a union certified before is skipped.
+   If the union satisfies the certification policy [`is_certifiable`](@ref) (vanishing trace and trace-minimality), it is certified: it is added to `complete_orbits`, a new irreducible [`WitnessSet`](@ref) with system `G` and slice `L` is added to `decomposition`, its points are added to `certified_up`, and `on_certified(indices, W_new)` is called.
+
+Testing the unions by increasing size guarantees the minimality required above.
+No path tracking happens here; all traces come from `point_traces`.
+
+### Arguments
+* `P`: the witness points; orbits are sets of indices into `P`.
+* `atol`, `rtol`: tolerances for adding points to `certified_up`.
+"""
+function certify_orbit_unions!(
+    on_certified,
+    complete_orbits::Vector{Set{Int}},
+    decomposition,
+    certified_up,
+    orbits,
+    phantom_indices,
+    P,
+    point_traces::PointTraces,
+    G,
+    L,
+    tol;
+    atol,
+    rtol,
+)
+    covered = Set{Int}()
+    for o in complete_orbits
+        union!(covered, o)
+    end
+
+    # 1. candidate orbits
+    remaining = Vector{Vector{Int}}()
+    for orbit in orbits
+        o = sort!(collect(setdiff(orbit, phantom_indices)))
+        (isempty(o) || !isdisjoint(o, covered)) && continue
+        t = cached_trace(point_traces, P[o])
+        # no cached trace, or a component on its own
+        (isnothing(t) || t < tol) && continue
+        push!(remaining, o)
+    end
+
+    # 2. size limit
+    m = length(remaining)
+    (2 ≤ m ≤ MAX_COMBINATORIAL_ORBITS) || return nothing
+
+    # 3. bit j-1 of `mask` set ⟺ the union contains the orbit remaining[j]
+    masks =
+        sort!(filter(mask -> count_ones(mask) ≥ 2, collect(1:(1<<m)-1)); by = count_ones)
+    used = 0 # orbits that are part of a certified union
+    for mask in masks
+        mask & used == 0 || continue
+        idx = Int[]
+        for j = 1:m
+            (mask >> (j - 1)) & 1 == 1 && append!(idx, remaining[j])
+        end
+        sort!(idx)
+        t = cached_trace(point_traces, P[idx])
+        # The union is minimal among unions of candidate orbits (by the order of the masks); `is_certifiable` additionally checks it against all subsets of its points with at least 2 points.
+        if is_certifiable(point_traces, P[idx], t, tol)
+            used |= mask
+            W_new = WitnessSet(G, L, P[idx]; is_irreducible = true)
+            push!(complete_orbits, Set(idx))
+            push!(decomposition, W_new)
+            for p in P[idx]
+                add!(certified_up, p, 1; atol = atol, rtol = rtol)
+            end
+            on_certified(idx, W_new)
+        end
+    end
+    nothing
 end
 
 # Helper function to merge two sets
@@ -1892,49 +2486,6 @@ function matching_indices(points, certified_points; atol, rtol)
     indices
 end
 
-
-# Returns a vector of sets of indices of points in P that are in the same orbit
-function get_orbits_from_monodromy_permutations(
-    monodromy_result;
-    initial_orbits = Vector{Set{Int}}(),
-)
-    P = permutations(monodromy_result)
-    orbits = copy(initial_orbits)
-
-    matching_orbits = Int[]
-    for col in eachcol(P)
-        for (i, j) in enumerate(col)
-            # Ignore 0s in orbit since they indicate an error
-            if j == 0
-                continue
-            end
-            # Find all orbits where i or j is contained
-            empty!(matching_orbits)   # reuse the buffer
-            for (k, orbit) in enumerate(orbits)
-                if i in orbit || j in orbit
-                    push!(matching_orbits, k)
-                end
-            end
-
-
-            if (length(matching_orbits) == 1)
-                # Add i and j to the orbit
-                push!(orbits[matching_orbits[1]], i, j)
-            else
-                # Merge all matching orbits
-                merged_orbit = Set([i, j])
-                for k in reverse(matching_orbits)
-                    union!(merged_orbit, orbits[k])
-                    deleteat!(orbits, k)
-                end
-                push!(orbits, merged_orbit)
-            end
-        end
-    end
-    sort!(orbits; by = length, rev = true)
-
-    orbits
-end
 
 function decompose_with_monodromy_options(
     M::MonodromyOptions;
