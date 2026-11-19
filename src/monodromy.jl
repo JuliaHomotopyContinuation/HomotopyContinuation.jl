@@ -1467,35 +1467,8 @@ function track(
     tracker = egtracker.tracker
 
     if loop.p isa LinearSubspace && collect_trace
-        parameters!(tracker, loop.p, loop.p₀₁)
-        x₀ = solution(r)
-        retcode =
-            track!(tracker, x₀; ω = r.ω, μ = r.μ, extended_precision = r.extended_precision)
-        x₀₁ = solution(tracker)
-        if !is_success(retcode)
-            return nothing
-        end
-
-        parameters!(tracker, loop.p₀₁, loop.p₁)
-        retcode = track!(
-            tracker,
-            x₀₁;
-            ω = tracker.state.ω,
-            μ = tracker.state.μ,
-            extended_precision = tracker.state.extended_prec,
-        )
-        x₁ = solution(tracker)
-        if !is_success(retcode)
-            return nothing
-        end
-
-        Base.@lock trace_lock begin
-            for i = 1:length(x₀)
-                trace[i, 1] += x₀[i]
-                trace[i, 2] += x₀₁[i]
-                trace[i, 3] += x₁[i]
-            end
-        end
+        x₁ = track_trace_legs!(tracker, r, loop, trace, trace_lock)
+        isnothing(x₁) && return nothing
     else
         parameters!(tracker, loop.p, loop.p₁)
         retcode = track!(
@@ -1538,6 +1511,73 @@ function track(
     else
         nothing
     end
+end
+
+"""
+    track_trace_legs!(tracker::Tracker, r::PathResult, loop::MonodromyLoop, trace, trace_lock)
+
+Track the solution of `r` from `loop.p` over `loop.p₀₁` to `loop.p₁` (parallel translates of each other) and add the three points to the `trace` matrix.
+Returns the point over `loop.p₁`, or `nothing` if a path failed.
+"""
+function track_trace_legs!(
+    tracker::Tracker,
+    r::PathResult,
+    loop::MonodromyLoop,
+    trace,
+    trace_lock,
+)
+    track_trace_legs!(
+        tracker,
+        solution(r),
+        loop,
+        trace,
+        trace_lock;
+        ω = r.ω,
+        μ = r.μ,
+        extended_precision = r.extended_precision,
+    )
+end
+function track_trace_legs!(
+    tracker::Tracker,
+    x₀::AbstractVector,
+    loop::MonodromyLoop,
+    trace,
+    trace_lock;
+    ω::Float64 = 1.0,
+    μ::Float64 = eps(),
+    extended_precision::Bool = false,
+)
+    parameters!(tracker, loop.p, loop.p₀₁)
+    retcode = track!(tracker, x₀; ω = ω, μ = μ, extended_precision = extended_precision)
+    x₀₁ = solution(tracker)
+    if !is_success(retcode)
+        return nothing
+    end
+
+    parameters!(tracker, loop.p₀₁, loop.p₁)
+    retcode = track!(
+        tracker,
+        x₀₁;
+        ω = tracker.state.ω,
+        μ = tracker.state.μ,
+        extended_precision = tracker.state.extended_prec,
+    )
+    x₁ = solution(tracker)
+    if !is_success(retcode)
+        return nothing
+    end
+
+    isnothing(trace_lock) || lock(trace_lock)
+    try
+        for i = 1:length(x₀)
+            trace[i, 1] += x₀[i]
+            trace[i, 2] += x₀₁[i]
+            trace[i, 3] += x₁[i]
+        end
+    finally
+        isnothing(trace_lock) || unlock(trace_lock)
+    end
+    x₁
 end
 
 update_progress!(progress::Nothing, stats::MonodromyStatistics; kwargs...) = nothing

@@ -310,4 +310,104 @@
         @test ncomponents(NID, 0) == 1
         @test degrees(NID)[0] == [1]
     end
+
+    @testset "trace test with cached point traces" begin
+        @var x y
+        circle, cubic = x^2 + y^2 - 1, y - x^3 + 2x - 1
+        line1, line2 = x - 2y, x + y - 3
+        function setup(f, seed)
+            W = only(regeneration(System([f]); show_progress = false, seed = seed))
+            opts = HC.decompose_with_monodromy_options(MonodromyOptions())
+            L = linear_subspace(W)
+            MS = HC.MonodromySolver(system(W), L; compile = false, options = opts)
+            PT = HC.PointTraces(L, opts) # one fixed displacement for all points
+            HC.update_traces!(PT, solutions(W), MS, false)
+            W, solutions(W), PT, opts.trace_test_tol
+        end
+        on(g, P) = findall(p -> abs(System([g], variables = [x, y])(p)[1]) < 1e-8, P)
+        function certify(W, P, PT, tol, orbits)
+            certified = Vector{Int}[]
+            up = HC.UniquePoints(first(P), 1; distance = HC.InfNorm())
+            dec = WitnessSet[]
+            HC.certify_orbit_unions!(
+                Set{Int}[],
+                dec,
+                up,
+                orbits,
+                Set{Int}(),
+                P,
+                PT,
+                system(W),
+                linear_subspace(W),
+                tol;
+                atol = 1e-14,
+                rtol = 1e-8,
+            ) do idx, _
+                push!(certified, idx)
+            end
+            sort(certified), dec
+        end
+
+        # two components, each split into several orbits: exactly the components are certified
+        W, P, PT, tol = setup(circle * cubic, 0x2d4c1a73)
+        A, B = on(circle, P), on(cubic, P)
+        trace(S) = HC.cached_trace(PT, P[S])
+        @test trace(A) < tol && trace(B) < tol && trace(B[1:2]) > tol
+        orbits = [Set([A[1]]), Set([A[2]]), Set(B[1:2]), Set([B[3]])]
+        certified, dec = certify(W, P, PT, tol, orbits)
+        @test certified == sort([A, B]) && sort(degree.(dec)) == [2, 3]
+
+        # the union of the two components has a vanishing trace but is not minimal
+        AB = sort([A; B])
+        @test HC.is_certifiable(PT, P[A], trace(A), tol)
+        @test !HC.is_certifiable(PT, P[AB], trace(AB), tol)
+        @test Set(HC.split_nonminimal_orbits([Set(AB)], P, PT, Set{Int}(), tol)) ==
+              Set([Set(A), Set(B)])
+        @test isempty(
+            first(certify(W, P, PT, tol, [Set([A[1], B[1]]), Set([A[2]; B[2:3]])])),
+        )
+
+        # points on lines are components on their own: they are not combined, and a single point needs the degree 1 rule; links of such points need a second loop
+        W, P, PT, tol = setup(line1 * line2 * circle, 0x5be0f3a1)
+        l1, l2, C = only(on(line1, P)), only(on(line2, P)), on(circle, P)
+        @test HC.small_trace_points(PT, P, tol) == Set([l1, l2])
+        certified, _ =
+            certify(W, P, PT, tol, [Set([l1]), Set([l2]), Set([C[1]]), Set([C[2]])])
+        @test certified == [sort(C)]
+        @test !HC.is_certifiable(PT, P[[l1]], trace([l1]), tol)
+        @test HC.is_certifiable(PT, P[[l1]], trace([l1]), tol; allow_single_point = true)
+        jump = reshape([i == l1 ? l2 : i == l2 ? l1 : i for i = 1:length(P)], :, 1)
+        links = HC.SmallTraceLinks()
+        orbits, _ = HC.get_orbits_from_monodromy_permutations(
+            jump,
+            Set{Int}[],
+            P,
+            Set([l1, l2]),
+            links,
+        )
+        @test only(filter(o -> l1 in o, orbits)) == Set([l1])
+        orbits, _ =
+            HC.get_orbits_from_monodromy_permutations(jump, orbits, P, Set([l1, l2]), links)
+        @test only(filter(o -> l1 in o, orbits)) == Set([l1, l2])
+    end
+
+    @testset "trace_precheck!" begin
+        @var x y
+        W = only(
+            regeneration(
+                System([(x^2 + y^2 - 1) * (y - x^3 + 2x - 1)]);
+                show_progress = false,
+                seed = 0x2d4c1a73,
+            ),
+        )
+        L = linear_subspace(W)
+        opts = HC.decompose_with_monodromy_options(MonodromyOptions())
+        MS = HC.MonodromySolver(system(W), L; compile = false, options = opts)
+        # complete witness points are certified, incomplete ones are not
+        @test HC.trace_precheck!(MS, solutions(W), L, false)
+        @test !HC.trace_precheck!(MS, solutions(W)[1:3], L, false)
+        @test is_success(
+            monodromy_solve(MS, solutions(W)[1:3], L, rand(UInt32); show_progress = false),
+        )
+    end
 end
