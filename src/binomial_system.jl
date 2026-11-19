@@ -174,7 +174,8 @@ function solve!(BSS::BinomialSystemSolver)
         solve!(BSS, BSS.H, BSS.U)
         # check result
         if !validate_result(BSS)
-            if Int == Int64
+            # `set_si!` takes a C `long`, which is only 32 bits on Windows
+            if Clong == Int64
                 MPZ.set_si!.(BSS.H_big, BSS.H)
                 MPZ.set_si!.(BSS.U_big, BSS.U)
             else
