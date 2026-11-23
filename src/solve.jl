@@ -125,6 +125,7 @@ function solver_startsolutions(
     p₀ = generic_parameters,
     target_parameters = p₀,
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
+    ishomogeneous::Union{Bool,Nothing} = nothing,
     start_subspace = nothing,
     target_subspace = nothing,
     intrinsic = nothing,
@@ -132,6 +133,7 @@ function solver_startsolutions(
     threading::Bool = Threads.nthreads() > 1,
     kwargs...,
 )
+    Base.@constprop :aggressive
     !isnothing(seed) && Random.seed!(seed)
 
 
@@ -158,6 +160,7 @@ function solver_startsolutions(
                 start_parameters = start_parameters,
                 target_parameters = target_parameters,
                 compile = compile,
+                ishomogeneous = ishomogeneous,
                 kwargs...,
             )
         elseif start_system == :polyhedral
@@ -224,9 +227,11 @@ function parameter_homotopy_tracker(
     F::Union{System,AbstractSystem};
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(),
+    ishomogeneous::Union{Bool,Nothing} = nothing,
     kwargs...,
 )
-    H = parameter_homotopy(F; kwargs...)
+    Base.@constprop :aggressive
+    H = parameter_homotopy(F; ishomogeneous = ishomogeneous, kwargs...)
     EndgameTracker(H; tracker_options = tracker_options, options = endgame_options)
 end
 
@@ -246,13 +251,16 @@ function parameter_homotopy(
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(),
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
+    ishomogeneous::Union{Bool,Nothing} = nothing,
     kwargs...,
 )
+    Base.@constprop :aggressive
     unsupported_kwargs(kwargs)
     m, n = size(F)
     H = ParameterHomotopy(fixed(F; compile = compile), start_parameters, target_parameters)
     f = System(F)
-    if is_homogeneous(f)
+    ish = isnothing(ishomogeneous) ? is_homogeneous(f) : ishomogeneous
+    if ish
         vargroups = variable_groups(f)
         if vargroups === nothing
             m ≥ (n - 1) || throw(FiniteException(n - 1 - m))
