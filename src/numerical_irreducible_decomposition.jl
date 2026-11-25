@@ -429,7 +429,7 @@ function _regeneration(
     end
 
     # prepare equations
-    f = expressions(F)
+    f = copy(expressions(F)) # copy: prepare_polynomials! sorts f in place and must not modify F
     is_poly = all(is_polynomial, f)
     if is_poly && prepare_polynomials!(f, sorted, projective)
         return nothing
